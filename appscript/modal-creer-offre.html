@@ -1,0 +1,52 @@
+<div class="modal fade" id="modalCreerOffre" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle"></i> Créer une Nouvelle Offre</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="formNouvelleOffre">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">NOM DE L'OFFRE *</label>
+            <input type="text" class="form-control" id="newOpNom" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">TYPE *</label>
+              <select class="form-select" id="newOpType" required>
+                <option value="Produit" selected>Produit</option>
+                <option value="Evenement">Évènement</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="blocModeSaisie_new">
+              <label class="form-label small fw-bold text-secondary">MODE DE SAISIE</label>
+              <select class="form-select" id="newOpMode">
+                <option value="Libre">Libre</option>
+                <option value="Predefini" selected>Prédéfini</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3" id="blocArticlesPredefinis_new">
+            <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
+            <div id="newOpArticlesContainer">
+              <div class="d-flex gap-2 mb-2">
+                <input type="text" class="form-control new-article-input" placeholder="Nom de l'article">
+                <button type="button" class="btn btn-sm btn-outline-success" id="btnAjouterArticle">
+                  <i class="bi bi-plus-circle"></i>
+                </button>
+              </div>
+              <div id="newOpArticlesList" class="mb-2"></div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-success fw-bold" id="btnSauvegarderOffre">
+          <i class="bi bi-save"></i> ENREGISTRER
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
