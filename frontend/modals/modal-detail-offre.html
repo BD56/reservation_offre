@@ -55,7 +55,7 @@
                 <div class="col-md-6">
                   <label class="form-label small fw-bold text-secondary">TYPE *</label>
                   <select class="form-select" id="editOpType" required>
-                    <option value="Produit">Produits</option>
+                    <option value="Produit">Produit</option>
                     <option value="Evenement">Évènement</option>
                   </select>
                 </div>
@@ -67,19 +67,17 @@
                   </select>
                 </div>
               </div>
-              <div class="row g-2 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label small fw-bold text-secondary">DÉBUT</label>
-                  <input type="date" class="form-control" id="editOpDateDebut">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label small fw-bold text-secondary">FIN</label>
-                  <input type="date" class="form-control" id="editOpDateFin">
-                </div>
-              </div>
               <div class="mb-3" id="blocArticlesPredefinis_edit" style="display: none;">
-                <label class="form-label small fw-bold text-secondary">ARTICLES (Séparés par une virgule)</label>
-                <textarea class="form-control" id="editOpArticles" rows="2"></textarea>
+                <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
+                <div id="editOpArticlesContainer">
+                  <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control edit-article-input" placeholder="Nom de l'article">
+                    <button type="button" class="btn btn-sm btn-outline-success" id="btnAjouterArticleEdit">
+                      <i class="bi bi-plus-circle"></i>
+                    </button>
+                  </div>
+                  <div id="editOpArticlesList" class="mb-2"></div>
+                </div>
               </div>
               <div class="text-end mt-4">
                 <button type="button" class="btn btn-dark fw-bold" id="btnUpdateOffre">

@@ -15,7 +15,7 @@
             <div class="col-md-6">
               <label class="form-label small fw-bold text-secondary">TYPE *</label>
               <select class="form-select" id="newOpType" required>
-                <option value="Produit">Produits</option>
+                <option value="Produit" selected>Produit</option>
                 <option value="Evenement">Évènement</option>
               </select>
             </div>
@@ -23,23 +23,21 @@
               <label class="form-label small fw-bold text-secondary">MODE DE SAISIE</label>
               <select class="form-select" id="newOpMode">
                 <option value="Libre">Libre</option>
-                <option value="Predefini">Prédéfini</option>
+                <option value="Predefini" selected>Prédéfini</option>
               </select>
             </div>
           </div>
-          <div class="row g-2 mb-3">
-            <div class="col-md-6">
-              <label class="form-label small fw-bold text-secondary">DÉBUT</label>
-              <input type="date" class="form-control" id="newOpDateDebut">
+          <div class="mb-3" id="blocArticlesPredefinis_new">
+            <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
+            <div id="newOpArticlesContainer">
+              <div class="d-flex gap-2 mb-2">
+                <input type="text" class="form-control new-article-input" placeholder="Nom de l'article">
+                <button type="button" class="btn btn-sm btn-outline-success" id="btnAjouterArticle">
+                  <i class="bi bi-plus-circle"></i>
+                </button>
+              </div>
+              <div id="newOpArticlesList" class="mb-2"></div>
             </div>
-            <div class="col-md-6">
-              <label class="form-label small fw-bold text-secondary">FIN</label>
-              <input type="date" class="form-control" id="newOpDateFin">
-            </div>
-          </div>
-          <div class="mb-3" id="blocArticlesPredefinis_new" style="display: none;">
-            <label class="form-label small fw-bold text-secondary">ARTICLES (Séparés par une virgule)</label>
-            <textarea class="form-control" id="newOpArticles" rows="2"></textarea>
           </div>
         </form>
       </div>

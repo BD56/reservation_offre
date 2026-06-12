@@ -6,6 +6,8 @@
 // État global
 let currentOperationDetails = null;
 let operationsCache = [];
+let newOpArticlesList = [];
+let editOpArticlesList = [];
 
 // Initialisation au chargement de la page
 document.addEventListener('DOMContentLoaded', function() {
@@ -47,6 +49,10 @@ function initEventListeners() {
   // Gestion des champs pour modification offre
   document.getElementById('editOpType').addEventListener('change', () => gererChampsNouvelleOffre('edit'));
   document.getElementById('editOpMode').addEventListener('change', () => gererChampsNouvelleOffre('edit'));
+
+  // Boutons pour ajouter des articles dans les modals
+  document.getElementById('btnAjouterArticle')?.addEventListener('click', () => ajouterArticle('new'));
+  document.getElementById('btnAjouterArticleEdit')?.addEventListener('click', () => ajouterArticle('edit'));
 }
 
 /**
@@ -179,6 +185,70 @@ function supprimerLigne(bouton) {
 }
 
 /**
+ * Ajoute un article à la liste dynamique (pour les modals de création/modification d'offre).
+ * @param {string} prefix - Préfixe ('new' ou 'edit').
+ */
+function ajouterArticle(prefix) {
+  const input = document.querySelector(`#${prefix}OpArticlesContainer .${prefix}-article-input`);
+  const articleName = input.value.trim();
+  
+  if (!articleName) {
+    showToast("Veuillez saisir un nom d'article.", "error");
+    return;
+  }
+
+  // Ajouter à la liste
+  if (prefix === 'new') {
+    newOpArticlesList.push(articleName);
+  } else {
+    editOpArticlesList.push(articleName);
+  }
+
+  // Mettre à jour l'affichage
+  afficherListeArticles(prefix);
+  
+  // Vider l'input
+  input.value = '';
+}
+
+/**
+ * Affiche la liste des articles pour un modal.
+ * @param {string} prefix - Préfixe ('new' ou 'edit').
+ */
+function afficherListeArticles(prefix) {
+  const listContainer = document.getElementById(`${prefix}OpArticlesList`);
+  const articles = prefix === 'new' ? newOpArticlesList : editOpArticlesList;
+  
+  listContainer.innerHTML = '';
+  
+  articles.forEach((article, index) => {
+    const div = document.createElement('div');
+    div.className = 'd-flex justify-content-between align-items-center mb-1 p-2 bg-light rounded';
+    div.innerHTML = `
+      <span>${article}</span>
+      <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerArticle('${prefix}', ${index})">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    `;
+    listContainer.appendChild(div);
+  });
+}
+
+/**
+ * Supprime un article de la liste dynamique.
+ * @param {string} prefix - Préfixe ('new' ou 'edit').
+ * @param {number} index - Index de l'article à supprimer.
+ */
+function supprimerArticle(prefix, index) {
+  if (prefix === 'new') {
+    newOpArticlesList.splice(index, 1);
+  } else {
+    editOpArticlesList.splice(index, 1);
+  }
+  afficherListeArticles(prefix);
+}
+
+/**
  * Vérifie la validité des contacts (téléphone/email).
  */
 function verifierContacts() {
@@ -267,6 +337,15 @@ function gererChampsNouvelleOffre(prefix) {
   const mode = document.getElementById(prefix + 'OpMode').value;
   document.getElementById('blocModeSaisie_' + prefix).style.display = (type === 'Evenement') ? 'none' : 'block';
   document.getElementById('blocArticlesPredefinis_' + prefix).style.display = (type === 'Produit' && mode === 'Predefini') ? 'block' : 'none';
+  
+  // Réinitialiser les listes d'articles si le mode change
+  if (prefix === 'new') {
+    newOpArticlesList = [];
+    afficherListeArticles('new');
+  } else {
+    editOpArticlesList = [];
+    afficherListeArticles('edit');
+  }
 }
 
 /**
@@ -276,6 +355,8 @@ function creerNouvelleOffre() {
   const modalOperations = bootstrap.Modal.getInstance(document.getElementById('modalOperations'));
   if (modalOperations) modalOperations.hide();
   document.getElementById('formNouvelleOffre').reset();
+  newOpArticlesList = [];
+  afficherListeArticles('new');
   gererChampsNouvelleOffre('new');
   new bootstrap.Modal(document.getElementById('modalCreerOffre')).show();
 }
@@ -295,9 +376,9 @@ function sauvegarderNouvelleOffre() {
     nom: document.getElementById('newOpNom').value.trim(),
     type: type,
     modeSaisie: mode,
-    dateDebut: document.getElementById('newOpDateDebut').value,
-    dateFin: document.getElementById('newOpDateFin').value,
-    articlesPredefinis: mode === 'Predefini' ? document.getElementById('newOpArticles').value.trim() : ''
+    dateDebut: '',
+    dateFin: '',
+    articlesPredefinis: mode === 'Predefini' ? newOpArticlesList.join(',') : ''
   };
 
   const btn = document.getElementById('btnSauvegarderOffre');
@@ -309,6 +390,7 @@ function sauvegarderNouvelleOffre() {
       if (modal) modal.hide();
       showToast("Nouvelle offre créée !", "success");
       btn.disabled = false;
+      newOpArticlesList = [];
       loadOperations();
       new bootstrap.Modal(document.getElementById('modalOperations')).show();
     })
@@ -338,9 +420,11 @@ function voirReservationsDetail(idOperation) {
       document.getElementById('editOpNom').value = op.nom;
       document.getElementById('editOpType').value = op.type;
       document.getElementById('editOpMode').value = op.modeSaisie;
-      document.getElementById('editOpDateDebut').value = op.dateDebut;
-      document.getElementById('editOpDateFin').value = op.dateFin;
-      document.getElementById('editOpArticles').value = op.articlesPredefinis;
+      
+      // Charger les articles prédéfinis dans la liste
+      editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
+      afficherListeArticles('edit');
+      
       gererChampsNouvelleOffre('edit');
 
       const tbody = document.getElementById('tableInscritsBody');
@@ -409,9 +493,9 @@ function sauvegarderModificationOffre() {
     nom: document.getElementById('editOpNom').value.trim(),
     type: type,
     modeSaisie: mode,
-    dateDebut: document.getElementById('editOpDateDebut').value,
-    dateFin: document.getElementById('editOpDateFin').value,
-    articlesPredefinis: mode === 'Predefini' ? document.getElementById('editOpArticles').value.trim() : ''
+    dateDebut: '',
+    dateFin: '',
+    articlesPredefinis: mode === 'Predefini' ? editOpArticlesList.join(',') : ''
   };
 
   const btn = document.getElementById('btnUpdateOffre');
@@ -421,6 +505,7 @@ function sauvegarderModificationOffre() {
     .withSuccessHandler(function() {
       showToast("Offre mise à jour !", "success");
       btn.disabled = false;
+      editOpArticlesList = [];
       loadOperations();
     })
     .withFailureHandler(function(err) {
