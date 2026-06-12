@@ -1,6 +1,18 @@
 # Reservation Offre
 
-Une application Google Apps Script pour la gestion des réservations et des offres.
+Une application Google Apps Script pour la **gestion des réservations clients** par l'accueil de l'Hypermarché Carrefour Vannes.
+
+## 📌 Contexte
+L'application permet à l'accueil de saisir les **réservations des clients** pour des offres promotionnelles. Elle enregistre :
+- **Les informations du client** : Nom, prénom, et un moyen de contact (téléphone **ou** email).
+- **Les articles souhaités** : Liste des produits à réserver avec leurs quantités.
+
+**Hors scope** :
+- La gestion des vignettes (non gérée par l'application).
+- La gestion du stock (pas de limite de quantité imposée).
+
+**Fonctionnalité à implémenter** :
+- Bouton **"Fin de Réservation"** pour une offre : Désactive la possibilité d'ajouter de nouvelles réservations pour cette offre.
 
 ## 📁 Structure du Projet
 
