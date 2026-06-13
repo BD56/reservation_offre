@@ -202,8 +202,12 @@
                 <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
                 <div id="newOpArticlesContainer">
                   <div class="d-flex gap-2 mb-2">
-                    <input type="text" class="form-control new-article-input" placeholder="Nom de l'article">
-                    <button type="button" class="btn btn-sm btn-outline-success" onclick="ajouterArticle('new')">
+                    <input type="text" class="form-control new-article-input" 
+                           placeholder="Nom de l'article" 
+                           onkeypress="if(event.key==='Enter'){ event.preventDefault(); ajouterArticleEtNouvelleCase('new'); }">
+                    <button type="button" class="btn btn-sm btn-outline-success" 
+                            onclick="ajouterArticleEtNouvelleCase('new')" 
+                            title="Appuyez sur Entrée ou cliquez ici pour ajouter">
                       <i class="bi bi-plus-circle"></i>
                     </button>
                   </div>
@@ -290,8 +294,12 @@
                     <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
                     <div id="editOpArticlesContainer">
                       <div class="d-flex gap-2 mb-2">
-                        <input type="text" class="form-control edit-article-input" placeholder="Nom de l'article">
-                        <button type="button" class="btn btn-sm btn-outline-success" onclick="ajouterArticle('edit')">
+                        <input type="text" class="form-control edit-article-input" 
+                               placeholder="Nom de l'article" 
+                               onkeypress="if(event.key==='Enter'){ event.preventDefault(); ajouterArticleEtNouvelleCase('edit'); }">
+                        <button type="button" class="btn btn-sm btn-outline-success" 
+                                onclick="ajouterArticleEtNouvelleCase('edit')"
+                                title="Appuyez sur Entrée ou cliquez ici pour ajouter">
                           <i class="bi bi-plus-circle"></i>
                         </button>
                       </div>
@@ -299,7 +307,7 @@
                     </div>
                   </div>
                   <div class="text-end mt-4">
-                    <button type="button" class="btn btn-dark fw-bold" onclick="sauvegarderModificationOffre()">
+                    <button type="button" class="btn btn-dark fw-bold" id="btnUpdateOffre" onclick="sauvegarderModificationOffre()">
                       <i class="bi bi-check2-circle"></i> METTRE À JOUR L'OFFRE
                     </button>
                   </div>
@@ -395,7 +403,7 @@
       let editOpArticlesList = [];
 
       // --- NOUVELLES FONCTIONS POUR LES ARTICLES DYNAMIQUES ---
-      function ajouterArticle(prefix) {
+      function ajouterArticleEtNouvelleCase(prefix) {
         const input = document.querySelector(`#${prefix}OpArticlesContainer .${prefix}-article-input`);
         const articleName = input.value.trim();
         if (!articleName) {
@@ -409,6 +417,7 @@
         }
         afficherListeArticles(prefix);
         input.value = '';
+        input.focus();
       }
 
       function afficherListeArticles(prefix) {
@@ -417,15 +426,28 @@
         listContainer.innerHTML = '';
         articles.forEach((article, index) => {
           const div = document.createElement('div');
-          div.className = 'd-flex justify-content-between align-items-center mb-1 p-2 bg-light rounded';
+          div.className = 'd-flex gap-2 mb-1 p-2 bg-light rounded align-items-center';
           div.innerHTML = `
-            <span>${article}</span>
-            <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerArticle('${prefix}', ${index})">
+            <input type="text" class="form-control form-control-sm flex-grow-1 edit-article-field"
+                   value="${article}"
+                   onchange="mettreAJourArticle('${prefix}', ${index}, this.value)"
+                   onkeypress="if(event.key==='Enter'){ event.preventDefault(); }">
+            <button type="button" class="btn btn-sm btn-outline-danger border-0"
+                    onclick="supprimerArticle('${prefix}', ${index})">
               <i class="bi bi-x-lg"></i>
             </button>
           `;
           listContainer.appendChild(div);
         });
+      }
+
+      function mettreAJourArticle(prefix, index, newValue) {
+        const trimmedValue = newValue.trim();
+        if (prefix === 'new') {
+          newOpArticlesList[index] = trimmedValue;
+        } else {
+          editOpArticlesList[index] = trimmedValue;
+        }
       }
 
       function supprimerArticle(prefix, index) {
