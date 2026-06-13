@@ -211,6 +211,7 @@
                       <i class="bi bi-plus-circle"></i>
                     </button>
                   </div>
+                  <small class="text-muted mb-2 d-block">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
                   <div id="newOpArticlesList" class="mb-2"></div>
                 </div>
               </div>
@@ -303,6 +304,7 @@
                           <i class="bi bi-plus-circle"></i>
                         </button>
                       </div>
+                      <small class="text-muted mb-2 d-block">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
                       <div id="editOpArticlesList" class="mb-2"></div>
                     </div>
                   </div>
@@ -426,14 +428,14 @@
         listContainer.innerHTML = '';
         articles.forEach((article, index) => {
           const div = document.createElement('div');
-          div.className = 'd-flex gap-2 mb-1 p-2 bg-light rounded align-items-center';
+          div.className = 'd-flex gap-2 mb-1';
           div.innerHTML = `
-            <input type="text" class="form-control form-control-sm flex-grow-1 edit-article-field"
+            <input type="text" class="form-control form-control-sm" style="width: 70%;"
                    value="${article}"
                    onchange="mettreAJourArticle('${prefix}', ${index}, this.value)"
                    onkeypress="if(event.key==='Enter'){ event.preventDefault(); }">
             <button type="button" class="btn btn-sm btn-outline-danger border-0"
-                    onclick="supprimerArticle('${prefix}', ${index})">
+                    onclick="supprimerArticle('${prefix}', ${index})" title="Supprimer">
               <i class="bi bi-x-lg"></i>
             </button>
           `;
