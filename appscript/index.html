@@ -4,9 +4,10 @@
     <base target="_top">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    
     <style>
       body {
-        background-color: #f4f6f9;
+        background-color: #f4f6f9; 
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         padding-top: 40px;
       }
@@ -15,7 +16,7 @@
         margin: 0 auto;
         background: #fff;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         padding: 30px;
       }
       .header-toolbar {
@@ -26,11 +27,9 @@
         padding-bottom: 15px;
         margin-bottom: 20px;
       }
-      .table-res small {
-        font-size: 0.8em;
-        color: #6c757d;
-      }
-      /* CSS pour l'impression */
+      .table-res small { font-size: 0.8em; color: #6c757d; }
+      
+      /* --- CSS POUR L'IMPRESSION --- */
       @media print {
         body * { visibility: hidden !important; }
         #zoneImpression, #zoneImpression * { visibility: visible !important; }
@@ -41,6 +40,7 @@
     </style>
   </head>
   <body>
+    
     <div id="zoneImpression" class="d-none"></div>
 
     <div class="container">
@@ -56,7 +56,7 @@
             </button>
           </div>
         </div>
-
+        
         <form id="formReservation" class="mt-4">
           <div class="mb-3">
             <label class="form-label fw-bold text-secondary small">OPÉRATION</label>
@@ -86,7 +86,7 @@
                 <div class="invalid-feedback">Format invalide (ex: nom@mail.com)</div>
               </div>
             </div>
-
+            
             <div id="alerteContact" class="text-danger small" style="display: none;">
               <i class="bi bi-exclamation-triangle"></i> Veuillez saisir au moins un Téléphone ou un Email valide.
             </div>
@@ -95,7 +95,7 @@
           <div id="sectionProduits" class="mb-4 p-3 rounded" style="display: none; background-color: #f8f9fa; border: 1px dashed #ced4da;">
             <label class="form-label fw-bold text-secondary small">DÉTAIL DES ARTICLES</label>
             <div id="listeProduits"></div>
-            <button type="button" id="btnAjouterLigne" class="btn btn-sm btn-outline-secondary mt-2" style="display: none;" onclick="ajouterLigneProduit()">
+            <button type="button" id="btnAjouterLigne" class="btn btn-sm btn-outline-secondary mt-2" onclick="ajouterLigneProduit()">
               <i class="bi bi-plus-circle"></i> Ajouter un article
             </button>
           </div>
@@ -113,15 +113,271 @@
       </div>
     </div>
 
-    <!-- Modals -->
-    <?!= include('modal-mentions'); ?>
-    <?!= include('modal-operations'); ?>
-    <?!= include('modal-creer-offre'); ?>
-    <?!= include('modal-detail-offre'); ?>
-    <?!= include('modal-confirm-delete'); ?>
-    <?!= include('modal-help'); ?>
+    <div class="modal fade" id="modalMentions" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-light">
+            <h5 class="modal-title fw-bold text-dark">
+              <i class="bi bi-bank"></i> Mentions Légales
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body p-4 text-secondary" style="font-size: 0.9em;">
+            <p class="fw-bold text-dark mb-1">© 2026 DESJARDINS Bryan - Tous droits réservés.</p>
+            <p>L'autorisation d'utiliser cette application est accordée exclusivement à l'<strong>Hypermarché Carrefour Vannes</strong>. Toute reproduction, copie, modification ou déploiement de cet outil vers une autre structure est strictement interdite sans l'accord préalable de l'auteur.</p>
+            
+            <p class="fw-bold text-dark mb-1 mt-3">Confidentialité et Données :</p>
+            <p>Cet outil a été pensé et conçu pour un usage strictement interne, dédié à la gestion des réservations. Les données saisies (Identités, Contacts téléphoniques ou mails, etc.) sont stockées et archivées de manière sécurisée à des fins de traçabilité de l'offre, et ne sont en aucun cas prévues pour être cédées ou transmises à des tiers.</p>
+            
+            <p class="fw-bold text-dark mb-1 mt-3">Responsabilité :</p>
+            <p class="mb-0">L'auteur fournit uniquement l'infrastructure technique de cette application. La responsabilité quant à l'utilisation conforme de l'outil et au traitement légal des données collectées (respect du RGPD) incombe exclusivement à la direction de l'établissement utilisateur. L'auteur décline toute responsabilité en cas d'usage abusif, détourné ou négligent de ces informations par l'établissement.</p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- Toast -->
+    <div class="modal fade" id="modalOperations" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered"> 
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-light">
+            <h5 class="modal-title fw-bold text-secondary">
+              <i class="bi bi-gear text-dark"></i> Gestion des Opérations
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-4">Nom de l'Offre</th>
+                    <th>Dates</th>
+                    <th class="text-center">Réservations</th>
+                    <th class="text-end pe-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tableOperationsBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-success w-100 fw-bold" onclick="creerNouvelleOffre()">
+              <i class="bi bi-plus-circle"></i> CRÉER UNE NOUVELLE OFFRE
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalCreerOffre" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle"></i> Créer une Nouvelle Offre</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body p-4">
+            <form id="formNouvelleOffre">
+              <div class="mb-3">
+                <label class="form-label small fw-bold text-secondary">NOM DE L'OFFRE *</label>
+                <input type="text" class="form-control" id="newOpNom" required>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-bold text-secondary">TYPE *</label>
+                  <select class="form-select" id="newOpType" onchange="gererChampsNouvelleOffre('new')" required>
+                    <option value="Produit" selected>Produit</option>
+                    <option value="Evenement">Évènement</option>
+                  </select>
+                </div>
+                <div class="col-md-6" id="blocModeSaisie_new">
+                  <label class="form-label small fw-bold text-secondary">MODE DE SAISIE</label>
+                  <select class="form-select" id="newOpMode" onchange="gererChampsNouvelleOffre('new')">
+                    <option value="Libre">Libre</option>
+                    <option value="Predefini" selected>Prédéfini</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mb-3" id="blocArticlesPredefinis_new">
+                <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
+                <div id="newOpArticlesContainer">
+                  <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control new-article-input" placeholder="Nom de l'article">
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="ajouterArticle('new')">
+                      <i class="bi bi-plus-circle"></i>
+                    </button>
+                  </div>
+                  <div id="newOpArticlesList" class="mb-2"></div>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="button" class="btn btn-success fw-bold" id="btnSauvegarderOffre" onclick="sauvegarderNouvelleOffre()">
+              <i class="bi bi-save"></i> ENREGISTRER
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalDetailOffre" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered"> 
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title fw-bold" id="detailModalTitle">Détails de l'offre</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          
+          <div class="modal-body p-0">
+            <ul class="nav nav-tabs px-3 pt-3 bg-light" id="detailTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-bold" id="inscrits-tab" data-bs-toggle="tab" data-bs-target="#inscrits" type="button" role="tab"><i class="bi bi-people"></i> Liste des Réservations</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link fw-bold" id="parametres-tab" data-bs-toggle="tab" data-bs-target="#parametres" type="button" role="tab"><i class="bi bi-pencil-square"></i> Modifier l'Offre</button>
+              </li>
+            </ul>
+
+            <div class="tab-content p-4" id="detailTabsContent">
+              <div class="tab-pane fade show active" id="inscrits" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="mb-0 text-secondary"><i class="bi bi-list-check"></i> Commandes et Inscrits</h6>
+                  <button class="btn btn-primary btn-sm fw-bold shadow-sm" onclick="imprimerReservations()">
+                    <i class="bi bi-printer"></i> IMPRIMER LE RÉSUMÉ
+                  </button>
+                </div>
+
+                <div class="table-responsive">
+                  <table class="table table-bordered table-res align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Client</th>
+                        <th>Contact</th>
+                        <th>Détail (Articles)</th>
+                        <th style="width: 160px;">État</th> </tr>
+                    </thead>
+                    <tbody id="tableInscritsBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="tab-pane fade" id="parametres" role="tabpanel">
+                <form id="formEditOffre">
+                  <input type="hidden" id="editOpId"> 
+                  <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary">NOM DE L'OFFRE *</label>
+                    <input type="text" class="form-control" id="editOpNom" required>
+                  </div>
+                  <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold text-secondary">TYPE *</label>
+                      <select class="form-select" id="editOpType" onchange="gererChampsNouvelleOffre('edit')" required>
+                        <option value="Produit">Produit</option>
+                        <option value="Evenement">Évènement</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6" id="blocModeSaisie_edit">
+                      <label class="form-label small fw-bold text-secondary">MODE DE SAISIE</label>
+                      <select class="form-select" id="editOpMode" onchange="gererChampsNouvelleOffre('edit')">
+                        <option value="Libre">Libre</option>
+                        <option value="Predefini">Prédéfini</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="mb-3" id="blocArticlesPredefinis_edit" style="display: none;">
+                    <label class="form-label small fw-bold text-secondary">ARTICLES PRÉDÉFINIS</label>
+                    <div id="editOpArticlesContainer">
+                      <div class="d-flex gap-2 mb-2">
+                        <input type="text" class="form-control edit-article-input" placeholder="Nom de l'article">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="ajouterArticle('edit')">
+                          <i class="bi bi-plus-circle"></i>
+                        </button>
+                      </div>
+                      <div id="editOpArticlesList" class="mb-2"></div>
+                    </div>
+                  </div>
+                  <div class="text-end mt-4">
+                    <button type="button" class="btn btn-dark fw-bold" onclick="sauvegarderModificationOffre()">
+                      <i class="bi bi-check2-circle"></i> METTRE À JOUR L'OFFRE
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-body text-center p-4">
+            <i class="bi bi-exclamation-circle text-danger fs-1 mb-3"></i>
+            <h5 class="mb-3">Confirmation</h5>
+            <p class="text-muted mb-4">Êtes-vous sûr de vouloir supprimer cette offre ?</p>
+            <div class="d-flex justify-content-center gap-2">
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuler</button>
+              <button type="button" class="btn btn-danger" id="btnConfirmerSuppression">Supprimer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="offcanvasHelp" aria-labelledby="offcanvasHelpLabel">
+      <div class="offcanvas-header bg-info text-white">
+        <h5 class="offcanvas-title fw-bold" id="offcanvasHelpLabel">
+          <i class="bi bi-question-circle"></i> Centre d'Aide
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+      </div>
+      <div class="offcanvas-body">
+        <p class="text-muted small mb-4">Retrouvez ici les réponses aux questions les plus fréquentes pour utiliser l'application en magasin.</p>
+
+        <div class="accordion accordion-flush" id="accordionHelp">
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help1">
+                Comment enregistrer une réservation ?
+              </button>
+            </h2>
+            <div id="help1" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small text-muted">
+                Sélectionnez l'offre dans le menu déroulant. Renseignez les informations du client. Si c'est une offre de produits, ajoutez les quantités souhaitées (les lignes à zéro sont ignorées). Enfin, cliquez sur <strong>Vérifier et Valider</strong>.
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help2">
+                Comment modifier le statut d'un client ?
+              </button>
+            </h2>
+            <div id="help2" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small text-muted">
+                Dans la gestion des opérations, cliquez sur une offre. Dans l'onglet <strong>Liste des Réservations</strong>, utilisez le menu déroulant dans la colonne "État" pour passer le client en "Retrait", "Contacté" ou "Annulé". La sauvegarde est automatique.
+              </div>
+            </div>
+          </div>
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help3">
+                Comment imprimer la feuille de préparation ?
+              </button>
+            </h2>
+            <div id="help3" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small text-muted">
+                Dans les détails d'une offre (onglet Liste des Réservations), cliquez sur le bouton bleu <strong>Imprimer le résumé</strong>. L'application générera un récapitulatif des quantités totales à préparer et la liste complète des clients à pointer.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
       <div id="appToast" class="toast align-items-center border-0 text-white" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
@@ -132,146 +388,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
-      // État global
       let currentOperationDetails = null;
-      let operationsCache = [];
       let newOpArticlesList = [];
       let editOpArticlesList = [];
 
-      // Initialisation au chargement de la page
-      document.addEventListener('DOMContentLoaded', function() {
-        initEventListeners();
-        loadOperations();
-      });
-
-      function initEventListeners() {
-        // Boutons des modals
-        document.getElementById('btnCreerNouvelleOffre')?.addEventListener('click', creerNouvelleOffre);
-        document.getElementById('btnSauvegarderOffre')?.addEventListener('click', sauvegarderNouvelleOffre);
-        document.getElementById('btnUpdateOffre')?.addEventListener('click', sauvegarderModificationOffre);
-        document.getElementById('btnImprimerReservations')?.addEventListener('click', imprimerReservations);
-        document.getElementById('btnConfirmerSuppression')?.addEventListener('click', confirmerSuppression);
-        document.getElementById('btnAjouterLigne')?.addEventListener('click', ajouterLigneProduit);
-        document.getElementById('btnAjouterArticle')?.addEventListener('click', () => ajouterArticle('new'));
-        document.getElementById('btnAjouterArticleEdit')?.addEventListener('click', () => ajouterArticle('edit'));
-
-        // Gestion des champs pour nouvelle offre
-        document.getElementById('newOpType')?.addEventListener('change', () => gererChampsNouvelleOffre('new'));
-        document.getElementById('newOpMode')?.addEventListener('change', () => gererChampsNouvelleOffre('new'));
-
-        // Gestion des champs pour modification offre
-        document.getElementById('editOpType')?.addEventListener('change', () => gererChampsNouvelleOffre('edit'));
-        document.getElementById('editOpMode')?.addEventListener('change', () => gererChampsNouvelleOffre('edit'));
-      }
-
-      function loadOperations() {
-        google.script.run
-          .withSuccessHandler(afficherDonnees)
-          .withFailureHandler(function(e) { showToast("Erreur de connexion : " + e.message, "error"); })
-          .getOperationsData();
-      }
-
-      function afficherDonnees(operations) {
-        operationsCache = operations;
-        const select = document.getElementById('operationSelect');
-        const tbody = document.getElementById('tableOperationsBody');
-
-        select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
-        tbody.innerHTML = '';
-
-        if (operations.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
-          return;
-        }
-
-        operations.forEach(op => {
-          const option = document.createElement('option');
-          option.value = op.id;
-          option.setAttribute('data-type', op.type);
-          option.setAttribute('data-mode', op.modeSaisie);
-          option.setAttribute('data-articles', op.articlesPredefinis);
-          option.textContent = `[${op.type}] ${op.nom}`;
-          select.appendChild(option);
-
-          const tr = document.createElement('tr');
-          tr.style.cursor = 'pointer';
-          tr.onclick = function() { voirReservationsDetail(op.id); };
-
-          let pastilleCouleur = op.count > 0 ? 'success' : 'secondary';
-          let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
-
-          tr.innerHTML = `
-            <td class="ps-4"><span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
-            <td><small>Du ${op.dateDebut}<br>Au ${op.dateFin}</small></td>
-            <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
-            <td class="text-end pe-4">
-              <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
-                <i class="bi bi-trash"></i>
-              </button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
-
-      function gererAffichageProduits() {
-        const select = document.getElementById('operationSelect');
-        const optionSelectionnee = select.options[select.selectedIndex];
-
-        const typeOperation = optionSelectionnee.getAttribute('data-type');
-        const modeSaisie = optionSelectionnee.getAttribute('data-mode');
-        const articlesPredefinis = optionSelectionnee.getAttribute('data-articles');
-
-        const sectionProduits = document.getElementById('sectionProduits');
-        const conteneurListe = document.getElementById('listeProduits');
-        const btnAjouter = document.getElementById('btnAjouterLigne');
-
-        conteneurListe.innerHTML = '';
-
-        if (typeOperation === 'Produit') {
-          sectionProduits.style.display = 'block';
-          if (modeSaisie === 'Predefini' && articlesPredefinis) {
-            btnAjouter.style.display = 'none';
-            articlesPredefinis.split(',').forEach(article => {
-              if (!article.trim()) return;
-              const div = document.createElement('div');
-              div.className = 'row g-2 mb-2 ligne-produit';
-              div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${article.trim()}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
-              conteneurListe.appendChild(div);
-            });
-          } else {
-            btnAjouter.style.display = 'inline-block';
-            ajouterLigneProduit();
-          }
-        } else {
-          sectionProduits.style.display = 'none';
-        }
-      }
-
-      function ajouterLigneProduit() {
-        const div = document.createElement('div');
-        div.className = 'row g-2 mb-2 ligne-produit';
-        div.innerHTML = `
-          <div class="col-8">
-            <input type="text" class="form-control nom-article" placeholder="Nom de l'article">
-          </div>
-          <div class="col-3">
-            <input type="number" class="form-control quantite-article" placeholder="Qté" min="1">
-          </div>
-          <div class="col-1 d-flex align-items-center">
-            <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-        `;
-        document.getElementById('listeProduits').appendChild(div);
-      }
-
-      function supprimerLigne(bouton) {
-        bouton.closest('.ligne-produit').remove();
-      }
-
+      // --- NOUVELLES FONCTIONS POUR LES ARTICLES DYNAMIQUES ---
       function ajouterArticle(prefix) {
         const input = document.querySelector(`#${prefix}OpArticlesContainer .${prefix}-article-input`);
         const articleName = input.value.trim();
@@ -314,11 +437,122 @@
         afficherListeArticles(prefix);
       }
 
+      function showToast(message, type = 'success') {
+        const toastEl = document.getElementById('appToast');
+        toastEl.className = `toast align-items-center border-0 text-white ${type === 'success' ? 'bg-success' : (type==='info' ? 'bg-info' : 'bg-danger')}`;
+        document.getElementById('toastMessage').innerHTML = message;
+        new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        google.script.run
+          .withSuccessHandler(afficherDonnees)
+          .withFailureHandler(function(e) { showToast("Erreur de connexion", "error"); })
+          .getOperationsData(); 
+      });
+
+      function afficherDonnees(operations) {
+        const select = document.getElementById('operationSelect');
+        const tbody = document.getElementById('tableOperationsBody');
+        select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
+        tbody.innerHTML = '';
+
+        if (operations.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+          return;
+        }
+
+        operations.forEach(op => {
+          const option = document.createElement('option');
+          option.value = op.id;
+          option.setAttribute('data-type', op.type);
+          option.setAttribute('data-mode', op.modeSaisie);
+          option.setAttribute('data-articles', op.articlesPredefinis);
+          option.textContent = `[${op.type}] ${op.nom}`;
+          select.appendChild(option);
+
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.onclick = function() { voirReservationsDetail(op.id); }; 
+          
+          let pastilleCouleur = op.count > 0 ? 'success' : 'secondary';
+          let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
+
+          tr.innerHTML = `
+            <td class="ps-4"><span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
+            <td><small>Du ${op.dateDebut}<br>Au ${op.dateFin}</small></td>
+            <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
+            <td class="text-end pe-4">
+              <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // --- OUVRIR MENTIONS LEGALES ET AIDE ---
+      function ouvrirMentions() {
+        new bootstrap.Modal(document.getElementById('modalMentions')).show();
+      }
+
+      function ouvrirAide() {
+        const panneauAide = document.getElementById('offcanvasHelp');
+        const offcanvas = new bootstrap.Offcanvas(panneauAide);
+        offcanvas.show();
+      }
+
+      function ouvrirOperations() { new bootstrap.Modal(document.getElementById('modalOperations')).show(); }
+
+      function gererAffichageProduits() {
+        const select = document.getElementById('operationSelect');
+        const optionSelectionnee = select.options[select.selectedIndex];
+        
+        const typeOperation = optionSelectionnee.getAttribute('data-type');
+        const modeSaisie = optionSelectionnee.getAttribute('data-mode');
+        const articlesPredefinis = optionSelectionnee.getAttribute('data-articles');
+        
+        const sectionProduits = document.getElementById('sectionProduits');
+        const conteneurListe = document.getElementById('listeProduits');
+        const btnAjouter = document.getElementById('btnAjouterLigne');
+
+        conteneurListe.innerHTML = '';
+
+        if (typeOperation === 'Produit') {
+          sectionProduits.style.display = 'block';
+          if (modeSaisie === 'Predefini' && articlesPredefinis) {
+            btnAjouter.style.display = 'none';
+            articlesPredefinis.split(',').forEach(article => {
+              if(!article.trim()) return;
+              const div = document.createElement('div');
+              div.className = 'row g-2 mb-2 ligne-produit';
+              div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${article.trim()}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
+              conteneurListe.appendChild(div);
+            });
+          } else {
+            btnAjouter.style.display = 'inline-block';
+            ajouterLigneProduit();
+          }
+        } else {
+          sectionProduits.style.display = 'none';
+        }
+      }
+
+      function ajouterLigneProduit() {
+        const div = document.createElement('div');
+        div.className = 'row g-2 mb-2 ligne-produit';
+        div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article" placeholder="Nom de l'article"></div><div class="col-3"><input type="number" class="form-control quantite-article" placeholder="Qté" min="1"></div><div class="col-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)"><i class="bi bi-x-lg"></i></button></div>`;
+        document.getElementById('listeProduits').appendChild(div);
+      }
+
+      function supprimerLigne(bouton) { bouton.closest('.ligne-produit').remove(); }
+
       function verifierContacts() {
         const telInput = document.getElementById('telClient');
         const emailInput = document.getElementById('emailClient');
         const alerteContact = document.getElementById('alerteContact');
-
+        
         const regexTel = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
         const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -327,7 +561,7 @@
 
         let telValide = telSaisi === '' || regexTel.test(telSaisi);
         let emailValide = emailSaisi === '' || regexEmail.test(emailSaisi);
-
+        
         telInput.classList.toggle('is-invalid', telSaisi !== '' && !telValide);
         telInput.classList.toggle('is-valid', telSaisi !== '' && telValide);
         emailInput.classList.toggle('is-invalid', emailSaisi !== '' && !emailValide);
@@ -341,12 +575,10 @@
       function validerFormulaire() {
         const operationId = document.getElementById('operationSelect').value;
         if (!operationId || !document.getElementById('nomClient').value || !document.getElementById('prenomClient').value) {
-          showToast("Veuillez sélectionner une offre et remplir Nom/Prénom.", "error");
-          return;
+          showToast("Veuillez sélectionner une offre et remplir Nom/Prénom.", "error"); return;
         }
         if (!verifierContacts()) {
-          document.getElementById('alerteContact').style.display = 'block';
-          return;
+          document.getElementById('alerteContact').style.display = 'block'; return;
         }
 
         const articlesSaisis = [];
@@ -366,8 +598,7 @@
         };
 
         const btn = document.querySelector('button[onclick="validerFormulaire()"]');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
 
         google.script.run
           .withSuccessHandler(function() {
@@ -375,17 +606,12 @@
             document.getElementById('formReservation').reset();
             document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
             document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
-            gererAffichageProduits();
-            btn.disabled = false;
-            btn.innerHTML = 'VÉRIFIER ET VALIDER';
-            loadOperations();
+            gererAffichageProduits(); 
+            btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER';
+            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
           })
-          .withFailureHandler(function(err) {
-            showToast("Erreur : " + err.message, "error");
-            btn.disabled = false;
-            btn.innerHTML = 'VÉRIFIER ET VALIDER';
-          })
-          .saveReservation(data);
+          .withFailureHandler(function(err) { showToast("? Erreur : " + err.message, "error"); btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER'; })
+          .saveReservation(data); 
       }
 
       function gererChampsNouvelleOffre(prefix) {
@@ -393,6 +619,8 @@
         const mode = document.getElementById(prefix + 'OpMode').value;
         document.getElementById('blocModeSaisie_' + prefix).style.display = (type === 'Evenement') ? 'none' : 'block';
         document.getElementById('blocArticlesPredefinis_' + prefix).style.display = (type === 'Produit' && mode === 'Predefini') ? 'block' : 'none';
+        
+        // Réinitialiser les listes d'articles si le mode change
         if (prefix === 'new') {
           newOpArticlesList = [];
           afficherListeArticles('new');
@@ -403,78 +631,67 @@
       }
 
       function creerNouvelleOffre() {
-        const modalOperations = bootstrap.Modal.getInstance(document.getElementById('modalOperations'));
-        if (modalOperations) modalOperations.hide();
+        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
         document.getElementById('formNouvelleOffre').reset();
         newOpArticlesList = [];
         afficherListeArticles('new');
-        gererChampsNouvelleOffre('new');
+        gererChampsNouvelleOffre('new'); 
         new bootstrap.Modal(document.getElementById('modalCreerOffre')).show();
       }
 
       function sauvegarderNouvelleOffre() {
-        if (!document.getElementById('formNouvelleOffre').checkValidity()) {
-          document.getElementById('formNouvelleOffre').reportValidity();
-          return;
-        }
-
+        if (!document.getElementById('formNouvelleOffre').checkValidity()) { document.getElementById('formNouvelleOffre').reportValidity(); return; }
         const type = document.getElementById('newOpType').value;
         const mode = type === 'Produit' ? document.getElementById('newOpMode').value : '';
         const data = {
-          nom: document.getElementById('newOpNom').value.trim(),
-          type: type,
+          nom: document.getElementById('newOpNom').value.trim(), 
+          type: type, 
           modeSaisie: mode,
           dateDebut: '',
           dateFin: '',
           articlesPredefinis: mode === 'Predefini' ? newOpArticlesList.join(',') : ''
         };
-
-        const btn = document.getElementById('btnSauvegarderOffre');
-        btn.disabled = true;
-
+        const btn = document.getElementById('btnSauvegarderOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalCreerOffre'));
-            if (modal) modal.hide();
+            bootstrap.Modal.getInstance(document.getElementById('modalCreerOffre')).hide();
             showToast("Nouvelle offre créée !", "success");
             btn.disabled = false;
             newOpArticlesList = [];
-            loadOperations();
-            new bootstrap.Modal(document.getElementById('modalOperations')).show();
-          })
-          .withFailureHandler(function(err) {
-            showToast("Erreur : " + err.message, "error");
-            btn.disabled = false;
-          })
-          .saveOperation(data);
+            google.script.run.withSuccessHandler(ops => { afficherDonnees(ops); new bootstrap.Modal(document.getElementById('modalOperations')).show(); }).getOperationsData();
+          }).saveOperation(data);
       }
 
+      // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
-        const modalOperations = bootstrap.Modal.getInstance(document.getElementById('modalOperations'));
-        if (modalOperations) modalOperations.hide();
+        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
         showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
 
         google.script.run
           .withSuccessHandler(function(details) {
-            currentOperationDetails = details;
+            currentOperationDetails = details; 
             const op = details.operation;
-
+            
             document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom}`;
             document.getElementById('editOpId').value = op.id;
             document.getElementById('editOpNom').value = op.nom;
             document.getElementById('editOpType').value = op.type;
             document.getElementById('editOpMode').value = op.modeSaisie;
+            
+            // Charger les articles prédéfinis dans la liste
             editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
             afficherListeArticles('edit');
+            
             gererChampsNouvelleOffre('edit');
 
             const tbody = document.getElementById('tableInscritsBody');
             tbody.innerHTML = '';
-
-            if (details.reservations.length === 0) {
+            
+            if(details.reservations.length === 0) {
               tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
             } else {
               details.reservations.forEach(res => {
+                // Création du menu déroulant (Select) pour le statut
                 let selectHtml = `
                   <select class="form-select form-select-sm fw-bold border-secondary text-secondary" onchange="changerStatutReservation('${res.idRes}', this.value)">
                     <option value="Réservé" ${res.etat === 'Réservé' ? 'selected' : ''}>Réservé</option>
@@ -496,24 +713,25 @@
             }
             new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
           })
-          .withFailureHandler(function(err) {
-            showToast("Erreur : " + err.message, "error");
-          })
+          .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); })
           .getOperationDetails(idOperation);
       }
 
+      // Fonction d'enregistrement à la volée du statut
       function changerStatutReservation(idRes, nouveauStatut) {
         showToast("<span class='spinner-border spinner-border-sm'></span> Mise à jour du statut...", "info");
         google.script.run
           .withSuccessHandler(function() {
             showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
+            
+            // Mise à jour de la donnée "en mémoire" pour que l'impression reflète le changement sans recharger
             if (currentOperationDetails) {
               let resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
               if (resToUpdate) resToUpdate.etat = nouveauStatut;
             }
           })
           .withFailureHandler(function(err) {
-            showToast("Erreur : " + err.message, "error");
+            showToast("Erreur lors de la mise à jour : " + err.message, "error");
           })
           .updateReservationStatus(idRes, nouveauStatut);
       }
@@ -522,53 +740,37 @@
         const type = document.getElementById('editOpType').value;
         const mode = type === 'Produit' ? document.getElementById('editOpMode').value : '';
         const data = {
-          id: document.getElementById('editOpId').value,
+          id: document.getElementById('editOpId').value, 
           nom: document.getElementById('editOpNom').value.trim(),
-          type: type,
+          type: type, 
           modeSaisie: mode,
           dateDebut: '',
           dateFin: '',
           articlesPredefinis: mode === 'Predefini' ? editOpArticlesList.join(',') : ''
         };
-
-        const btn = document.getElementById('btnUpdateOffre');
-        btn.disabled = true;
-
+        const btn = document.getElementById('btnUpdateOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
-            showToast("Offre mise à jour !", "success");
+            showToast("Offre mise à jour !", "success"); 
             btn.disabled = false;
             editOpArticlesList = [];
-            loadOperations();
+            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
           })
-          .withFailureHandler(function(err) {
-            showToast("Erreur : " + err.message, "error");
-            btn.disabled = false;
-          })
+          .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); btn.disabled = false; })
           .updateOperation(data);
       }
 
+      let idOffreASupprimer = null;
       function demanderSuppression(idOperation) {
-        window.idOffreASupprimer = idOperation;
+        idOffreASupprimer = idOperation;
         new bootstrap.Modal(document.getElementById('modalConfirmDelete')).show();
       }
-
-      function confirmerSuppression() {
-        if (window.idOffreASupprimer) {
-          const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete'));
-          if (modal) modal.hide();
-
-          google.script.run
-            .withSuccessHandler(function() {
-              showToast("Opération supprimée !", 'success');
-              loadOperations();
-            })
-            .withFailureHandler(function(err) {
-              showToast("Erreur : " + err.message, "error");
-            })
-            .deleteOperation(window.idOffreASupprimer);
+      document.getElementById('btnConfirmerSuppression').addEventListener('click', function() {
+        if (idOffreASupprimer) {
+          bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete')).hide();
+          google.script.run.withSuccessHandler(function() { showToast("Opération supprimée !", 'success'); google.script.run.withSuccessHandler(afficherDonnees).getOperationsData(); }).deleteOperation(idOffreASupprimer);
         }
-      }
+      });
 
       function imprimerReservations() {
         if (!currentOperationDetails) return;
@@ -580,7 +782,7 @@
         let html = `
           <div class="mb-4 text-center">
             <h2 class="mb-1">${op.nom}</h2>
-            <p class="text-muted">Dates : Du ${op.dateDebut || '-' } au ${op.dateFin || '-'}</p>
+            <p class="text-muted">Dates : Du ${op.dateDebut || '-'} au ${op.dateFin || '-'}</p>
           </div>
         `;
 
@@ -588,17 +790,10 @@
           html += `
             <h4 class="mb-2">Résumé des Produits à préparer</h4>
             <table class="table table-bordered border-dark mb-5">
-              <thead class="table-light">
-                <tr>
-                  <th>Désignation du produit</th>
-                  <th style="width: 150px" class="text-center">Quantité Totale</th>
-                </tr>
-              </thead>
+              <thead class="table-light"><tr><th>Désignation du produit</th><th style="width: 150px" class="text-center">Quantité Totale</th></tr></thead>
               <tbody>
           `;
-          resume.forEach(r => {
-            html += `<tr><td>${r.nom}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`;
-          });
+          resume.forEach(r => { html += `<tr><td>${r.nom}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`; });
           html += `</tbody></table>`;
         }
 
@@ -606,62 +801,27 @@
           <h4 class="mb-2">Liste des Commandes (${res.length})</h4>
           <table class="table table-bordered border-dark">
             <thead class="table-light">
-              <tr>
-                <th>Nom & Prénom</th>
-                <th>Contact</th>
-                <th>Détail de la commande</th>
-                <th>État</th>
-              </tr>
+              <tr><th>Nom & Prénom</th><th>Contact</th><th>Détail de la commande</th><th>État</th></tr>
             </thead>
             <tbody>
         `;
-
-        if (res.length === 0) {
+        if(res.length === 0) {
           html += `<tr><td colspan="4" class="text-center">Aucune réservation pour le moment.</td></tr>`;
         } else {
           res.forEach(r => {
-            html += `<tr>
-              <td><strong>${r.nom} ${r.prenom}</strong><br><small class="text-muted">${r.dateSaisie}</small></td>
-              <td>${r.contact}</td>
-              <td>${r.articlesText || '-'}</td>
-              <td class="text-center"><strong>${r.etat}</strong></td>
-            </tr>`;
+            html += `<tr><td><strong>${r.nom} ${r.prenom}</strong><br><small class="text-muted">${r.dateSaisie}</small></td><td>${r.contact}</td><td>${r.articlesText || '-'}</td><td class="text-center"><strong>${r.etat}</strong></td></tr>`;
           });
         }
-
         html += `</tbody></table>`;
 
         const zoneImpression = document.getElementById('zoneImpression');
         zoneImpression.innerHTML = html;
         zoneImpression.classList.remove('d-none');
-
-        window.print();
-        setTimeout(() => {
-          zoneImpression.classList.add('d-none');
-          zoneImpression.innerHTML = "";
-        }, 1000);
+        
+        window.print(); 
+        setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
       }
 
-      function showToast(message, type = 'success') {
-        const toastEl = document.getElementById('appToast');
-        toastEl.className = `toast align-items-center border-0 text-white ${type === 'success' ? 'bg-success' : (type === 'info' ? 'bg-info' : 'bg-danger')}`;
-        document.getElementById('toastMessage').innerHTML = message;
-        new bootstrap.Toast(toastEl, { delay: 4000 }).show();
-      }
-
-      function ouvrirMentions() {
-        new bootstrap.Modal(document.getElementById('modalMentions')).show();
-      }
-
-      function ouvrirAide() {
-        const panneauAide = document.getElementById('offcanvasHelp');
-        const offcanvas = new bootstrap.Offcanvas(panneauAide);
-        offcanvas.show();
-      }
-
-      function ouvrirOperations() {
-        new bootstrap.Modal(document.getElementById('modalOperations')).show();
-      }
     </script>
   </body>
 </html>
