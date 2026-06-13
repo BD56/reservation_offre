@@ -211,8 +211,11 @@
                       <i class="bi bi-plus-circle"></i>
                     </button>
                   </div>
-                  <small class="text-muted mb-2 d-block">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
-                  <div id="newOpArticlesList" class="mb-2"></div>
+                  <div class="mt-2">
+                    <small class="text-secondary fw-bold">Liste des articles</small>
+                    <div id="newOpArticlesList" class="mb-2"></div>
+                    <small class="text-muted">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
+                  </div>
                 </div>
               </div>
             </form>
@@ -304,8 +307,11 @@
                           <i class="bi bi-plus-circle"></i>
                         </button>
                       </div>
-                      <small class="text-muted mb-2 d-block">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
-                      <div id="editOpArticlesList" class="mb-2"></div>
+                      <div class="mt-2">
+                        <small class="text-secondary fw-bold">Liste des articles</small>
+                        <div id="editOpArticlesList" class="mb-2"></div>
+                        <small class="text-muted">*(Appuyez sur Entrée ou "+" pour ajouter)*</small>
+                      </div>
                     </div>
                   </div>
                   <div class="text-end mt-4">
@@ -434,6 +440,10 @@
                    value="${article}"
                    onchange="mettreAJourArticle('${prefix}', ${index}, this.value)"
                    onkeypress="if(event.key==='Enter'){ event.preventDefault(); }">
+            <button type="button" class="btn btn-sm btn-outline-primary border-0"
+                    onclick="editerArticle('${prefix}', ${index})" title="Modifier">
+              <i class="bi bi-pencil"></i>
+            </button>
             <button type="button" class="btn btn-sm btn-outline-danger border-0"
                     onclick="supprimerArticle('${prefix}', ${index})" title="Supprimer">
               <i class="bi bi-x-lg"></i>
@@ -441,6 +451,12 @@
           `;
           listContainer.appendChild(div);
         });
+      }
+
+      function editerArticle(prefix, index) {
+        const input = document.querySelector(`#${prefix}OpArticlesList div:nth-child(${index + 1}) input`);
+        input.focus();
+        input.select();
       }
 
       function mettreAJourArticle(prefix, index, newValue) {
