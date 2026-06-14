@@ -573,6 +573,19 @@
           return;
         }
 
+        // Trier par dateDebut du plus récent au plus ancien, ou par ID si pas de date
+        operations.sort((a, b) => {
+          const parseDate = (d) => {
+            if (!d) return new Date(0);
+            // Format dd/MM/yyyy
+            const parts = d.split('/');
+            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          };
+          const dateA = parseDate(a.dateDebut);
+          const dateB = parseDate(b.dateDebut);
+          return dateB - dateA; // Plus récent en premier
+        });
+
         operations.forEach(op => {
           const option = document.createElement('option');
           option.value = op.id;
