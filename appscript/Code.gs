@@ -79,6 +79,15 @@ function appendRow(sheetName, rowData) {
   return true;
 }
 
+function appendRows(sheetName, rowsData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) { console.error(`Feuille "${sheetName}" introuvable.`); return false; }
+  if (rowsData.length === 0) return true;
+  sheet.getRange(sheet.getLastRow() + 1, 1, rowsData.length, rowsData[0].length).setValues(rowsData);
+  return true;
+}
+
 function deleteRow(sheetName, rowIndex) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
@@ -212,13 +221,28 @@ function createReservation(data) {
   if (data.email) { contact += (contact ? " / " : "") + data.email; }
   const dateSaisie = formatDate(new Date(), Config.DATETIME_FORMAT_DISPLAY);
   const resRowData = [reservationId, data.operationId, data.nom, data.prenom, contact, "Réservé", dateSaisie];
-  appendRow(Config.SHEET_RESERVATIONS, resRowData);
+  
+  // Préparer toutes les lignes à ajouter
+  const allRows = [];
+  
+  // Ajouter la réservation
+  allRows.push(resRowData);
+  
+  // Préparer les articles
+  const articlesRows = [];
   if (data.articles && data.articles.length > 0) {
     data.articles.forEach(art => {
       const artId = generateArticleId();
-      appendRow(Config.SHEET_ARTICLES, [artId, reservationId, art.nom, art.quantite]);
+      articlesRows.push([artId, reservationId, art.nom, art.quantite]);
     });
   }
+  
+  // Tout ajouter en une seule opération par feuille
+  appendRow(Config.SHEET_RESERVATIONS, resRowData);
+  if (articlesRows.length > 0) {
+    appendRows(Config.SHEET_ARTICLES, articlesRows);
+  }
+  
   return { id: reservationId, operationId: data.operationId, nom: data.nom, prenom: data.prenom, contact: contact, etat: "Réservé", dateSaisie: dateSaisie };
 }
 
