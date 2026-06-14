@@ -508,7 +508,8 @@
           option.setAttribute('data-type', op.type);
           option.setAttribute('data-mode', op.modeSaisie);
           option.setAttribute('data-articles', op.articlesPredefinis);
-          option.textContent = `[${op.type}] ${op.nom}`;
+          option.setAttribute('data-count', op.count || 0);
+          option.textContent = `[${op.type}] ${op.nom} (${op.count || 0})`;
           select.appendChild(option);
 
           const tr = document.createElement('tr');
@@ -648,7 +649,18 @@
             document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
             gererAffichageProduits(); 
             btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER';
-            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            // Mise à jour du compte localement au lieu de recharger tout
+            const select = document.getElementById('operationSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption) {
+              const currentCount = parseInt(selectedOption.getAttribute('data-count')) || 0;
+              const newCount = currentCount + 1;
+              selectedOption.setAttribute('data-count', newCount);
+              // Remplacer le nombre entre parenthèses
+              const type = selectedOption.getAttribute('data-type');
+              const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
+              selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
+            }
           })
           .withFailureHandler(function(err) { showToast("? Erreur : " + err.message, "error"); btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER'; })
           .saveReservation(data); 
