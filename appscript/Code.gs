@@ -234,12 +234,6 @@ function createReservation(data) {
   const dateSaisie = formatDate(new Date(), Config.DATETIME_FORMAT_DISPLAY);
   const resRowData = [reservationId, data.operationId, data.nom, data.prenom, contact, "Réservé", dateSaisie];
   
-  // Préparer toutes les lignes à ajouter
-  const allRows = [];
-  
-  // Ajouter la réservation
-  allRows.push(resRowData);
-  
   // Préparer les articles
   const articlesRows = [];
   if (data.articles && data.articles.length > 0) {
@@ -249,10 +243,17 @@ function createReservation(data) {
     });
   }
   
-  // Tout ajouter en une seule opération par feuille
-  appendRow(Config.SHEET_RESERVATIONS, resRowData);
+  // Tout ajouter en une seule opération
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resSheet = ss.getSheetByName(Config.SHEET_RESERVATIONS);
+  const artSheet = ss.getSheetByName(Config.SHEET_ARTICLES);
+  
+  // Ajouter la réservation
+  resSheet.appendRow(resRowData);
+  
+  // Ajouter les articles en batch
   if (articlesRows.length > 0) {
-    appendRows(Config.SHEET_ARTICLES, articlesRows);
+    artSheet.getRange(artSheet.getLastRow() + 1, 1, articlesRows.length, articlesRows[0].length).setValues(articlesRows);
   }
   
   return { id: reservationId, operationId: data.operationId, nom: data.nom, prenom: data.prenom, contact: contact, etat: "Réservé", dateSaisie: dateSaisie };

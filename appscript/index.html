@@ -343,6 +343,26 @@
       </div>
     </div>
 
+    <div class="modal fade" id="modalSaveError" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle"></i> Erreur d'enregistrement</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body p-4">
+            <p class="text-muted mb-3">L'enregistrement a échoué. Voici les données que vous aviez saisies :</p>
+            <div id="errorDataDisplay" class="bg-light p-3 rounded mb-3"></div>
+            <p class="mb-3">Souhaitez-vous réessayer ?</p>
+            <div class="d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuler</button>
+              <button type="button" class="btn btn-danger" onclick="retrySaveReservation()">Réessayer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="offcanvasHelp" aria-labelledby="offcanvasHelpLabel">
       <div class="offcanvas-header bg-info text-white">
         <h5 class="offcanvas-title fw-bold" id="offcanvasHelpLabel">
@@ -409,6 +429,7 @@
       let currentOperationDetails = null;
       let newOpArticlesList = [];
       let editOpArticlesList = [];
+      let lastReservationData = null; // Pour stocker les données en cas d'erreur
 
       // --- NOUVELLES FONCTIONS POUR LES ARTICLES DYNAMIQUES ---
       function ajouterArticleEtNouvelleCase(prefix) {
@@ -482,6 +503,56 @@
         toastEl.className = `toast align-items-center border-0 text-white ${type === 'success' ? 'bg-success' : (type==='info' ? 'bg-info' : 'bg-danger')}`;
         document.getElementById('toastMessage').innerHTML = message;
         new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+      }
+
+      function showSaveError(errorMessage, data) {
+        const displayEl = document.getElementById('errorDataDisplay');
+        let html = `<p><strong>Offre:</strong> ${document.getElementById('operationSelect').options[document.getElementById('operationSelect').selectedIndex].text}</p>`;
+        html += `<p><strong>Client:</strong> ${data.nom} ${data.prenom}</p>`;
+        html += `<p><strong>Contact:</strong> ${data.telephone || ''}${data.telephone && data.email ? ' / ' : ''}${data.email || ''}</p>`;
+        if (data.articles && data.articles.length > 0) {
+          html += `<p><strong>Articles:</strong> ${data.articles.map(a => `${a.quantite}x ${a.nom}`).join(', ')}</p>`;
+        }
+        displayEl.innerHTML = html;
+        new bootstrap.Modal(document.getElementById('modalSaveError')).show();
+      }
+
+      function retrySaveReservation() {
+        if (lastReservationData) {
+          const btn = document.querySelector('button[onclick="validerFormulaire()"]');
+          const originalText = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enregistrement...';
+          
+          google.script.run
+            .withSuccessHandler(function() {
+              showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
+              document.getElementById('formReservation').reset();
+              document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
+              document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
+              gererAffichageProduits();
+              btn.disabled = false; btn.innerHTML = originalText;
+              bootstrap.Modal.getInstance(document.getElementById('modalSaveError')).hide();
+              lastReservationData = null;
+              
+              // Mise à jour du compte
+              const select = document.getElementById('operationSelect');
+              const selectedOption = select.options[select.selectedIndex];
+              if (selectedOption) {
+                const currentCount = parseInt(selectedOption.getAttribute('data-count')) || 0;
+                const newCount = currentCount + 1;
+                selectedOption.setAttribute('data-count', newCount);
+                const type = selectedOption.getAttribute('data-type');
+                const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
+                selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
+              }
+            })
+            .withFailureHandler(function(err) {
+              btn.disabled = false; btn.innerHTML = originalText;
+              showToast("Erreur : " + err.message, "error");
+            })
+            .saveReservation(lastReservationData);
+        }
       }
 
       document.addEventListener('DOMContentLoaded', function() {
@@ -638,31 +709,34 @@
           articles: articlesSaisis
         };
 
-        const btn = document.querySelector('button[onclick="validerFormulaire()"]');
-        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+        // Stocker les données pour retry en cas d'erreur
+        lastReservationData = data;
 
+        // Ne pas bloquer l'UI - enregistrement en arrière-plan
         google.script.run
           .withSuccessHandler(function() {
-            showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
-            document.getElementById('formReservation').reset();
-            document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
-            document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
-            gererAffichageProduits(); 
-            btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER';
-            // Mise à jour du compte localement au lieu de recharger tout
+            // Mise à jour du compte localement
             const select = document.getElementById('operationSelect');
             const selectedOption = select.options[select.selectedIndex];
             if (selectedOption) {
               const currentCount = parseInt(selectedOption.getAttribute('data-count')) || 0;
               const newCount = currentCount + 1;
               selectedOption.setAttribute('data-count', newCount);
-              // Remplacer le nombre entre parenthèses
               const type = selectedOption.getAttribute('data-type');
               const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
               selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
             }
+            // Réinitialiser le formulaire
+            document.getElementById('formReservation').reset();
+            document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
+            document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
+            gererAffichageProduits();
+            lastReservationData = null;
           })
-          .withFailureHandler(function(err) { showToast("? Erreur : " + err.message, "error"); btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER'; })
+          .withFailureHandler(function(err) {
+            // Afficher modale d'erreur avec les données
+            showSaveError(err.message, data);
+          })
           .saveReservation(data); 
       }
 
