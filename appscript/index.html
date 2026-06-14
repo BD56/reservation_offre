@@ -712,6 +712,9 @@
         // Stocker les données pour retry en cas d'erreur
         lastReservationData = data;
 
+        // Afficher un toast discret pour confirmer que l'enregistrement est lancé
+        showToast("<i class='bi bi-hourglass-split'></i> Enregistrement en cours...", "info");
+
         // Ne pas bloquer l'UI - enregistrement en arrière-plan
         google.script.run
           .withSuccessHandler(function() {
