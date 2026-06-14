@@ -12,6 +12,7 @@ const Config = {
   COL_OPERATION_DATE_FIN: 4,
   COL_OPERATION_MODE_SAISIE: 5,
   COL_OPERATION_ARTICLES_PREDEFINIS: 6,
+  COL_OPERATION_TERMINEE: 7,
   COL_RESERVATION_ID: 0,
   COL_RESERVATION_OPERATION_ID: 1,
   COL_RESERVATION_NOM: 2,
@@ -167,6 +168,7 @@ function getAllOperationsWithCounts() {
       dateFin: toDate(row[Config.COL_OPERATION_DATE_FIN]),
       modeSaisie: String(row[Config.COL_OPERATION_MODE_SAISIE] || "Libre"),
       articlesPredefinis: String(row[Config.COL_OPERATION_ARTICLES_PREDEFINIS] || ""),
+      isTerminee: String(row[Config.COL_OPERATION_TERMINEE] || "").toLowerCase() === "true" || false,
       count: reservationCounts[String(row[Config.COL_OPERATION_ID]).trim()] || 0
     }));
 }
@@ -182,7 +184,8 @@ function getOperationById(operationId) {
         dateDebut: toDate(row[Config.COL_OPERATION_DATE_DEBUT]),
         dateFin: toDate(row[Config.COL_OPERATION_DATE_FIN]),
         modeSaisie: String(row[Config.COL_OPERATION_MODE_SAISIE] || "Libre"),
-        articlesPredefinis: String(row[Config.COL_OPERATION_ARTICLES_PREDEFINIS] || "")
+        articlesPredefinis: String(row[Config.COL_OPERATION_ARTICLES_PREDEFINIS] || ""),
+        isTerminee: String(row[Config.COL_OPERATION_TERMINEE] || "").toLowerCase() === "true" || false
       };
     }
   }
@@ -191,16 +194,16 @@ function getOperationById(operationId) {
 
 function createOperation(data) {
   const newId = generateOperationId();
-  const rowData = [newId, data.nom, data.type, data.dateDebut || "", data.dateFin || "", data.modeSaisie || "Libre", data.articlesPredefinis || ""];
+  const rowData = [newId, data.nom, data.type, data.dateDebut || "", data.dateFin || "", data.modeSaisie || "Libre", data.articlesPredefinis || "", "false"];
   appendRow(Config.SHEET_OPERATIONS, rowData);
-  return { id: newId, nom: data.nom, type: data.type, dateDebut: toDate(data.dateDebut), dateFin: toDate(data.dateFin), modeSaisie: data.modeSaisie || "Libre", articlesPredefinis: data.articlesPredefinis || "" };
+  return { id: newId, nom: data.nom, type: data.type, dateDebut: toDate(data.dateDebut), dateFin: toDate(data.dateFin), modeSaisie: data.modeSaisie || "Libre", articlesPredefinis: data.articlesPredefinis || "", isTerminee: false };
 }
 
 function updateOperation(data) {
   const rowIndex = findRowIndexByColumnValue(Config.SHEET_OPERATIONS, Config.COL_OPERATION_ID, data.id);
   if (!rowIndex) { throw new Error(`Opération avec l'ID "${data.id}" introuvable.`); }
-  const rowData = [[data.nom, data.type, data.dateDebut || "", data.dateFin || "", data.modeSaisie || "Libre", data.articlesPredefinis || ""]];
-  return updateRange(Config.SHEET_OPERATIONS, rowIndex, Config.COL_OPERATION_NOM + 1, 1, 6, rowData);
+  const rowData = [[data.nom, data.type, data.dateDebut || "", data.dateFin || "", data.modeSaisie || "Libre", data.articlesPredefinis || "", data.isTerminee ? "true" : "false"]];
+  return updateRange(Config.SHEET_OPERATIONS, rowIndex, Config.COL_OPERATION_NOM + 1, 1, 7, rowData);
 }
 
 function deleteOperationWithCascade(operationId) {
@@ -389,7 +392,8 @@ function getOperationDetails(operationId) {
         id: operation.id, nom: operation.nom, type: operation.type,
         dateDebut: operation.dateDebut ? formatDate(operation.dateDebut, Config.DATE_FORMAT_INPUT) : "",
         dateFin: operation.dateFin ? formatDate(operation.dateFin, Config.DATE_FORMAT_INPUT) : "",
-        modeSaisie: operation.modeSaisie, articlesPredefinis: operation.articlesPredefinis
+        modeSaisie: operation.modeSaisie, articlesPredefinis: operation.articlesPredefinis,
+        isTerminee: operation.isTerminee || false
       },
       reservations: reservations, resume: resume
     };
@@ -409,6 +413,15 @@ function updateOperation(data) {
 function deleteOperation(operationId) {
   try { return deleteOperationWithCascade(operationId); }
   catch (e) { throw new Error("Impossible de supprimer l'opération : " + e.message); }
+}
+
+function terminerOperation(operationId) {
+  try {
+    const rowIndex = findRowIndexByColumnValue(Config.SHEET_OPERATIONS, Config.COL_OPERATION_ID, operationId);
+    if (!rowIndex) { throw new Error(`Opération avec l'ID "${operationId}" introuvable.`); }
+    updateCell(Config.SHEET_OPERATIONS, rowIndex, Config.COL_OPERATION_TERMINEE, "true");
+    return true;
+  } catch (e) { throw new Error("Impossible de terminer l'opération : " + e.message); }
 }
 
 function updateReservationStatus(reservationId, newStatus) {

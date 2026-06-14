@@ -146,6 +146,15 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
           </div>
           <div class="modal-body p-0">
+            <div class="p-3 bg-light border-bottom">
+              <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" id="filterOperations" onchange="filtrerOperations()">
+                  <option value="actives" selected>Offres actives</option>
+                  <option value="terminees">Offres terminées</option>
+                  <option value="toutes">Toutes les offres</option>
+                </select>
+              </div>
+            </div>
             <div class="table-responsive">
               <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
@@ -315,8 +324,11 @@
                     </div>
                   </div>
                   <div class="text-end mt-4">
-                    <button type="button" class="btn btn-dark fw-bold" id="btnUpdateOffre" onclick="sauvegarderModificationOffre()">
+                    <button type="button" class="btn btn-dark fw-bold me-2" id="btnUpdateOffre" onclick="sauvegarderModificationOffre()">
                       <i class="bi bi-check2-circle"></i> METTRE À JOUR L'OFFRE
+                    </button>
+                    <button type="button" class="btn btn-warning fw-bold" id="btnTerminerOffre" onclick="terminerOffre()">
+                      <i class="bi bi-stop-circle"></i> TERMINER L'OFFRE
                     </button>
                   </div>
                 </form>
@@ -427,6 +439,7 @@
     
     <script>
       let currentOperationDetails = null;
+      let allOperations = []; // Stockage de toutes les opérations pour le filtrage
       let newOpArticlesList = [];
       let editOpArticlesList = [];
       let lastReservationData = null; // Pour stocker les données en cas d'erreur
@@ -563,53 +576,78 @@
       });
 
       function afficherDonnees(operations) {
+        // Stockage de toutes les opérations
+        allOperations = operations;
+        
+        // Filtrer selon le filtre actuel
+        filtrerOperations();
+      }
+
+      function filtrerOperations() {
+        const filter = document.getElementById('filterOperations').value;
         const select = document.getElementById('operationSelect');
         const tbody = document.getElementById('tableOperationsBody');
+        
+        // Trier par date de création (extraite de l'ID OP-{timestamp}) du plus récent au plus ancien
+        const sortedOps = [...allOperations].sort((a, b) => {
+          const getTimestamp = (id) => {
+            const match = id.match(/OP-(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          return getTimestamp(b.id) - getTimestamp(a.id);
+        });
+        
+        // Filtrer
+        const filteredOps = sortedOps.filter(op => {
+          if (filter === 'actives') return !op.isTerminee;
+          if (filter === 'terminees') return op.isTerminee;
+          return true; // toutes
+        });
+        
+        // Afficher dans le dropdown
         select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
-        tbody.innerHTML = '';
-
-        if (operations.length === 0) {
+        
+        if (filteredOps.length === 0) {
           tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
           return;
         }
 
-        // Trier par date de création (extraite de l'ID OP-{timestamp}) du plus récent au plus ancien
-        operations.sort((a, b) => {
-          const getTimestamp = (id) => {
-            // ID format: OP-{timestamp}
-            const match = id.match(/OP-(\d+)/);
-            return match ? parseInt(match[1]) : 0;
-          };
-          const timeA = getTimestamp(a.id);
-          const timeB = getTimestamp(b.id);
-          return timeB - timeA; // Plus récent en premier
-        });
-
-        operations.forEach(op => {
+        filteredOps.forEach(op => {
           const option = document.createElement('option');
           option.value = op.id;
           option.setAttribute('data-type', op.type);
           option.setAttribute('data-mode', op.modeSaisie);
           option.setAttribute('data-articles', op.articlesPredefinis);
           option.setAttribute('data-count', op.count || 0);
-          option.textContent = `[${op.type}] ${op.nom} (${op.count || 0})`;
+          option.setAttribute('data-terminee', op.isTerminee || false);
+          option.disabled = op.isTerminee; // Désactiver les offres terminées dans le dropdown
+          option.textContent = `[${op.type}] ${op.nom} (${op.count || 0})${op.isTerminee ? ' - TERMINÉE' : ''}`;
           select.appendChild(option);
 
           const tr = document.createElement('tr');
-          tr.style.cursor = 'pointer';
-          tr.onclick = function() { voirReservationsDetail(op.id); }; 
+          tr.style.cursor = op.isTerminee ? 'not-allowed' : 'pointer';
+          tr.className = op.isTerminee ? 'table-secondary' : '';
+          
+          if (!op.isTerminee) {
+            tr.onclick = function() { voirReservationsDetail(op.id); };
+          } else {
+            tr.onclick = function() { 
+              showToast("Offre terminée - seule l'impression est disponible", "info");
+            };
+          }
           
           let pastilleCouleur = op.count > 0 ? 'success' : 'secondary';
           let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
+          let statutOffre = op.isTerminee ? '<span class="badge bg-dark me-2">Terminée</span>' : '';
 
           tr.innerHTML = `
-            <td class="ps-4"><span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
+            <td class="ps-4">${statutOffre}<span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
             <td><small>Du ${op.dateDebut}<br>Au ${op.dateFin}</small></td>
             <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
             <td class="text-end pe-4">
-              <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
+              ${!op.isTerminee ? `<button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
                 <i class="bi bi-trash"></i>
-              </button>
+              </button>` : ''}
             </td>
           `;
           tbody.appendChild(tr);
@@ -814,11 +852,21 @@
             currentOperationDetails = details; 
             const op = details.operation;
             
-            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom}`;
+            // Afficher l'état terminé dans le titre
+            const termineeBadge = op.isTerminee ? '<span class="badge bg-dark ms-2">TERMINÉE</span>' : '';
+            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom} ${termineeBadge}`;
             document.getElementById('editOpId').value = op.id;
             document.getElementById('editOpNom').value = op.nom;
             document.getElementById('editOpType').value = op.type;
             document.getElementById('editOpMode').value = op.modeSaisie;
+            
+            // Désactiver les champs si l'offre est terminée
+            const formEditOffre = document.getElementById('formEditOffre');
+            if (op.isTerminee) {
+              formEditOffre.querySelectorAll('input, select').forEach(el => el.disabled = true);
+              document.getElementById('btnUpdateOffre').disabled = true;
+              document.getElementById('btnTerminerOffre').disabled = true;
+            }
             
             // Charger les articles prédéfinis dans la liste
             editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
@@ -900,6 +948,33 @@
           })
           .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); btn.disabled = false; })
           .updateOperation(data);
+      }
+
+      function terminerOffre() {
+        const operationId = document.getElementById('editOpId').value;
+        if (!operationId) return;
+        
+        if (confirm("Êtes-vous sûr de vouloir terminer cette offre ? Les nouvelles réservations ne seront plus possibles.")) {
+          const btn = document.getElementById('btnTerminerOffre');
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Terminaison...';
+          
+          google.script.run
+            .withSuccessHandler(function() {
+              showToast("Offre terminée !", "success");
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
+              // Fermer la modale et recharger
+              bootstrap.Modal.getInstance(document.getElementById('modalDetailOffre')).hide();
+              google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            })
+            .withFailureHandler(function(err) {
+              showToast("Erreur : " + err.message, "error");
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
+            })
+            .terminerOperation(operationId);
+        }
       }
 
       let idOffreASupprimer = null;
