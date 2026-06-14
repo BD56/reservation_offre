@@ -71,6 +71,15 @@ function getSheetDataWithoutHeader(sheetName) {
   return data.length > 0 ? data.slice(1) : [];
 }
 
+function getColumnData(sheetName, columnIndex) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) { console.error(`Feuille "${sheetName}" introuvable.`); return []; }
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  return sheet.getRange(2, columnIndex + 1, lastRow - 1, 1).getValues().flat();
+}
+
 function appendRow(sheetName, rowData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
@@ -139,12 +148,15 @@ function findAllRowIndexesByColumnValue(sheetName, colIndex, searchValue) {
  */
 function getAllOperationsWithCounts() {
   const opsData = getSheetDataWithoutHeader(Config.SHEET_OPERATIONS);
-  const resData = getSheetDataWithoutHeader(Config.SHEET_RESERVATIONS);
+  
+  // Optimisation : ne charger que la colonne ID_Offre de Réservations pour compter
+  const opIds = getColumnData(Config.SHEET_RESERVATIONS, Config.COL_RESERVATION_OPERATION_ID);
   const reservationCounts = {};
-  resData.forEach(row => {
-    const opId = String(row[Config.COL_RESERVATION_OPERATION_ID]).trim();
-    if (opId) { reservationCounts[opId] = (reservationCounts[opId] || 0) + 1; }
+  opIds.forEach(opId => {
+    const id = String(opId).trim();
+    if (id) { reservationCounts[id] = (reservationCounts[id] || 0) + 1; }
   });
+  
   return opsData
     .filter(row => String(row[Config.COL_OPERATION_ID]).trim() !== "")
     .map(row => ({
@@ -247,9 +259,19 @@ function createReservation(data) {
 }
 
 function getReservationsByOperation(operationId) {
-  const resData = getSheetDataWithoutHeader(Config.SHEET_RESERVATIONS);
+  // Optimisation : charger seulement les lignes de cette offre
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(Config.SHEET_RESERVATIONS);
+  if (!sheet) { console.error(`Feuille "${Config.SHEET_RESERVATIONS}" introuvable.`); return []; }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  
+  const data = sheet.getDataRange().getValues();
   const reservations = [];
-  resData.forEach(row => {
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
     if (String(row[Config.COL_RESERVATION_OPERATION_ID]).trim() === String(operationId).trim()) {
       const dateSaisie = row[Config.COL_RESERVATION_DATE_SAISIE];
       const formattedDateSaisie = (dateSaisie instanceof Date) ? formatDate(dateSaisie, Config.DATETIME_FORMAT_DISPLAY) : String(dateSaisie || "");
@@ -263,7 +285,7 @@ function getReservationsByOperation(operationId) {
         articlesText: ""
       });
     }
-  });
+  }
   return reservations;
 }
 
@@ -293,15 +315,32 @@ function getArticlesByReservation(reservationId) {
 }
 
 function getResumeArticlesByOperation(operationId) {
-  const reservations = getReservationsByOperation(operationId);
+  // Optimisation : charger tous les articles de cette offre en une seule passe
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const artSheet = ss.getSheetByName(Config.SHEET_ARTICLES);
+  if (!artSheet) { console.error(`Feuille "${Config.SHEET_ARTICLES}" introuvable.`); return []; }
+  
+  const lastRow = artSheet.getLastRow();
+  if (lastRow <= 1) return [];
+  
+  const artData = artSheet.getDataRange().getValues();
   const resumeArticles = {};
-  reservations.forEach(res => {
-    const articles = getArticlesByReservation(res.idRes);
-    articles.forEach(art => {
-      const nomArt = art.nom.trim();
-      if (nomArt) { resumeArticles[nomArt] = (resumeArticles[nomArt] || 0) + art.quantite; }
-    });
-  });
+  
+  // Récupérer les IDs de réservation de cette offre
+  const resData = getReservationsByOperation(operationId);
+  const resIds = resData.map(r => r.idRes);
+  
+  // Parcourir tous les articles et garder ceux de cette offre
+  for (let i = 1; i < artData.length; i++) {
+    const row = artData[i];
+    const resId = String(row[Config.COL_ARTICLE_RESERVATION_ID]).trim();
+    if (resIds.includes(resId)) {
+      const nomArt = String(row[Config.COL_ARTICLE_NOM]).trim();
+      const qte = parseInt(row[Config.COL_ARTICLE_QUANTITE]) || 0;
+      if (nomArt) { resumeArticles[nomArt] = (resumeArticles[nomArt] || 0) + qte; }
+    }
+  }
+  
   const result = Object.keys(resumeArticles).map(nom => ({ nom: nom, total: resumeArticles[nom] }));
   result.sort((a, b) => a.nom.localeCompare(b.nom));
   return result;
