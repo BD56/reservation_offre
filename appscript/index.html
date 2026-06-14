@@ -712,6 +712,12 @@
         // Stocker les données pour retry en cas d'erreur
         lastReservationData = data;
 
+        // Réinitialiser le formulaire IMMEDIATEMENT
+        document.getElementById('formReservation').reset();
+        document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
+        document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
+        gererAffichageProduits();
+
         // Afficher un toast discret pour confirmer que l'enregistrement est lancé
         showToast("<i class='bi bi-check-circle'></i> Enregistrement poussé", "info");
 
@@ -729,11 +735,6 @@
               const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
               selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
             }
-            // Réinitialiser le formulaire
-            document.getElementById('formReservation').reset();
-            document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
-            document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
-            gererAffichageProduits();
             lastReservationData = null;
           })
           .withFailureHandler(function(err) {
