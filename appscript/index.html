@@ -993,40 +993,105 @@
         const op = currentOperationDetails.operation;
         const res = currentOperationDetails.reservations;
         const resume = currentOperationDetails.resume;
+        const now = new Date();
+        const dateImpression = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+        const timeImpression = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
         let html = `
-          <div class="mb-4 text-center">
-            <h2 class="mb-1">${op.nom}</h2>
+          <style>
+            @media print {
+              .print-header { font-family: Arial, sans-serif; }
+              .print-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+              .print-subtitle { font-size: 14px; color: #666; margin-bottom: 20px; }
+              .print-section-title { font-size: 16px; font-weight: bold; margin: 25px 0 10px 0; border-bottom: 2px solid #333; padding-bottom: 5px; }
+              .print-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+              .print-table th, .print-table td { border: 1px solid #333; padding: 8px; }
+              .print-table th { background-color: #f5f5f5; font-weight: bold; }
+              .print-table td { vertical-align: top; }
+              .print-total-row td { font-weight: bold; font-size: 15px; }
+              .print-footer { font-size: 12px; color: #666; margin-top: 20px; text-align: right; }
+              .article-row td:first-child { padding-left: 20px !important; }
+            }
+          </style>
+          
+          <div class="print-header">
+            <div class="print-title">HYPERMARCHÉ CARREFOUR VANNES</div>
+            <div class="print-subtitle">FICHE DE PRÉPARATION</div>
+            <div style="font-size: 14px; margin-bottom: 15px;">
+              <strong>Offre:</strong> ${op.nom} &nbsp;&nbsp;&nbsp; <strong>Date:</strong> ${dateImpression} ${timeImpression}
+            </div>
           </div>
         `;
 
         if (resume && resume.length > 0) {
           html += `
-            <h4 class="mb-2">Résumé des Produits à préparer</h4>
-            <table class="table table-bordered border-dark mb-5">
-              <thead class="table-light"><tr><th>Désignation du produit</th><th style="width: 150px" class="text-center">Quantité Totale</th></tr></thead>
+            <div class="print-section-title">📦 RÉSUMÉ DES PRODUITS À PRÉPARER</div>
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th style="width: 70%;">Désignation du produit</th>
+                  <th style="width: 30%; text-align: center;">Quantité Totale</th>
+                </tr>
+              </thead>
               <tbody>
           `;
-          resume.forEach(r => { html += `<tr><td>${r.nom}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`; });
+          resume.forEach(r => { 
+            html += `<tr><td>${r.nom}</td><td style="text-align: center; font-weight: bold; font-size: 15px;">${r.total}</td></tr>`; 
+          });
           html += `</tbody></table>`;
         }
 
         html += `
-          <h4 class="mb-2">Liste des Commandes (${res.length})</h4>
-          <table class="table table-bordered border-dark">
-            <thead class="table-light">
-              <tr><th>Nom & Prénom</th><th>Contact</th><th>Détail de la commande</th><th>État</th></tr>
+          <div class="print-section-title">📋 LISTE DES COMMANDES (${res.length})</div>
+          <table class="print-table">
+            <thead>
+              <tr>
+                <th style="width: 25%;">Nom & Prénom</th>
+                <th style="width: 25%;">Contact</th>
+                <th style="width: 40%;">Détail de la commande</th>
+                <th style="width: 10%; text-align: center;">État</th>
+              </tr>
             </thead>
             <tbody>
         `;
         if(res.length === 0) {
-          html += `<tr><td colspan="4" class="text-center">Aucune réservation pour le moment.</td></tr>`;
+          html += `<tr><td colspan="4" style="text-align: center;">Aucune réservation pour le moment.</td></tr>`;
         } else {
           res.forEach(r => {
-            html += `<tr><td><strong>${r.nom} ${r.prenom}</strong><br><small class="text-muted">${r.dateSaisie}</small></td><td>${r.contact}</td><td>${r.articlesText || '-'}</td><td class="text-center"><strong>${r.etat}</strong></td></tr>`;
+            const articles = r.articlesText ? r.articlesText.split(',').map(a => a.trim()) : [];
+            
+            if (articles.length === 0) {
+              // Pas d'articles
+              html += `<tr>
+                <td><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
+                <td>${r.contact}</td>
+                <td>-</td>
+                <td style="text-align: center;"><strong>${r.etat}</strong></td>
+              </tr>`;
+            } else {
+              // Premier article sur la même ligne que le client
+              const firstArticle = articles[0];
+              html += `<tr>
+                <td rowspan="${articles.length}"><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
+                <td rowspan="${articles.length}">${r.contact}</td>
+                <td>${firstArticle}</td>
+                <td rowspan="${articles.length}" style="text-align: center; vertical-align: middle;"><strong>${r.etat}</strong></td>
+              </tr>`;
+              
+              // Articles suivants sur des lignes séparées
+              for (let i = 1; i < articles.length; i++) {
+                html += `<tr class="article-row">
+                  <td>${articles[i]}</td>
+                </tr>`;
+              }
+            }
           });
         }
         html += `</tbody></table>`;
+
+        html += `
+          <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
+        `;
 
         const zoneImpression = document.getElementById('zoneImpression');
         zoneImpression.innerHTML = html;
