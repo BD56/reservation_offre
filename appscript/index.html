@@ -160,7 +160,6 @@
                 <thead class="table-light">
                   <tr>
                     <th class="ps-4">Nom de l'Offre</th>
-                    <th>Dates</th>
                     <th class="text-center">Réservations</th>
                     <th class="text-end pe-4">Action</th>
                   </tr>
@@ -642,7 +641,6 @@
 
           tr.innerHTML = `
             <td class="ps-4">${statutOffre}<span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
-            <td><small>Du ${op.dateDebut}<br>Au ${op.dateFin}</small></td>
             <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
             <td class="text-end pe-4">
               ${!op.isTerminee ? `<button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
