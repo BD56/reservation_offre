@@ -1008,7 +1008,13 @@
               .print-table th, .print-table td { border: 1px solid #333; padding: 8px; }
               .print-table th { background-color: #f5f5f5; font-weight: bold; }
               .print-table td { vertical-align: top; }
+              /* L'en-tête du tableau se répète en haut de chaque page imprimée */
+              .print-table thead { display: table-header-group; }
               .print-table tr { page-break-inside: avoid; }
+              /* Une commande = un tbody : on évite qu'elle soit coupée par un saut de page */
+              .print-table tbody.commande-group { page-break-inside: avoid; break-inside: avoid; }
+              /* Force la liste des commandes à démarrer sur une nouvelle page (p.2) */
+              .page-commandes { page-break-before: always; }
               .print-total-row td { font-weight: bold; font-size: 15px; }
               .print-footer { font-size: 12px; color: #666; margin-top: 20px; text-align: right; }
               .article-row td:first-child { padding-left: 20px !important; }
@@ -1043,8 +1049,10 @@
           html += `</tbody></table>`;
         }
 
+        // On ne force le saut de page (commandes en page 2) que si un résumé occupe la page 1.
+        const pageBreakClass = (resume && resume.length > 0) ? 'page-commandes' : '';
         html += `
-          <div class="print-section-title">📋 LISTE DES COMMANDES (${res.length})</div>
+          <div class="print-section-title ${pageBreakClass}">📋 LISTE DES COMMANDES (${res.length})</div>
           <table class="print-table">
             <thead>
               <tr>
@@ -1054,14 +1062,16 @@
                 <th style="width: 10%; text-align: center;">État</th>
               </tr>
             </thead>
-            <tbody>
         `;
         if(res.length === 0) {
-          html += `<tr><td colspan="4" style="text-align: center;">Aucune réservation pour le moment.</td></tr>`;
+          html += `<tbody><tr><td colspan="4" style="text-align: center;">Aucune réservation pour le moment.</td></tr></tbody>`;
         } else {
           res.forEach(r => {
             const articles = r.articlesText ? r.articlesText.split(',').map(a => a.trim()) : [];
-            
+
+            // Chaque commande est dans son propre <tbody> pour ne jamais être coupée par un saut de page.
+            html += `<tbody class="commande-group">`;
+
             if (articles.length === 0) {
               // Pas d'articles
               html += `<tr>
@@ -1079,7 +1089,7 @@
                 <td>${firstArticle}</td>
                 <td rowspan="${articles.length}" style="text-align: center; vertical-align: middle;"><strong>${r.etat}</strong></td>
               </tr>`;
-              
+
               // Articles suivants sur des lignes séparées
               for (let i = 1; i < articles.length; i++) {
                 html += `<tr class="article-row">
@@ -1087,9 +1097,11 @@
                 </tr>`;
               }
             }
+
+            html += `</tbody>`;
           });
         }
-        html += `</tbody></table>`;
+        html += `</table>`;
 
         html += `
           <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
