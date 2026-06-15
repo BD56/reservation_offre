@@ -1010,7 +1010,11 @@
               .print-table td { vertical-align: top; }
               .print-total-row td { font-weight: bold; font-size: 15px; }
               .print-footer { font-size: 12px; color: #666; margin-top: 20px; text-align: right; }
-              .article-row td:first-child { padding-left: 20px !important; }
+                .article-row td:first-child { padding-left: 20px !important; }
+              .page-break { page-break-after: always; }
+              .commande { page-break-inside: avoid; }
+              .print-page-1 { page-break-after: always; }
+              .print-page-2 { page-break-before: always; }
             }
           </style>
           
@@ -1024,6 +1028,9 @@
           </div>
         `;
 
+        // Page 1: Résumé des produits
+        html += '<div class="print-page-1">';
+        
         if (resume && resume.length > 0) {
           html += `
             <div class="print-section-title">📦 RÉSUMÉ DES PRODUITS À PRÉPARER</div>
@@ -1041,7 +1048,14 @@
           });
           html += `</tbody></table>`;
         }
-
+        
+        html += '</div>';
+        
+        // Saut de page
+        html += '<div class="page-break"></div>';
+        
+        // Page 2: Liste des commandes
+        html += '<div class="print-page-2">';
         html += `
           <div class="print-section-title">📋 LISTE DES COMMANDES (${res.length})</div>
           <table class="print-table">
@@ -1063,7 +1077,7 @@
             
             if (articles.length === 0) {
               // Pas d'articles
-              html += `<tr>
+              html += `<tr class="commande">
                 <td><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
                 <td>${r.contact}</td>
                 <td>-</td>
@@ -1072,7 +1086,7 @@
             } else {
               // Premier article sur la même ligne que le client
               const firstArticle = articles[0];
-              html += `<tr>
+              html += `<tr class="commande">
                 <td rowspan="${articles.length}"><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
                 <td rowspan="${articles.length}">${r.contact}</td>
                 <td>${firstArticle}</td>
@@ -1081,7 +1095,7 @@
               
               // Articles suivants sur des lignes séparées
               for (let i = 1; i < articles.length; i++) {
-                html += `<tr class="article-row">
+                html += `<tr class="commande article-row">
                   <td>${articles[i]}</td>
                 </tr>`;
               }
@@ -1089,6 +1103,7 @@
           });
         }
         html += `</tbody></table>`;
+        html += '</div>';
 
         html += `
           <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
