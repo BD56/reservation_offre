@@ -441,6 +441,7 @@
     <script>
       let currentOperationDetails = null;
       let allOperations = []; // Stockage de toutes les opérations pour le filtrage
+      let detailsCache = {};  // Cache des détails de toutes les offres (préchargé en arrière-plan)
       let newOpArticlesList = [];
       let editOpArticlesList = [];
       let lastReservationData = null; // Pour stocker les données en cas d'erreur
@@ -560,6 +561,9 @@
                 const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
                 selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
               }
+
+              // Une réservation a été ajoutée => rafraîchir le cache des détails.
+              prechargerDetails();
             })
             .withFailureHandler(function(err) {
               btn.disabled = false; btn.innerHTML = originalText;
@@ -579,6 +583,10 @@
       function afficherDonnees(operations) {
         // Stockage de toutes les opérations
         allOperations = operations;
+
+        // Précharge (ou rafraîchit) en arrière-plan le cache des détails de toutes
+        // les offres : appelé au chargement de la page et après chaque modification.
+        prechargerDetails();
         
         // Filtrer selon le filtre actuel
         filtrerOperations();
@@ -845,69 +853,91 @@
       // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
         bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
-        showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
 
+        // Cache prêt => affichage instantané, sans appel serveur.
+        if (detailsCache && detailsCache[idOperation]) {
+          afficherDetailOffre(detailsCache[idOperation]);
+          return;
+        }
+
+        // Sinon, repli sur l'appel serveur (et on alimente le cache au passage).
+        showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
         google.script.run
           .withSuccessHandler(function(details) {
-            currentOperationDetails = details; 
-            const op = details.operation;
-            
-            // Afficher l'état terminé dans le titre
-            const termineeBadge = op.isTerminee ? '<span class="badge bg-dark ms-2">TERMINÉE</span>' : '';
-            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom} ${termineeBadge}`;
-            document.getElementById('editOpId').value = op.id;
-            document.getElementById('editOpNom').value = op.nom;
-            document.getElementById('editOpType').value = op.type;
-            document.getElementById('editOpMode').value = op.modeSaisie;
-            
-            // Désactiver les champs si l'offre est terminée
-            const formEditOffre = document.getElementById('formEditOffre');
-            if (op.isTerminee) {
-              formEditOffre.querySelectorAll('input, select').forEach(el => el.disabled = true);
-              document.getElementById('btnUpdateOffre').disabled = true;
-              document.getElementById('btnTerminerOffre').disabled = true;
-            }
-            
-            // Gérer la visibilité des blocs AVANT de charger les articles :
-            // gererChampsNouvelleOffre() réinitialise editOpArticlesList = [],
-            // il doit donc être appelé en premier, sinon il efface les articles chargés.
-            gererChampsNouvelleOffre('edit');
-
-            // Charger les articles prédéfinis dans la liste (après la réinitialisation ci-dessus)
-            editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
-            afficherListeArticles('edit');
-
-            const tbody = document.getElementById('tableInscritsBody');
-            tbody.innerHTML = '';
-            
-            if(details.reservations.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
-            } else {
-              details.reservations.forEach(res => {
-                // Création du menu déroulant (Select) pour le statut
-                let selectHtml = `
-                  <select class="form-select form-select-sm fw-bold border-secondary text-secondary" onchange="changerStatutReservation('${res.idRes}', this.value)">
-                    <option value="Réservé" ${res.etat === 'Réservé' ? 'selected' : ''}>Réservé</option>
-                    <option value="Contacté" ${res.etat === 'Contacté' ? 'selected' : ''}>Contacté</option>
-                    <option value="Retrait" ${res.etat === 'Retrait' ? 'selected' : ''}>Retrait</option>
-                    <option value="Annulé" ${res.etat === 'Annulé' ? 'selected' : ''}>Annulé</option>
-                  </select>
-                `;
-
-                tbody.innerHTML += `
-                  <tr>
-                    <td><span class="fw-bold">${res.nom} ${res.prenom}</span><br><small>Saisi le ${res.dateSaisie}</small></td>
-                    <td>${res.contact}</td>
-                    <td><small>${res.articlesText || '-'}</small></td>
-                    <td>${selectHtml}</td>
-                  </tr>
-                `;
-              });
-            }
-            new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
+            detailsCache[idOperation] = details;
+            afficherDetailOffre(details);
           })
           .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); })
           .getOperationDetails(idOperation);
+      }
+
+      // Rendu du détail d'une offre (utilisé par le cache ET par l'appel serveur).
+      function afficherDetailOffre(details) {
+        currentOperationDetails = details;
+        const op = details.operation;
+
+        // Afficher l'état terminé dans le titre
+        const termineeBadge = op.isTerminee ? '<span class="badge bg-dark ms-2">TERMINÉE</span>' : '';
+        document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom} ${termineeBadge}`;
+        document.getElementById('editOpId').value = op.id;
+        document.getElementById('editOpNom').value = op.nom;
+        document.getElementById('editOpType').value = op.type;
+        document.getElementById('editOpMode').value = op.modeSaisie;
+
+        // Activer/désactiver les champs selon l'état terminé (on réactive explicitement
+        // car le même modal est réutilisé : une offre terminée ouverte avant ne doit pas
+        // laisser les champs grisés pour l'offre suivante).
+        const formEditOffre = document.getElementById('formEditOffre');
+        const desactiver = !!op.isTerminee;
+        formEditOffre.querySelectorAll('input, select').forEach(el => el.disabled = desactiver);
+        document.getElementById('btnUpdateOffre').disabled = desactiver;
+        document.getElementById('btnTerminerOffre').disabled = desactiver;
+
+        // Gérer la visibilité des blocs AVANT de charger les articles :
+        // gererChampsNouvelleOffre() réinitialise editOpArticlesList = [],
+        // il doit donc être appelé en premier, sinon il efface les articles chargés.
+        gererChampsNouvelleOffre('edit');
+
+        // Charger les articles prédéfinis dans la liste (après la réinitialisation ci-dessus)
+        editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
+        afficherListeArticles('edit');
+
+        const tbody = document.getElementById('tableInscritsBody');
+        tbody.innerHTML = '';
+
+        if(details.reservations.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
+        } else {
+          details.reservations.forEach(res => {
+            // Création du menu déroulant (Select) pour le statut
+            let selectHtml = `
+              <select class="form-select form-select-sm fw-bold border-secondary text-secondary" onchange="changerStatutReservation('${res.idRes}', this.value)">
+                <option value="Réservé" ${res.etat === 'Réservé' ? 'selected' : ''}>Réservé</option>
+                <option value="Contacté" ${res.etat === 'Contacté' ? 'selected' : ''}>Contacté</option>
+                <option value="Retrait" ${res.etat === 'Retrait' ? 'selected' : ''}>Retrait</option>
+                <option value="Annulé" ${res.etat === 'Annulé' ? 'selected' : ''}>Annulé</option>
+              </select>
+            `;
+
+            tbody.innerHTML += `
+              <tr>
+                <td><span class="fw-bold">${res.nom} ${res.prenom}</span><br><small>Saisi le ${res.dateSaisie}</small></td>
+                <td>${res.contact}</td>
+                <td><small>${res.articlesText || '-'}</small></td>
+                <td>${selectHtml}</td>
+              </tr>
+            `;
+          });
+        }
+        new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
+      }
+
+      // Précharge en arrière-plan les détails de toutes les offres (silencieux).
+      function prechargerDetails() {
+        google.script.run
+          .withSuccessHandler(function(map) { detailsCache = map || {}; })
+          .withFailureHandler(function() { /* silencieux : repli sur le chargement à la demande */ })
+          .getAllOperationsDetails();
       }
 
       // Fonction d'enregistrement à la volée du statut
@@ -922,6 +952,9 @@
               let resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
               if (resToUpdate) resToUpdate.etat = nouveauStatut;
             }
+
+            // Rafraîchir le cache des détails pour les prochaines ouvertures.
+            prechargerDetails();
           })
           .withFailureHandler(function(err) {
             showToast("Erreur lors de la mise à jour : " + err.message, "error");

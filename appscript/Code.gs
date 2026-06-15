@@ -458,6 +458,109 @@ function getOperationDetails(operationId) {
   } catch (e) { throw new Error("Impossible de récupérer les détails : " + e.message); }
 }
 
+/**
+ * Renvoie les détails (offre + réservations + résumé) de TOUTES les offres en
+ * une seule fois, en lisant chaque feuille une seule fois. Sert au préchargement
+ * côté client : l'ouverture d'une offre devient instantanée (pas d'appel serveur).
+ * Forme identique à getOperationDetails(), indexée par id d'opération.
+ */
+function getAllOperationsDetails() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const result = {};       // opId -> { operation, reservations, resume }
+    const resObjById = {};   // idRes -> objet réservation (référence)
+    const resOpById = {};    // idRes -> opId
+    const resumeByOp = {};   // opId -> { nomArticle: total }
+
+    // --- 1 lecture : Operations ---
+    const opSheet = ss.getSheetByName(Config.SHEET_OPERATIONS);
+    if (opSheet && opSheet.getLastRow() > 1) {
+      const opData = opSheet.getDataRange().getValues();
+      for (let i = 1; i < opData.length; i++) {
+        const row = opData[i];
+        const id = String(row[Config.COL_OPERATION_ID]).trim();
+        if (!id) continue;
+        const dateDebut = toDate(row[Config.COL_OPERATION_DATE_DEBUT]);
+        const dateFin = toDate(row[Config.COL_OPERATION_DATE_FIN]);
+        result[id] = {
+          operation: {
+            id: id,
+            nom: String(row[Config.COL_OPERATION_NOM] || ""),
+            type: String(row[Config.COL_OPERATION_TYPE] || ""),
+            dateDebut: dateDebut ? formatDate(dateDebut, Config.DATE_FORMAT_INPUT) : "",
+            dateFin: dateFin ? formatDate(dateFin, Config.DATE_FORMAT_INPUT) : "",
+            modeSaisie: String(row[Config.COL_OPERATION_MODE_SAISIE] || "Libre"),
+            articlesPredefinis: String(row[Config.COL_OPERATION_ARTICLES_PREDEFINIS] || ""),
+            isTerminee: String(row[Config.COL_OPERATION_TERMINEE] || "").toLowerCase() === "true"
+          },
+          reservations: [],
+          resume: []
+        };
+        resumeByOp[id] = {};
+      }
+    }
+
+    // --- 1 lecture : Reservations ---
+    const resSheet = ss.getSheetByName(Config.SHEET_RESERVATIONS);
+    if (resSheet && resSheet.getLastRow() > 1) {
+      const resData = resSheet.getDataRange().getValues();
+      for (let i = 1; i < resData.length; i++) {
+        const row = resData[i];
+        const opId = String(row[Config.COL_RESERVATION_OPERATION_ID]).trim();
+        if (!result[opId]) continue; // réservation orpheline => ignorée
+        const idRes = String(row[Config.COL_RESERVATION_ID]).trim();
+        const dateSaisie = row[Config.COL_RESERVATION_DATE_SAISIE];
+        const formattedDateSaisie = (dateSaisie instanceof Date)
+          ? formatDate(dateSaisie, Config.DATETIME_FORMAT_DISPLAY)
+          : String(dateSaisie || "");
+        const resObj = {
+          idRes: idRes,
+          nom: String(row[Config.COL_RESERVATION_NOM] || ""),
+          prenom: String(row[Config.COL_RESERVATION_PRENOM] || ""),
+          contact: String(row[Config.COL_RESERVATION_CONTACT] || ""),
+          etat: String(row[Config.COL_RESERVATION_ETAT] || "Réservé"),
+          dateSaisie: formattedDateSaisie,
+          articlesText: ""
+        };
+        result[opId].reservations.push(resObj);
+        resObjById[idRes] = resObj;
+        resOpById[idRes] = opId;
+      }
+    }
+
+    // --- 1 lecture : Articles (rattachement + résumé en une passe) ---
+    const artSheet = ss.getSheetByName(Config.SHEET_ARTICLES);
+    if (artSheet && artSheet.getLastRow() > 1) {
+      const artData = artSheet.getDataRange().getValues();
+      const articlesParRes = {}; // idRes -> ["2x Pomme", ...]
+      for (let i = 1; i < artData.length; i++) {
+        const row = artData[i];
+        const resId = String(row[Config.COL_ARTICLE_RESERVATION_ID]).trim();
+        const opId = resOpById[resId];
+        if (!opId) continue;
+        const nomArt = String(row[Config.COL_ARTICLE_NOM] || "").trim();
+        if (!nomArt) continue;
+        const qte = parseInt(row[Config.COL_ARTICLE_QUANTITE]) || 0;
+        (articlesParRes[resId] || (articlesParRes[resId] = [])).push(`${qte}x ${nomArt}`);
+        resumeByOp[opId][nomArt] = (resumeByOp[opId][nomArt] || 0) + qte;
+      }
+      Object.keys(articlesParRes).forEach(resId => {
+        if (resObjById[resId]) resObjById[resId].articlesText = articlesParRes[resId].join(', ');
+      });
+    }
+
+    // Résumés triés par nom, par offre
+    Object.keys(result).forEach(opId => {
+      const map = resumeByOp[opId] || {};
+      result[opId].resume = Object.keys(map)
+        .map(nom => ({ nom: nom, total: map[nom] }))
+        .sort((a, b) => a.nom.localeCompare(b.nom));
+    });
+
+    return result;
+  } catch (e) { throw new Error("Impossible de précharger les détails : " + e.message); }
+}
+
 function saveOperation(data) {
   try { createOperation(data); return true; }
   catch (e) { throw new Error("Impossible de sauvegarder l'opération : " + e.message); }
