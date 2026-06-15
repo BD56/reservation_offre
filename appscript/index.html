@@ -1029,7 +1029,7 @@
         `;
 
         // Page 1: Résumé des produits
-        html += '<div class="print-page-1">';
+        html += '<div style="page-break-after: always;">';
         
         if (resume && resume.length > 0) {
           html += `
@@ -1052,10 +1052,10 @@
         html += '</div>';
         
         // Saut de page
-        html += '<div class="page-break"></div>';
+        html += '<div style="page-break-after: always;"></div>';
         
         // Page 2: Liste des commandes
-        html += '<div class="print-page-2">';
+        html += '<div style="page-break-before: always;">';
         html += `
           <div class="print-section-title">📋 LISTE DES COMMANDES (${res.length})</div>
           <table class="print-table">
@@ -1077,7 +1077,7 @@
             
             if (articles.length === 0) {
               // Pas d'articles
-              html += `<tr class="commande">
+              html += `<tr style="page-break-inside: avoid;">
                 <td><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
                 <td>${r.contact}</td>
                 <td>-</td>
@@ -1086,7 +1086,7 @@
             } else {
               // Premier article sur la même ligne que le client
               const firstArticle = articles[0];
-              html += `<tr class="commande">
+              html += `<tr style="page-break-inside: avoid;">
                 <td rowspan="${articles.length}"><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
                 <td rowspan="${articles.length}">${r.contact}</td>
                 <td>${firstArticle}</td>
@@ -1095,8 +1095,8 @@
               
               // Articles suivants sur des lignes séparées
               for (let i = 1; i < articles.length; i++) {
-                html += `<tr class="commande article-row">
-                  <td>${articles[i]}</td>
+                html += `<tr style="page-break-inside: avoid;">
+                  <td style="padding-left: 20px !important;">${articles[i]}</td>
                 </tr>`;
               }
             }
@@ -1106,7 +1106,7 @@
         html += '</div>';
 
         html += `
-          <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
+          <div style="font-size: 12px; color: #666; margin-top: 20px; text-align: right;">Imprimé le ${dateImpression} à ${timeImpression}</div>
         `;
 
         const zoneImpression = document.getElementById('zoneImpression');
