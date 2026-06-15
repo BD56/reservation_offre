@@ -31,11 +31,13 @@
       
       /* --- CSS POUR L'IMPRESSION --- */
       @media print {
-        body * { visibility: hidden !important; }
-        #zoneImpression, #zoneImpression * { visibility: visible !important; }
-        #zoneImpression { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 20px; }
-        .modal, .modal-backdrop, .offcanvas, .offcanvas-backdrop { display: none !important; }
-        .toast-container { display: none !important; }
+        /* Masquer toute l'interface en la retirant du flux (display:none, pas visibility)
+           pour éviter un grand espace vide en haut, ET pour que les sauts de page
+           fonctionnent : ils sont ignorés sur un conteneur en position:absolute. */
+        body > *:not(#zoneImpression) { display: none !important; }
+        /* La fiche d'impression occupe le flux normal du document => page-break OK */
+        #zoneImpression { display: block !important; position: static; width: 100%; padding: 20px; }
+        .modal, .modal-backdrop, .offcanvas, .offcanvas-backdrop, .toast-container { display: none !important; }
       }
     </style>
   </head>
