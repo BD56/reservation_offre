@@ -381,12 +381,70 @@ function getOperationDetails(operationId) {
   try {
     const operation = getOperationById(operationId);
     if (!operation) { throw new Error(`Opération avec l'ID "${operationId}" introuvable.`); }
-    const reservations = getReservationsByOperation(operationId);
-    const resume = getResumeArticlesByOperation(operationId);
+
+    // Optimisation : on lit chaque feuille UNE SEULE FOIS, puis on fait les jointures
+    // et l'agrégation du résumé en mémoire. (Avant : ~4 + N lectures de feuilles à cause
+    // d'un appel par réservation => très lent. Maintenant : 3 lectures au total, quel que
+    // soit le nombre d'inscrits.)
+    const opId = String(operationId).trim();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // --- 1 lecture : feuille Réservations (on ne garde que celles de cette offre) ---
+    const reservations = [];
+    const resIndexById = {}; // idRes -> position dans `reservations`, pour rattacher les articles
+    const resSheet = ss.getSheetByName(Config.SHEET_RESERVATIONS);
+    if (resSheet && resSheet.getLastRow() > 1) {
+      const resData = resSheet.getDataRange().getValues();
+      for (let i = 1; i < resData.length; i++) {
+        const row = resData[i];
+        if (String(row[Config.COL_RESERVATION_OPERATION_ID]).trim() !== opId) continue;
+        const idRes = String(row[Config.COL_RESERVATION_ID]).trim();
+        const dateSaisie = row[Config.COL_RESERVATION_DATE_SAISIE];
+        const formattedDateSaisie = (dateSaisie instanceof Date)
+          ? formatDate(dateSaisie, Config.DATETIME_FORMAT_DISPLAY)
+          : String(dateSaisie || "");
+        resIndexById[idRes] = reservations.length;
+        reservations.push({
+          idRes: idRes,
+          nom: String(row[Config.COL_RESERVATION_NOM] || ""),
+          prenom: String(row[Config.COL_RESERVATION_PRENOM] || ""),
+          contact: String(row[Config.COL_RESERVATION_CONTACT] || ""),
+          etat: String(row[Config.COL_RESERVATION_ETAT] || "Réservé"),
+          dateSaisie: formattedDateSaisie,
+          articlesText: ""
+        });
+      }
+    }
+
+    // --- 1 lecture : feuille Articles (rattachement aux réservations + résumé en une passe) ---
+    const articlesParRes = {}; // idRes -> ["2x Pomme", ...]
+    const resumeMap = {};      // nom d'article -> quantité totale
+    const artSheet = ss.getSheetByName(Config.SHEET_ARTICLES);
+    if (artSheet && artSheet.getLastRow() > 1) {
+      const artData = artSheet.getDataRange().getValues();
+      for (let i = 1; i < artData.length; i++) {
+        const row = artData[i];
+        const resId = String(row[Config.COL_ARTICLE_RESERVATION_ID]).trim();
+        if (!(resId in resIndexById)) continue; // article d'une autre offre => ignoré
+        const nomArt = String(row[Config.COL_ARTICLE_NOM] || "").trim();
+        if (!nomArt) continue;
+        const qte = parseInt(row[Config.COL_ARTICLE_QUANTITE]) || 0;
+        (articlesParRes[resId] || (articlesParRes[resId] = [])).push(`${qte}x ${nomArt}`);
+        resumeMap[nomArt] = (resumeMap[nomArt] || 0) + qte;
+      }
+    }
+
+    // Rattacher le texte des articles à chaque réservation
     reservations.forEach(res => {
-      const articles = getArticlesByReservation(res.idRes);
-      res.articlesText = articles.length > 0 ? articles.map(art => `${art.quantite}x ${art.nom}`).join(', ') : '';
+      const arts = articlesParRes[res.idRes];
+      res.articlesText = arts ? arts.join(', ') : '';
     });
+
+    // Construire le résumé trié par nom
+    const resume = Object.keys(resumeMap)
+      .map(nom => ({ nom: nom, total: resumeMap[nom] }))
+      .sort((a, b) => a.nom.localeCompare(b.nom));
+
     return {
       operation: {
         id: operation.id, nom: operation.nom, type: operation.type,
