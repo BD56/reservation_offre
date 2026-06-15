@@ -199,7 +199,7 @@ function createOperation(data) {
   return { id: newId, nom: data.nom, type: data.type, dateDebut: toDate(data.dateDebut), dateFin: toDate(data.dateFin), modeSaisie: data.modeSaisie || "Libre", articlesPredefinis: data.articlesPredefinis || "", isTerminee: false };
 }
 
-function updateOperation(data) {
+function _updateOperation(data) {
   const rowIndex = findRowIndexByColumnValue(Config.SHEET_OPERATIONS, Config.COL_OPERATION_ID, data.id);
   if (!rowIndex) { throw new Error(`Opération avec l'ID "${data.id}" introuvable.`); }
   const rowData = [[data.nom, data.type, data.dateDebut || "", data.dateFin || "", data.modeSaisie || "Libre", data.articlesPredefinis || "", data.isTerminee ? "true" : "false"]];
@@ -293,7 +293,7 @@ function getReservationsByOperation(operationId) {
   return reservations;
 }
 
-function updateReservationStatus(reservationId, newStatus) {
+function _updateReservationStatus(reservationId, newStatus) {
   if (!Config.RESERVATION_STATUSES.includes(newStatus)) {
     throw new Error(`Statut invalide : "${newStatus}". Statuts valides : ${Config.RESERVATION_STATUSES.join(", ")}`);
   }
@@ -406,7 +406,7 @@ function saveOperation(data) {
 }
 
 function updateOperation(data) {
-  try { return updateOperation(data); }
+  try { return _updateOperation(data); }
   catch (e) { throw new Error("Impossible de mettre à jour l'opération : " + e.message); }
 }
 
@@ -425,6 +425,6 @@ function terminerOperation(operationId) {
 }
 
 function updateReservationStatus(reservationId, newStatus) {
-  try { return updateReservationStatus(reservationId, newStatus); }
+  try { return _updateReservationStatus(reservationId, newStatus); }
   catch (e) { throw new Error("Impossible de mettre à jour le statut : " + e.message); }
 }
