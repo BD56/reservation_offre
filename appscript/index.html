@@ -1112,9 +1112,30 @@
         const zoneImpression = document.getElementById('zoneImpression');
         zoneImpression.innerHTML = html;
         zoneImpression.classList.remove('d-none');
-        
-        window.print(); 
-        setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
+
+        // On attend que le logo (image base64) soit décodé AVANT d'imprimer.
+        // Sinon window.print() capture la page avant que l'image ne soit peinte
+        // (piège classique des web apps Apps Script en iframe) => logo absent.
+        const lancerImpression = () => {
+          window.print();
+          setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
+        };
+        const logo = zoneImpression.querySelector('img');
+        if (logo) {
+          // Sécurité : si le décodage traîne, on imprime quand même au bout de 1,5 s.
+          let imprime = false;
+          const goUneSeuleFois = () => { if (!imprime) { imprime = true; lancerImpression(); } };
+          if (typeof logo.decode === 'function') {
+            logo.decode().then(goUneSeuleFois).catch(goUneSeuleFois);
+          } else {
+            logo.onload = goUneSeuleFois;
+            logo.onerror = goUneSeuleFois;
+            if (logo.complete) goUneSeuleFois();
+          }
+          setTimeout(goUneSeuleFois, 1500);
+        } else {
+          lancerImpression();
+        }
       }
 
     </script>
