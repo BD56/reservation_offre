@@ -367,7 +367,8 @@ function getOperationsData() {
       id: op.id, nom: op.nom, type: op.type,
       dateDebut: op.dateDebut ? formatDate(op.dateDebut, Config.DATE_FORMAT_DISPLAY) : "",
       dateFin: op.dateFin ? formatDate(op.dateFin, Config.DATE_FORMAT_DISPLAY) : "",
-      modeSaisie: op.modeSaisie, articlesPredefinis: op.articlesPredefinis, count: op.count
+      modeSaisie: op.modeSaisie, articlesPredefinis: op.articlesPredefinis, count: op.count,
+      isTerminee: op.isTerminee
     }));
   } catch (e) { throw new Error("Impossible de récupérer les opérations : " + e.message); }
 }
