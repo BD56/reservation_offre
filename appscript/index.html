@@ -606,11 +606,11 @@
           return getTimestamp(b.id) - getTimestamp(a.id);
         });
         
-        // Filtrer
+        // Filtrer : par défaut, afficher uniquement les offres actives dans le dropdown
         const filteredOps = sortedOps.filter(op => {
           if (filter === 'actives') return !op.isTerminee;
           if (filter === 'terminees') return op.isTerminee;
-          return true; // toutes
+          return !op.isTerminee; // Par défaut : offres actives
         });
         
         // Afficher dans le dropdown
