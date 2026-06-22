@@ -332,8 +332,12 @@
               </div>
 
               <div class="tab-pane fade" id="parametres" role="tabpanel">
+                <div id="bannerOffreTerminee" class="alert alert-warning d-flex align-items-center mb-3" style="display: none;">
+                  <i class="bi bi-lock-fill me-2"></i>
+                  <span>Offre <strong>terminée</strong> : la modification est verrouillée. Seule l'impression reste disponible.</span>
+                </div>
                 <form id="formEditOffre">
-                  <input type="hidden" id="editOpId"> 
+                  <input type="hidden" id="editOpId">
                   <div class="mb-3">
                     <label class="form-label small fw-bold text-secondary">NOM DE L'OFFRE *</label>
                     <input type="text" class="form-control" id="editOpNom" required>
@@ -1076,14 +1080,8 @@
         CustomSelect.refresh(document.getElementById('editOpType'));
         CustomSelect.refresh(document.getElementById('editOpMode'));
 
-        // Activer/désactiver les champs selon l'état terminé (on réactive explicitement
-        // car le même modal est réutilisé : une offre terminée ouverte avant ne doit pas
-        // laisser les champs grisés pour l'offre suivante).
         const formEditOffre = document.getElementById('formEditOffre');
         const desactiver = !!op.isTerminee;
-        formEditOffre.querySelectorAll('input, select').forEach(el => el.disabled = desactiver);
-        document.getElementById('btnUpdateOffre').disabled = desactiver;
-        document.getElementById('btnTerminerOffre').disabled = desactiver;
 
         // Gérer la visibilité des blocs AVANT de charger les articles :
         // gererChampsNouvelleOffre() réinitialise editOpArticlesList = [],
@@ -1093,6 +1091,13 @@
         // Charger les articles prédéfinis dans la liste (après la réinitialisation ci-dessus)
         editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
         afficherListeArticles('edit');
+
+        // Verrou "lecture seule" pour une offre terminée — APPLIQUÉ APRÈS le rendu de la
+        // liste d'articles (sinon ses champs et surtout ses BOUTONS supprimer/éditer/ajouter,
+        // recréés ici, échapperaient au verrou). On réactive explicitement si l'offre est
+        // active, car le modal est réutilisé. Une bannière informe l'utilisateur.
+        formEditOffre.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = desactiver);
+        document.getElementById('bannerOffreTerminee').style.display = desactiver ? 'flex' : 'none';
 
         const tbody = document.getElementById('tableInscritsBody');
         tbody.innerHTML = '';
