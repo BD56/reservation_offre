@@ -399,11 +399,15 @@
         <div class="modal-content border-0 shadow">
           <div class="modal-body text-center p-4">
             <i class="bi bi-exclamation-circle text-danger fs-1 mb-3"></i>
-            <h5 class="mb-3">Confirmation</h5>
-            <p class="text-muted mb-4">Êtes-vous sûr de vouloir supprimer cette offre ?</p>
-            <div class="d-flex justify-content-center gap-2">
+            <h5 class="mb-2">Supprimer cette offre ?</h5>
+            <p class="fw-bold text-dark mb-1" id="confirmDeleteNom"></p>
+            <p class="text-danger small mb-4">Suppression <strong>définitive</strong> de l'offre et de toutes ses réservations. Action irréversible.</p>
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-success fw-bold" id="btnDlPuisSupprimer">
+                <i class="bi bi-download"></i> Télécharger le récap (PDF) puis supprimer
+              </button>
+              <button type="button" class="btn btn-outline-danger" id="btnSupprimerSeul">Supprimer sans télécharger</button>
               <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annuler</button>
-              <button type="button" class="btn btn-danger" id="btnConfirmerSuppression">Supprimer</button>
             </div>
           </div>
         </div>
@@ -491,7 +495,10 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+    <!-- Génération PDF côté site (téléchargement du récap avant suppression) -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
     <script>
       let currentOperationDetails = null;
       let allOperations = []; // Stockage de toutes les opérations pour le filtrage
@@ -842,9 +849,9 @@
             <td class="ps-4">${statutOffre}<span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
             <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
             <td class="text-end pe-4">
-              ${!op.isTerminee ? `<button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
+              <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
                 <i class="bi bi-trash"></i>
-              </button>` : ''}
+              </button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -1216,36 +1223,85 @@
       let idOffreASupprimer = null;
       function demanderSuppression(idOperation) {
         idOffreASupprimer = idOperation;
+        const op = allOperations.find(o => o.id === idOperation);
+        const n = op ? (op.count || 0) : 0;
+        document.getElementById('confirmDeleteNom').textContent =
+          op ? `« ${op.nom} »  —  ${n} réservation${n > 1 ? 's' : ''}` : '';
         new bootstrap.Modal(document.getElementById('modalConfirmDelete')).show();
       }
-      document.getElementById('btnConfirmerSuppression').addEventListener('click', function() {
-        if (idOffreASupprimer) {
-          bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete')).hide();
-          google.script.run.withSuccessHandler(function() { showToast("Opération supprimée !", 'success'); google.script.run.withSuccessHandler(afficherDonnees).getOperationsData(); }).deleteOperation(idOffreASupprimer);
-        }
+
+      // Récupère les détails d'une offre : cache si dispo, sinon serveur.
+      function obtenirDetailsOffre(id, callback) {
+        if (detailsCache && detailsCache[id]) { callback(detailsCache[id]); return; }
+        google.script.run
+          .withSuccessHandler(function(d) { detailsCache[id] = d; callback(d); })
+          .withFailureHandler(function(e) { showToast("Erreur : " + e.message, "error"); })
+          .getOperationDetails(id);
+      }
+
+      // Suppression effective (après confirmation / éventuel téléchargement).
+      function _executerSuppression() {
+        const id = idOffreASupprimer;
+        if (!id) return;
+        bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete')).hide();
+        google.script.run
+          .withSuccessHandler(function() {
+            showToast("Offre supprimée !", 'success');
+            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+          })
+          .withFailureHandler(function(err) { showToast("Erreur : " + err.message, "error"); })
+          .deleteOperation(id);
+      }
+
+      // "Supprimer sans télécharger"
+      document.getElementById('btnSupprimerSeul').addEventListener('click', _executerSuppression);
+
+      // "Télécharger le récap (PDF) puis supprimer" : on NE supprime QUE si le PDF a réussi.
+      document.getElementById('btnDlPuisSupprimer').addEventListener('click', function() {
+        const id = idOffreASupprimer;
+        if (!id) return;
+        const btn = this;
+        const htmlBtn = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Génération du PDF...';
+        obtenirDetailsOffre(id, function(details) {
+          genererPdfFiche(details, function(ok) {
+            btn.disabled = false;
+            btn.innerHTML = htmlBtn;
+            if (ok) {
+              showToast("PDF téléchargé.", "success");
+              _executerSuppression();
+            }
+            // Échec PDF : on ne supprime pas (données préservées), message déjà affiché.
+          });
+        });
       });
 
-      function imprimerReservations() {
-        if (!currentOperationDetails) return;
-
-        const op = currentOperationDetails.operation;
-        const res = currentOperationDetails.reservations;
-        const resume = currentOperationDetails.resume;
+      // Construit le HTML de la fiche de préparation. Utilisé par l'impression ET le PDF.
+      // Les styles de base sont hors @media print pour que html2canvas (PDF) les applique ;
+      // seules les règles de pagination restent dans @media print.
+      function construireHtmlFiche(details) {
+        const op = details.operation;
+        const res = details.reservations;
+        const resume = details.resume;
         const now = new Date();
         const dateImpression = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
         const timeImpression = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
         let html = `
           <style>
+            .print-header { font-family: Arial, sans-serif; }
+            .print-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+            .print-subtitle { font-size: 14px; color: #666; margin-bottom: 20px; }
+            .print-section-title { font-size: 16px; font-weight: bold; margin: 25px 0 10px 0; border-bottom: 2px solid #333; padding-bottom: 5px; }
+            .print-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            .print-table th, .print-table td { border: 1px solid #333; padding: 8px; }
+            .print-table th { background-color: #f5f5f5; font-weight: bold; }
+            .print-table td { vertical-align: top; }
+            .print-total-row td { font-weight: bold; font-size: 15px; }
+            .print-footer { font-size: 12px; color: #666; margin-top: 20px; text-align: right; }
+            .article-row td:first-child { padding-left: 20px !important; }
             @media print {
-              .print-header { font-family: Arial, sans-serif; }
-              .print-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-              .print-subtitle { font-size: 14px; color: #666; margin-bottom: 20px; }
-              .print-section-title { font-size: 16px; font-weight: bold; margin: 25px 0 10px 0; border-bottom: 2px solid #333; padding-bottom: 5px; }
-              .print-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-              .print-table th, .print-table td { border: 1px solid #333; padding: 8px; }
-              .print-table th { background-color: #f5f5f5; font-weight: bold; }
-              .print-table td { vertical-align: top; }
               /* L'en-tête du tableau se répète en haut de chaque page imprimée */
               .print-table thead { display: table-header-group; }
               .print-table tr { page-break-inside: avoid; }
@@ -1253,14 +1309,11 @@
               .print-table tbody.commande-group { page-break-inside: avoid; break-inside: avoid; }
               /* Force la liste des commandes à démarrer sur une nouvelle page (p.2) */
               .page-commandes { page-break-before: always; }
-              .print-total-row td { font-weight: bold; font-size: 15px; }
-              .print-footer { font-size: 12px; color: #666; margin-top: 20px; text-align: right; }
-              .article-row td:first-child { padding-left: 20px !important; }
             }
           </style>
-          
+
           <div class="print-header" style="text-align: center; margin-bottom: 20px;">
-            <img src="https://raw.githubusercontent.com/BD56/reservation_offre/main/appscript/logo-transparent.png" style="max-width: 150px; height: auto; margin-bottom: 10px;" alt="Carrefour Logo">
+            <img src="https://raw.githubusercontent.com/BD56/reservation_offre/main/appscript/logo-transparent.png" style="max-width: 150px; height: auto; margin-bottom: 10px;" alt="Carrefour Logo" crossorigin="anonymous">
             <div class="print-title">HYPERMARCHÉ CARREFOUR VANNES</div>
             <div class="print-subtitle">FICHE DE PRÉPARATION</div>
             <div style="font-size: 14px; margin-bottom: 15px;">
@@ -1345,33 +1398,80 @@
           <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
         `;
 
+        return html;
+      }
+
+      function imprimerReservations() {
+        if (!currentOperationDetails) return;
         const zoneImpression = document.getElementById('zoneImpression');
-        zoneImpression.innerHTML = html;
+        zoneImpression.innerHTML = construireHtmlFiche(currentOperationDetails);
         zoneImpression.classList.remove('d-none');
 
-        // On attend que le logo (image base64) soit décodé AVANT d'imprimer.
-        // Sinon window.print() capture la page avant que l'image ne soit peinte
-        // (piège classique des web apps Apps Script en iframe) => logo absent.
+        // On attend que le logo soit décodé AVANT d'imprimer, sinon window.print()
+        // capture la page avant que l'image ne soit peinte (iframe Apps Script).
         const lancerImpression = () => {
           window.print();
           setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
         };
         const logo = zoneImpression.querySelector('img');
         if (logo) {
-          // Sécurité : si le décodage traîne, on imprime quand même au bout de 1,5 s.
           let imprime = false;
           const goUneSeuleFois = () => { if (!imprime) { imprime = true; lancerImpression(); } };
-          if (typeof logo.decode === 'function') {
-            logo.decode().then(goUneSeuleFois).catch(goUneSeuleFois);
-          } else {
-            logo.onload = goUneSeuleFois;
-            logo.onerror = goUneSeuleFois;
-            if (logo.complete) goUneSeuleFois();
-          }
+          if (typeof logo.decode === 'function') { logo.decode().then(goUneSeuleFois).catch(goUneSeuleFois); }
+          else { logo.onload = goUneSeuleFois; logo.onerror = goUneSeuleFois; if (logo.complete) goUneSeuleFois(); }
           setTimeout(goUneSeuleFois, 1500);
         } else {
           lancerImpression();
         }
+      }
+
+      // Génère et télécharge la fiche en PDF (100% côté site, jsPDF + html2canvas).
+      // callback(ok) : true si le PDF a bien été produit, false sinon.
+      function genererPdfFiche(details, callback) {
+        if (!window.jspdf || !window.html2canvas) {
+          showToast("Génération PDF indisponible (librairie non chargée).", "error");
+          callback(false); return;
+        }
+        // Conteneur temporaire rendu hors écran (html2canvas a besoin d'un rendu réel).
+        const cont = document.createElement('div');
+        cont.style.position = 'fixed';
+        cont.style.left = '-10000px';
+        cont.style.top = '0';
+        cont.style.width = '794px'; // ~ largeur A4 @96dpi
+        cont.style.background = '#ffffff';
+        cont.style.padding = '24px';
+        cont.innerHTML = construireHtmlFiche(details);
+        document.body.appendChild(cont);
+
+        const nettoyer = () => { if (cont.parentNode) cont.parentNode.removeChild(cont); };
+        const nomFichier = 'Fiche_' + String(details.operation.nom || 'offre').replace(/[^a-z0-9]+/gi, '_') + '.pdf';
+
+        const lancer = () => {
+          try {
+            const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
+            pdf.html(cont, {
+              callback: function(doc) {
+                try { doc.save(nomFichier); nettoyer(); callback(true); }
+                catch (e) { nettoyer(); showToast("Erreur PDF : " + e.message, "error"); callback(false); }
+              },
+              margin: [24, 24, 24, 24],
+              autoPaging: 'text',
+              html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' },
+              width: 547,      // 595pt (A4) - 2*24 de marge
+              windowWidth: 794
+            });
+          } catch (e) { nettoyer(); showToast("Erreur PDF : " + e.message, "error"); callback(false); }
+        };
+
+        // Attendre le décodage du logo pour qu'il apparaisse dans le PDF.
+        const logo = cont.querySelector('img');
+        if (logo) {
+          let lance = false;
+          const go = () => { if (!lance) { lance = true; lancer(); } };
+          if (typeof logo.decode === 'function') logo.decode().then(go).catch(go);
+          else { logo.onload = go; logo.onerror = go; if (logo.complete) go(); }
+          setTimeout(go, 2500);
+        } else { lancer(); }
       }
 
     </script>
