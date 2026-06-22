@@ -818,16 +818,17 @@
 
         filteredOps.forEach(op => {
           const tr = document.createElement('tr');
-          tr.style.cursor = op.isTerminee ? 'not-allowed' : 'pointer';
+          tr.style.cursor = 'pointer';
           tr.className = op.isTerminee ? 'table-secondary' : '';
-          
-          if (!op.isTerminee) {
-            tr.onclick = function() { voirReservationsDetail(op.id); };
-          } else {
-            tr.onclick = function() { 
-              showToast("Offre terminée - seule l'impression est disponible", "info");
-            };
-          }
+
+          // Active OU terminée : on ouvre le détail. Pour une offre terminée,
+          // afficherDetailOffre() désactive l'édition => seule l'impression reste possible.
+          tr.onclick = function() {
+            if (op.isTerminee) {
+              showToast("Offre terminée : seule l'impression est disponible.", "info");
+            }
+            voirReservationsDetail(op.id);
+          };
           
           let pastilleCouleur = op.count > 0 ? 'success' : 'secondary';
           let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
