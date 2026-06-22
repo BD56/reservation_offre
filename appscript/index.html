@@ -587,52 +587,65 @@
         // Précharge (ou rafraîchit) en arrière-plan le cache des détails de toutes
         // les offres : appelé au chargement de la page et après chaque modification.
         prechargerDetails();
-        
-        // Filtrer selon le filtre actuel
-        setTimeout(filtrerOperations, 100);
+
+        // Deux cibles distinctes, deux logiques :
+        //  - le dropdown de réservation : UNIQUEMENT les offres actives ;
+        //  - le tableau de la modal de gestion : selon le filtre choisi par l'utilisateur.
+        filtrerPourDropdown();
+        filtrerOperations();
       }
 
-      function filtrerOperations() {
-        const filter = document.getElementById('filterOperations').value;
-        const select = document.getElementById('operationSelect');
-        const tbody = document.getElementById('tableOperationsBody');
-        
-        // Trier par date de création (extraite de l'ID OP-{timestamp}) du plus récent au plus ancien
-        const sortedOps = [...allOperations].sort((a, b) => {
+      // Trie les offres de la plus récente à la plus ancienne (timestamp dans l'ID OP-xxx).
+      function trierOffresRecentes(ops) {
+        return [...ops].sort((a, b) => {
           const getTimestamp = (id) => {
             const match = id.match(/OP-(\d+)/);
             return match ? parseInt(match[1]) : 0;
           };
           return getTimestamp(b.id) - getTimestamp(a.id);
         });
-        
-        // Filtrer : par défaut, afficher uniquement les offres actives dans le dropdown
-        const filteredOps = sortedOps.filter(op => {
-          if (filter === 'actives') return !op.isTerminee;
-          if (filter === 'terminees') return op.isTerminee;
-          return !op.isTerminee; // Par défaut : offres actives
-        });
-        
-        // Afficher dans le dropdown
+      }
+
+      // Remplit le dropdown de réservation avec UNIQUEMENT les offres actives.
+      function filtrerPourDropdown() {
+        const select = document.getElementById('operationSelect');
+        const activeOps = trierOffresRecentes(allOperations).filter(op => !op.isTerminee);
+
         select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
-        
-        if (filteredOps.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+        if (activeOps.length === 0) {
+          select.innerHTML = '<option value="" disabled selected>Aucune offre active disponible.</option>';
           return;
         }
-
-        filteredOps.forEach(op => {
+        activeOps.forEach(op => {
           const option = document.createElement('option');
           option.value = op.id;
           option.setAttribute('data-type', op.type);
           option.setAttribute('data-mode', op.modeSaisie);
           option.setAttribute('data-articles', op.articlesPredefinis);
           option.setAttribute('data-count', op.count || 0);
-          option.setAttribute('data-terminee', op.isTerminee || false);
-          option.disabled = op.isTerminee; // Désactiver les offres terminées dans le dropdown
-          option.textContent = `[${op.type}] ${op.nom} (${op.count || 0})${op.isTerminee ? ' - TERMINÉE' : ''}`;
+          option.textContent = `[${op.type}] ${op.nom} (${op.count || 0})`;
           select.appendChild(option);
+        });
+      }
 
+      // Remplit le tableau de la modal "Gérer les opérations" selon le filtre choisi.
+      function filtrerOperations() {
+        const filter = document.getElementById('filterOperations').value;
+        const tbody = document.getElementById('tableOperationsBody');
+
+        const filteredOps = trierOffresRecentes(allOperations).filter(op => {
+          if (filter === 'actives') return !op.isTerminee;
+          if (filter === 'terminees') return op.isTerminee;
+          return true; // 'toutes' : actives ET terminées
+        });
+
+        tbody.innerHTML = '';
+        if (filteredOps.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+          return;
+        }
+
+        filteredOps.forEach(op => {
           const tr = document.createElement('tr');
           tr.style.cursor = op.isTerminee ? 'not-allowed' : 'pointer';
           tr.className = op.isTerminee ? 'table-secondary' : '';
