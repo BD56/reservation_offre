@@ -28,7 +28,38 @@
         margin-bottom: 20px;
       }
       .table-res small { font-size: 0.8em; color: #6c757d; }
-      
+
+      /* --- SELECT CUSTOM (remplace le menu déroulant natif de l'OS) --- */
+      .custom-select-wrapper { position: relative; width: 100%; }
+      .custom-select-trigger {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .custom-select-wrapper.disabled { opacity: 0.65; pointer-events: none; }
+      .custom-select-menu {
+        position: fixed;
+        z-index: 2000;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 0.5rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 4px;
+      }
+      .custom-select-option {
+        padding: 8px 12px;
+        border-radius: 0.35rem;
+        cursor: pointer;
+        font-size: 0.95em;
+      }
+      .custom-select-option:hover { background: #f1f3f5; }
+      .custom-select-option.selected { background: #0d6efd; color: #fff; }
+      .custom-select-option.disabled { color: #adb5bd; cursor: not-allowed; background: transparent; }
+
       /* --- CSS POUR L'IMPRESSION --- */
       @media print {
         /* Masquer toute l'interface en la retirant du flux (display:none, pas visibility)
@@ -133,6 +164,25 @@
             
             <p class="fw-bold text-dark mb-1 mt-3">Responsabilité :</p>
             <p class="mb-0">L'auteur fournit uniquement l'infrastructure technique de cette application. La responsabilité quant à l'utilisation conforme de l'outil et au traitement légal des données collectées (respect du RGPD) incombe exclusivement à la direction de l'établissement utilisateur. L'auteur décline toute responsabilité en cas d'usage abusif, détourné ou négligent de ces informations par l'établissement.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale de confirmation générique (remplace le confirm() natif du navigateur) -->
+    <div class="modal fade" id="modalConfirmAction" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header bg-light">
+            <h5 class="modal-title fw-bold text-dark">
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i> Confirmation
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body p-4 text-secondary" id="confirmActionMessage"></div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="button" class="btn btn-dark fw-bold" id="btnConfirmActionOk">Confirmer</button>
           </div>
         </div>
       </div>
@@ -564,6 +614,8 @@
 
               // Une réservation a été ajoutée => rafraîchir le cache des détails.
               prechargerDetails();
+              // Le formulaire a été reset => resynchroniser le dropdown custom.
+              CustomSelect.refresh(document.getElementById('operationSelect'));
             })
             .withFailureHandler(function(err) {
               btn.disabled = false; btn.innerHTML = originalText;
@@ -573,11 +625,130 @@
         }
       }
 
+      // =====================================================================
+      // COMPOSANT "SELECT CUSTOM" — remplace le menu déroulant natif de l'OS.
+      // Le <select> natif reste dans le DOM (caché) comme source de vérité :
+      // tout le code existant (.value, onchange, attributs data-*) reste valide.
+      // =====================================================================
+      const CustomSelect = (function() {
+        let openInstance = null;
+
+        function build(select) {
+          if (select._cs) return select._cs; // déjà transformé
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'custom-select-wrapper';
+          const trigger = document.createElement('div');
+          // On reprend les classes bootstrap du select (taille, gras, couleurs…) pour un rendu identique.
+          trigger.className = 'custom-select-trigger ' + select.className;
+          trigger.tabIndex = 0;
+
+          select.parentNode.insertBefore(wrapper, select);
+          wrapper.appendChild(select);
+          wrapper.appendChild(trigger);
+          select.style.display = 'none';
+
+          const menu = document.createElement('div');
+          menu.className = 'custom-select-menu';
+
+          const cs = { select, wrapper, trigger, menu, open: false };
+          select._cs = cs;
+
+          function syncLabel() {
+            const opt = select.options[select.selectedIndex];
+            trigger.textContent = opt ? opt.textContent : '';
+            wrapper.classList.toggle('disabled', select.disabled);
+          }
+          function buildMenu() {
+            menu.innerHTML = '';
+            Array.from(select.options).forEach((opt, i) => {
+              const item = document.createElement('div');
+              item.className = 'custom-select-option';
+              if (i === select.selectedIndex) item.classList.add('selected');
+              if (opt.disabled) item.classList.add('disabled');
+              item.textContent = opt.textContent;
+              item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (opt.disabled) return;
+                select.selectedIndex = i;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel();
+                close();
+              });
+              menu.appendChild(item);
+            });
+          }
+          function positionMenu() {
+            const r = trigger.getBoundingClientRect();
+            menu.style.top = (r.bottom + 4) + 'px';
+            menu.style.left = r.left + 'px';
+            menu.style.width = r.width + 'px';
+          }
+          function openMenu() {
+            if (select.disabled) return;
+            if (openInstance && openInstance !== cs) openInstance.close();
+            buildMenu();
+            document.body.appendChild(menu);
+            positionMenu();
+            wrapper.classList.add('open');
+            cs.open = true;
+            openInstance = cs;
+          }
+          function close() {
+            if (menu.parentNode) menu.parentNode.removeChild(menu);
+            wrapper.classList.remove('open');
+            cs.open = false;
+            if (openInstance === cs) openInstance = null;
+          }
+          cs.close = close;
+          cs.refresh = function() { syncLabel(); if (cs.open) buildMenu(); };
+
+          trigger.addEventListener('click', function(e) { e.stopPropagation(); cs.open ? close() : openMenu(); });
+          trigger.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cs.open ? close() : openMenu(); }
+            else if (e.key === 'Escape') close();
+          });
+
+          // Selects dynamiques (options recréées) + changement d'état "disabled" => on resynchronise.
+          new MutationObserver(function() { cs.refresh(); })
+            .observe(select, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+          select.addEventListener('change', syncLabel);
+
+          syncLabel();
+          return cs;
+        }
+
+        // Fermeture/repositionnement global
+        document.addEventListener('click', function() { if (openInstance) openInstance.close(); });
+        window.addEventListener('scroll', function() { if (openInstance) openInstance.close(); }, true);
+        window.addEventListener('resize', function() { if (openInstance) openInstance.close(); });
+
+        return {
+          enhanceAll: function(root) { (root || document).querySelectorAll('select').forEach(build); },
+          refresh: function(sel) { if (sel && sel._cs) sel._cs.refresh(); }
+        };
+      })();
+
+      // Helper de confirmation custom (remplace window.confirm()).
+      function confirmerAction(message, onConfirm, texteBouton) {
+        document.getElementById('confirmActionMessage').textContent = message;
+        const btnOk = document.getElementById('btnConfirmActionOk');
+        btnOk.textContent = texteBouton || 'Confirmer';
+        const modalEl = document.getElementById('modalConfirmAction');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        btnOk.onclick = function() {
+          modal.hide();
+          if (typeof onConfirm === 'function') onConfirm();
+        };
+        modal.show();
+      }
+
       document.addEventListener('DOMContentLoaded', function() {
+        CustomSelect.enhanceAll(); // transforme tous les <select> présents
         google.script.run
           .withSuccessHandler(afficherDonnees)
           .withFailureHandler(function(e) { showToast("Erreur de connexion", "error"); })
-          .getOperationsData(); 
+          .getOperationsData();
       });
 
       function afficherDonnees(operations) {
@@ -788,6 +959,7 @@
         document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
         document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
         gererAffichageProduits();
+        CustomSelect.refresh(document.getElementById('operationSelect'));
 
         // Afficher un toast discret pour confirmer que l'enregistrement est lancé
         showToast("<i class='bi bi-check-circle'></i> Enregistrement poussé", "info");
@@ -836,12 +1008,15 @@
         document.getElementById('formNouvelleOffre').reset();
         newOpArticlesList = [];
         afficherListeArticles('new');
-        gererChampsNouvelleOffre('new'); 
+        gererChampsNouvelleOffre('new');
+        // Le reset a remis les selects à leur valeur par défaut => resynchroniser l'affichage custom.
+        CustomSelect.refresh(document.getElementById('newOpType'));
+        CustomSelect.refresh(document.getElementById('newOpMode'));
         new bootstrap.Modal(document.getElementById('modalCreerOffre')).show();
       }
 
       function sauvegarderNouvelleOffre() {
-        if (!document.getElementById('formNouvelleOffre').checkValidity()) { document.getElementById('formNouvelleOffre').reportValidity(); return; }
+        if (!document.getElementById('formNouvelleOffre').checkValidity()) { showToast("Veuillez remplir tous les champs obligatoires (nom et type).", "error"); return; }
         const type = document.getElementById('newOpType').value;
         const mode = type === 'Produit' ? document.getElementById('newOpMode').value : '';
         const data = {
@@ -896,6 +1071,9 @@
         document.getElementById('editOpNom').value = op.nom;
         document.getElementById('editOpType').value = op.type;
         document.getElementById('editOpMode').value = op.modeSaisie;
+        // Les valeurs ci-dessus sont posées par JS (pas d'event) => resynchroniser le select custom.
+        CustomSelect.refresh(document.getElementById('editOpType'));
+        CustomSelect.refresh(document.getElementById('editOpMode'));
 
         // Activer/désactiver les champs selon l'état terminé (on réactive explicitement
         // car le même modal est réutilisé : une offre terminée ouverte avant ne doit pas
@@ -942,6 +1120,9 @@
             `;
           });
         }
+        // Les <select> de statut viennent d'être créés dans le tableau => les transformer.
+        CustomSelect.enhanceAll(document.getElementById('tableInscritsBody'));
+
         new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
       }
 
@@ -1003,11 +1184,11 @@
         const operationId = document.getElementById('editOpId').value;
         if (!operationId) return;
         
-        if (confirm("Êtes-vous sûr de vouloir terminer cette offre ? Les nouvelles réservations ne seront plus possibles.")) {
+        confirmerAction("Êtes-vous sûr de vouloir terminer cette offre ? Les nouvelles réservations ne seront plus possibles.", function() {
           const btn = document.getElementById('btnTerminerOffre');
           btn.disabled = true;
           btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Terminaison...';
-          
+
           google.script.run
             .withSuccessHandler(function() {
               showToast("Offre terminée !", "success");
@@ -1023,7 +1204,7 @@
               btn.innerHTML = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
             })
             .terminerOperation(operationId);
-        }
+        }, "Terminer l'offre");
       }
 
       let idOffreASupprimer = null;
