@@ -1446,32 +1446,41 @@
         const nettoyer = () => { if (cont.parentNode) cont.parentNode.removeChild(cont); };
         const nomFichier = 'Fiche_' + String(details.operation.nom || 'offre').replace(/[^a-z0-9]+/gi, '_') + '.pdf';
 
-        const lancer = () => {
-          try {
-            const pdf = new window.jspdf.jsPDF('p', 'pt', 'a4');
-            pdf.html(cont, {
-              callback: function(doc) {
-                try { doc.save(nomFichier); nettoyer(); callback(true); }
-                catch (e) { nettoyer(); showToast("Erreur PDF : " + e.message, "error"); callback(false); }
-              },
-              margin: [24, 24, 24, 24],
-              autoPaging: 'text',
-              html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' },
-              width: 547,      // 595pt (A4) - 2*24 de marge
-              windowWidth: 794
-            });
-          } catch (e) { nettoyer(); showToast("Erreur PDF : " + e.message, "error"); callback(false); }
+        // Capture le rendu (le MÊME que l'impression) en image, puis découpe en pages A4.
+        const capturer = () => {
+          window.html2canvas(cont, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+            .then(function(canvas) {
+              try {
+                const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+                const pageW = 210, pageH = 297;                 // A4 en mm
+                const imgW = pageW;
+                const imgH = canvas.height * imgW / canvas.width;
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                let position = 0, heightLeft = imgH;
+                pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                heightLeft -= pageH;
+                while (heightLeft > 0) {                          // pagination : on décale l'image vers le haut
+                  position -= pageH;
+                  pdf.addPage();
+                  pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                  heightLeft -= pageH;
+                }
+                pdf.save(nomFichier);
+                nettoyer(); callback(true);
+              } catch (e) { nettoyer(); showToast("Erreur PDF : " + e.message, "error"); callback(false); }
+            })
+            .catch(function(e) { nettoyer(); showToast("Erreur PDF : " + ((e && e.message) || e), "error"); callback(false); });
         };
 
         // Attendre le décodage du logo pour qu'il apparaisse dans le PDF.
         const logo = cont.querySelector('img');
         if (logo) {
           let lance = false;
-          const go = () => { if (!lance) { lance = true; lancer(); } };
+          const go = () => { if (!lance) { lance = true; capturer(); } };
           if (typeof logo.decode === 'function') logo.decode().then(go).catch(go);
           else { logo.onload = go; logo.onerror = go; if (logo.complete) go(); }
           setTimeout(go, 2500);
-        } else { lancer(); }
+        } else { capturer(); }
       }
 
     </script>
