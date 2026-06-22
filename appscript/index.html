@@ -60,6 +60,9 @@
       .custom-select-option.selected { background: #0d6efd; color: #fff; }
       .custom-select-option.disabled { color: #adb5bd; cursor: not-allowed; background: transparent; }
 
+      /* Ordre d'empilement global : toasts (3000) > menus select (2000) > modales (1056+) */
+      .toast-container { z-index: 3000; }
+
       /* --- CSS POUR L'IMPRESSION --- */
       @media print {
         /* Masquer toute l'interface en la retirant du flux (display:none, pas visibility)
@@ -753,6 +756,32 @@
         };
         modal.show();
       }
+
+      // =====================================================================
+      // EMPILEMENT DES MODALES — la dernière ouverte passe toujours au-dessus.
+      // Sans ça, deux modales Bootstrap ont le même z-index (1055) et c'est l'ordre
+      // dans le HTML qui décide qui est devant => une modale de confirmation pouvait
+      // se retrouver DERRIÈRE la modale qui l'a déclenchée.
+      // =====================================================================
+      document.addEventListener('show.bs.modal', function (event) {
+        const dejaOuvertes = document.querySelectorAll('.modal.show').length;
+        const z = 1056 + dejaOuvertes * 20;
+        event.target.style.zIndex = z;
+        // Le backdrop est créé juste après l'event : on le replace sous CETTE modale.
+        setTimeout(function () {
+          const backdrops = document.querySelectorAll('.modal-backdrop:not(.stacked-fixed)');
+          const backdrop = backdrops[backdrops.length - 1];
+          if (backdrop) { backdrop.style.zIndex = z - 10; backdrop.classList.add('stacked-fixed'); }
+        }, 0);
+      });
+      // À la fermeture d'une modale empilée, Bootstrap retire 'modal-open' du body même
+      // s'il reste une modale ouverte (bug connu) : on le remet pour garder le scroll-lock
+      // et l'interactivité de la modale restante.
+      document.addEventListener('hidden.bs.modal', function () {
+        if (document.querySelectorAll('.modal.show').length > 0) {
+          document.body.classList.add('modal-open');
+        }
+      });
 
       document.addEventListener('DOMContentLoaded', function() {
         CustomSelect.enhanceAll(); // transforme tous les <select> présents
