@@ -581,7 +581,7 @@ function terminerOperation(operationId) {
   try {
     const rowIndex = findRowIndexByColumnValue(Config.SHEET_OPERATIONS, Config.COL_OPERATION_ID, operationId);
     if (!rowIndex) { throw new Error(`Opération avec l'ID "${operationId}" introuvable.`); }
-    updateCell(Config.SHEET_OPERATIONS, rowIndex, Config.COL_OPERATION_TERMINEE, "true");
+    updateCell(Config.SHEET_OPERATIONS, rowIndex, Config.COL_OPERATION_TERMINEE + 1, "true");
     return true;
   } catch (e) { throw new Error("Impossible de terminer l'opération : " + e.message); }
 }
