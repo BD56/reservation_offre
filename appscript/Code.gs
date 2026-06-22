@@ -477,10 +477,26 @@ function getAllOperationsDetails() {
     const opSheet = ss.getSheetByName(Config.SHEET_OPERATIONS);
     if (opSheet && opSheet.getLastRow() > 1) {
       const opData = opSheet.getDataRange().getValues();
+
+      // On ne précharge que les détails des offres ACTIVES + les 3 dernières TERMINÉES.
+      // Les offres terminées plus anciennes restent listées mais leurs détails sont
+      // chargés à la demande (repli serveur dans voirReservationsDetail).
+      const estTerminee = (row) => String(row[Config.COL_OPERATION_TERMINEE] || "").toLowerCase() === "true";
+      const timestampDe = (id) => { const m = String(id).match(/OP-(\d+)/); return m ? parseInt(m[1]) : 0; };
+      const idsTermineesRecentes = new Set(
+        opData.slice(1)
+          .filter(row => String(row[Config.COL_OPERATION_ID]).trim() !== "" && estTerminee(row))
+          .sort((a, b) => timestampDe(b[Config.COL_OPERATION_ID]) - timestampDe(a[Config.COL_OPERATION_ID]))
+          .slice(0, 3)
+          .map(row => String(row[Config.COL_OPERATION_ID]).trim())
+      );
+
       for (let i = 1; i < opData.length; i++) {
         const row = opData[i];
         const id = String(row[Config.COL_OPERATION_ID]).trim();
         if (!id) continue;
+        // Sauter les offres terminées qui ne font pas partie des 3 plus récentes.
+        if (estTerminee(row) && !idsTermineesRecentes.has(id)) continue;
         const dateDebut = toDate(row[Config.COL_OPERATION_DATE_DEBUT]);
         const dateFin = toDate(row[Config.COL_OPERATION_DATE_FIN]);
         result[id] = {
