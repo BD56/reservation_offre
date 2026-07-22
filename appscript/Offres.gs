@@ -712,3 +712,223 @@ function testerOffresEtape2() {
   console.log(message);
   return message;
 }
+
+/**
+ * ============================================================================
+ * ÉTAPE 3 — RÉSERVATIONS
+ * ============================================================================
+ * Une réservation = une ligne dans la feuille de l'offre.
+ * Les quantités vont dans la colonne de l'article correspondant.
+ */
+
+/**
+ * Ajoute une réservation.
+ * data = { nom, prenom, telephone, email, articles: [{ nom, quantite }] }
+ *
+ * Mode "Libre"     : les articles inconnus créent leur colonne (après normalisation).
+ * Mode "Predefini" : un article inconnu lève une erreur — mieux vaut le signaler
+ *                    que de perdre silencieusement une commande client.
+ */
+function ajouterReservationOffre(idOffre, data) {
+  return avecVerrouOffre(function () {
+    const nom = String((data && data.nom) || "").trim();
+    const prenom = String((data && data.prenom) || "").trim();
+    if (!nom || !prenom) throw new Error("Le nom et le prénom sont obligatoires.");
+
+    const contexte = _feuilleDeOffre(idOffre);
+    const feuille = contexte.feuille;
+    const offre = contexte.offre;
+
+    if (offre.statut === OffresConfig.STATUT_TERMINEE) {
+      throw new Error(`L'offre "${offre.nom}" est terminée : aucune nouvelle réservation n'est possible.`);
+    }
+
+    // Contact : téléphone et/ou email, au moins l'un des deux.
+    let contact = String((data && data.telephone) || "").trim();
+    const email = String((data && data.email) || "").trim();
+    if (email) contact += (contact ? " / " : "") + email;
+    if (!contact) throw new Error("Au moins un téléphone ou un email est requis.");
+
+    // Articles saisis, nettoyés (quantités <= 0 et noms vides ignorés).
+    const saisis = [];
+    const brut = (data && Array.isArray(data.articles)) ? data.articles : [];
+    brut.forEach(article => {
+      const nomArticle = normaliserNomArticle(article && article.nom);
+      const quantite = parseInt(article && article.quantite, 10);
+      if (!nomArticle || isNaN(quantite) || quantite <= 0) return;
+      saisis.push({ nom: nomArticle, quantite: quantite });
+    });
+
+    if (saisis.length > 0 && offre.type !== "Produit") {
+      throw new Error(`L'offre "${offre.nom}" est de type ${offre.type} : elle n'accepte pas d'articles.`);
+    }
+
+    // Colonnes manquantes : créées en mode Libre, refusées en mode Predefini.
+    const manquants = [];
+    saisis.forEach(article => {
+      if (!trouverColonneArticle(feuille, article.nom)) manquants.push(article.nom);
+    });
+    if (manquants.length > 0) {
+      if (offre.modeSaisie !== "Libre") {
+        throw new Error(`Article(s) inconnu(s) pour cette offre à liste fixe : ${manquants.join(", ")}.`);
+      }
+      manquants.forEach(nomArticle => _ajouterArticleSansVerrou(idOffre, nomArticle));
+    }
+
+    // Construction de la ligne. On dimensionne sur le nombre RÉEL de colonnes
+    // et on écrit via l'index réel de chaque colonne : robuste même si un
+    // en-tête vide traînait au milieu.
+    const articles = lireArticlesOffre(feuille);
+    const nbColonnes = Math.max(feuille.getLastColumn(), OffresConfig.NB_COLONNES_FIXES);
+    const ligne = new Array(nbColonnes).fill("");
+
+    const idReservation = genererIdReservation();
+    ligne[OffresConfig.COL_RES_ID] = idReservation;
+    ligne[OffresConfig.COL_RES_NOM] = nom;
+    ligne[OffresConfig.COL_RES_PRENOM] = prenom;
+    ligne[OffresConfig.COL_RES_CONTACT] = contact;
+    ligne[OffresConfig.COL_RES_STATUT] = OffresConfig.STATUTS_RESERVATION[0]; // "Réservé"
+    ligne[OffresConfig.COL_RES_DATE_SAISIE] = new Date(); // vraie Date
+
+    const indexParCle = {};
+    articles.forEach(a => { indexParCle[cleComparaisonArticle(a.nom)] = a.index; });
+
+    // Cumul : si le même article a été saisi sur plusieurs lignes du formulaire,
+    // les quantités s'additionnent au lieu de s'écraser.
+    saisis.forEach(article => {
+      const index = indexParCle[cleComparaisonArticle(article.nom)];
+      if (index === undefined) return;
+      ligne[index] = (parseInt(ligne[index], 10) || 0) + article.quantite;
+    });
+
+    feuille.appendRow(ligne);
+
+    return {
+      idRes: idReservation, nom: nom, prenom: prenom, contact: contact,
+      etat: OffresConfig.STATUTS_RESERVATION[0],
+      articles: saisis
+    };
+  });
+}
+
+/**
+ * Change le statut d'une réservation.
+ * Volontairement AUTORISÉ sur une offre terminée : on doit pouvoir passer une
+ * commande en "Retrait" après la clôture de l'offre (décision validée).
+ */
+function mettreAJourStatutReservation(idOffre, idReservation, nouveauStatut) {
+  return avecVerrouOffre(function () {
+    if (OffresConfig.STATUTS_RESERVATION.indexOf(nouveauStatut) === -1) {
+      throw new Error(`Statut invalide : "${nouveauStatut}". Attendu : ${OffresConfig.STATUTS_RESERVATION.join(", ")}.`);
+    }
+    const feuille = _feuilleDeOffre(idOffre).feuille;
+    const derniereLigne = feuille.getLastRow();
+    if (derniereLigne <= 1) throw new Error("Cette offre ne contient aucune réservation.");
+
+    // On ne lit QUE la colonne des identifiants.
+    const ids = feuille.getRange(2, OffresConfig.COL_RES_ID + 1, derniereLigne - 1, 1).getValues();
+    const cible = String(idReservation).trim();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === cible) {
+        feuille.getRange(i + 2, OffresConfig.COL_RES_STATUT + 1).setValue(nouveauStatut);
+        return true;
+      }
+    }
+    throw new Error(`Réservation "${idReservation}" introuvable dans l'offre "${idOffre}".`);
+  });
+}
+
+/**
+ * ----------------------------------------------------------------------------
+ * VÉRIFICATION DE L'ÉTAPE 3
+ * ----------------------------------------------------------------------------
+ */
+function testerOffresEtape3() {
+  const rapport = [];
+  let offrePredefinie = null;
+  let offreLibre = null;
+
+  try {
+    // --- Offre à liste fixe ---
+    offrePredefinie = creerOffre({
+      nom: "TEST étape 3 (Predefini) — à supprimer",
+      type: "Produit", modeSaisie: "Predefini",
+      articlesPredefinis: ["Pommes", "Poires"]
+    });
+
+    ajouterReservationOffre(offrePredefinie.id, {
+      nom: "Dupont", prenom: "Jean", telephone: "0612345678",
+      articles: [{ nom: "Pommes", quantite: 2 }, { nom: "Poires", quantite: 3 }]
+    });
+
+    // Variante d'écriture + cumul sur deux lignes du même article
+    ajouterReservationOffre(offrePredefinie.id, {
+      nom: "Martin", prenom: "Pierre", email: "pierre@mail.com",
+      articles: [{ nom: "pommes", quantite: 5 }, { nom: "POMMES", quantite: 1 }]
+    });
+
+    const lu = getOffreById(offrePredefinie.id);
+    if (lu.reservations.length !== 2) throw new Error(`ÉCHEC : attendu 2 réservations, obtenu ${lu.reservations.length}.`);
+
+    const totalPommes = lu.resume.filter(r => r.nom === "Pommes")[0].total;
+    const totalPoires = lu.resume.filter(r => r.nom === "Poires")[0].total;
+    if (totalPommes !== 8) throw new Error(`ÉCHEC résumé : Pommes = ${totalPommes}, attendu 8 (2 + 5 + 1).`);
+    if (totalPoires !== 3) throw new Error(`ÉCHEC résumé : Poires = ${totalPoires}, attendu 3.`);
+    if (lu.offre.articles.length !== 2) throw new Error(`ÉCHEC : les variantes ont créé ${lu.offre.articles.length} colonnes au lieu de 2.`);
+    rapport.push(`Predefini : 2 réservations, résumé Pommes=8 (cumul + variantes de casse), Poires=3, toujours 2 colonnes`);
+
+    // Un article inconnu doit être REFUSÉ en mode Predefini
+    let refuse = false;
+    try {
+      ajouterReservationOffre(offrePredefinie.id, {
+        nom: "Durand", prenom: "Luc", telephone: "0700000000",
+        articles: [{ nom: "Ananas", quantite: 1 }]
+      });
+    } catch (e) { refuse = true; }
+    if (!refuse) throw new Error("ÉCHEC : un article inconnu a été accepté en mode Predefini.");
+    rapport.push("Predefini : article inconnu correctement refusé");
+
+    // Changement de statut
+    const idRes = lu.reservations[0].idRes;
+    mettreAJourStatutReservation(offrePredefinie.id, idRes, "Retrait");
+    const relu = getOffreById(offrePredefinie.id);
+    const majOk = relu.reservations.filter(r => r.idRes === idRes)[0].etat === "Retrait";
+    if (!majOk) throw new Error("ÉCHEC : statut non mis à jour.");
+    rapport.push("Changement de statut : OK");
+
+    // Statut modifiable même après terminaison (comportement voulu)
+    terminerOffre(offrePredefinie.id);
+    mettreAJourStatutReservation(offrePredefinie.id, idRes, "Contacté");
+    rapport.push("Statut modifiable sur une offre terminée : OK");
+
+    // Mais plus aucune nouvelle réservation
+    let bloque = false;
+    try {
+      ajouterReservationOffre(offrePredefinie.id, {
+        nom: "Trop", prenom: "Tard", telephone: "0600000000", articles: []
+      });
+    } catch (e) { bloque = true; }
+    if (!bloque) throw new Error("ÉCHEC : une réservation a été acceptée sur une offre terminée.");
+    rapport.push("Nouvelle réservation refusée sur offre terminée : OK");
+
+    // --- Offre libre : les articles inconnus créent leur colonne ---
+    offreLibre = creerOffre({ nom: "TEST étape 3 (Libre) — à supprimer", type: "Produit", modeSaisie: "Libre" });
+    ajouterReservationOffre(offreLibre.id, {
+      nom: "Petit", prenom: "Anne", telephone: "0611111111",
+      articles: [{ nom: "Cerises", quantite: 4 }, { nom: " cerises ", quantite: 2 }]
+    });
+    const luLibre = getOffreById(offreLibre.id);
+    if (luLibre.offre.articles.length !== 1) throw new Error(`ÉCHEC Libre : ${luLibre.offre.articles.length} colonnes au lieu de 1.`);
+    if (luLibre.resume[0].total !== 6) throw new Error(`ÉCHEC Libre : total ${luLibre.resume[0].total} au lieu de 6.`);
+    rapport.push("Libre : colonne créée à la volée, variantes fusionnées (Cerises = 6)");
+
+    const message = rapport.join("\n");
+    console.log(message);
+    return message;
+
+  } finally {
+    // Nettoyage systématique, même en cas d'échec d'une assertion.
+    if (offrePredefinie) { try { supprimerOffre(offrePredefinie.id); } catch (e) {} }
+    if (offreLibre) { try { supprimerOffre(offreLibre.id); } catch (e) {} }
+  }
+}
