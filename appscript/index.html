@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8">
     <base target="_top">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -338,7 +339,10 @@
               </div>
 
               <div class="tab-pane fade" id="parametres" role="tabpanel">
-                <div id="bannerOffreTerminee" class="alert alert-warning d-flex align-items-center mb-3" style="display: none;">
+                <!-- Pas de classe d-flex ici : Bootstrap la déclare en `display:flex !important`,
+                     ce qui écraserait le style.display='none' posé en JS et rendrait la
+                     bannière visible en permanence. L'affichage est piloté uniquement en inline. -->
+                <div id="bannerOffreTerminee" class="alert alert-warning align-items-center mb-3" style="display: none;">
                   <i class="bi bi-lock-fill me-2"></i>
                   <span>Offre <strong>terminée</strong> : la modification est verrouillée. Seule l'impression reste disponible.</span>
                 </div>
@@ -780,7 +784,7 @@
           html += `<p><strong>Articles:</strong> ${data.articles.map(a => `${a.quantite}x ${a.nom}`).join(', ')}</p>`;
         }
         displayEl.innerHTML = html;
-        new bootstrap.Modal(document.getElementById('modalSaveError')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalSaveError')).show();
       }
 
       function retrySaveReservation() {
@@ -798,7 +802,7 @@
               document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
               gererAffichageProduits();
               btn.disabled = false; btn.innerHTML = originalText;
-              bootstrap.Modal.getInstance(document.getElementById('modalSaveError')).hide();
+              fermerModale('modalSaveError');
               lastReservationData = null;
               
               // Mise à jour du compte
@@ -928,6 +932,19 @@
         };
       })();
 
+      /**
+       * Ferme une modale seulement si elle a une instance Bootstrap active.
+       * getInstance() renvoie null tant que la modale n'a jamais été ouverte :
+       * appeler .hide() dessus lève une TypeError qui interrompt tout le
+       * traitement en cours (fermeture, rechargement, enregistrement...).
+       */
+      function fermerModale(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const instance = bootstrap.Modal.getInstance(el);
+        if (instance) instance.hide();
+      }
+
       // Helper de confirmation custom (remplace window.confirm()).
       function confirmerAction(message, onConfirm, texteBouton) {
         document.getElementById('confirmActionMessage').textContent = message;
@@ -949,8 +966,17 @@
       // se retrouver DERRIÈRE la modale qui l'a déclenchée.
       // =====================================================================
       document.addEventListener('show.bs.modal', function (event) {
-        const dejaOuvertes = document.querySelectorAll('.modal.show').length;
-        const z = 1056 + dejaOuvertes * 20;
+        // On se place au-dessus du z-index le PLUS HAUT réellement appliqué aux
+        // modales visibles. Compter les modales ouvertes ne suffisait pas : le
+        // compte se désynchronise dès qu'une modale est ré-ouverte, et deux
+        // modales se retrouvaient alors au même niveau — c'est l'ordre dans le
+        // HTML qui tranchait, plaçant la confirmation DERRIÈRE son déclencheur.
+        let zMax = 1055;
+        document.querySelectorAll('.modal.show').forEach(function (m) {
+          const z = parseInt(m.style.zIndex || getComputedStyle(m).zIndex, 10);
+          if (!isNaN(z)) zMax = Math.max(zMax, z);
+        });
+        const z = zMax + 20;
         event.target.style.zIndex = z;
         // Le backdrop est créé juste après l'event : on le replace sous CETTE modale.
         setTimeout(function () {
@@ -1095,16 +1121,16 @@
 
       // --- OUVRIR MENTIONS LEGALES ET AIDE ---
       function ouvrirMentions() {
-        new bootstrap.Modal(document.getElementById('modalMentions')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalMentions')).show();
       }
 
       function ouvrirAide() {
         const panneauAide = document.getElementById('offcanvasHelp');
-        const offcanvas = new bootstrap.Offcanvas(panneauAide);
+        const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(panneauAide);
         offcanvas.show();
       }
 
-      function ouvrirOperations() { new bootstrap.Modal(document.getElementById('modalOperations')).show(); }
+      function ouvrirOperations() { bootstrap.Modal.getOrCreateInstance(document.getElementById('modalOperations')).show(); }
 
       function gererAffichageProduits() {
         const select = document.getElementById('operationSelect');
@@ -1227,26 +1253,13 @@
         // Ne pas bloquer l'UI - enregistrement en arrière-plan
         google.script.run
           .withSuccessHandler(function() {
-            // Mise à jour du compteur SUR L'OFFRE CONCERNÉE, retrouvée par son id :
-            // le formulaire a déjà été réinitialisé, donc selectedIndex pointe sur
-            // le placeholder (c'est lui qui était incrémenté auparavant).
-            const select = document.getElementById('operationSelect');
-            const option = Array.from(select.options).find(o => o.value === data.operationId);
-            if (option) {
-              const nouveau = (parseInt(option.getAttribute('data-count'), 10) || 0) + 1;
-              option.setAttribute('data-count', nouveau);
-              const type = option.getAttribute('data-type');
-              // On retire le préfixe [Type] ET le compteur avant de reconstruire,
-              // sinon le préfixe se dédouble à chaque enregistrement.
-              const nom = option.textContent
-                .replace(/^\[[^\]]*\]\s*/, '')
-                .replace(/\s*\(\d+\)\s*$/, '')
-                .trim();
-              option.textContent = `[${type}] ${nom} (${nouveau})`;
-              CustomSelect.refresh(select);
-            }
+            // On incrémente le compteur DANS LES DONNÉES puis on laisse le rendu se
+            // refaire. Manipuler directement le libellé de l'option était source de
+            // deux bugs (placeholder ciblé après le reset, préfixe [Type] dédoublé)
+            // et laissait le tableau de gestion sur un compteur périmé.
             const offre = allOperations.find(o => o.id === data.operationId);
             if (offre) offre.count = (offre.count || 0) + 1;
+            afficherDonnees(allOperations); // dropdown ET tableau de gestion
             lastReservationData = null;
           })
           .withFailureHandler(function(err) {
@@ -1273,7 +1286,7 @@
       }
 
       function creerNouvelleOffre() {
-        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
+        fermerModale('modalOperations');
         document.getElementById('formNouvelleOffre').reset();
         newOpArticlesList = [];
         afficherListeArticles('new');
@@ -1281,7 +1294,7 @@
         // Le reset a remis les selects à leur valeur par défaut => resynchroniser l'affichage custom.
         CustomSelect.refresh(document.getElementById('newOpType'));
         CustomSelect.refresh(document.getElementById('newOpMode'));
-        new bootstrap.Modal(document.getElementById('modalCreerOffre')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCreerOffre')).show();
       }
 
       function sauvegarderNouvelleOffre() {
@@ -1297,12 +1310,12 @@
         const btn = document.getElementById('btnSauvegarderOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
-            bootstrap.Modal.getInstance(document.getElementById('modalCreerOffre')).hide();
+            fermerModale('modalCreerOffre');
             showToast("Nouvelle offre créée !", "success");
             btn.disabled = false;
             newOpArticlesList = [];
             chargerListeOffres(function () {
-              new bootstrap.Modal(document.getElementById('modalOperations')).show();
+              bootstrap.Modal.getOrCreateInstance(document.getElementById('modalOperations')).show();
             });
           })
           .withFailureHandler(function(err){ btn.disabled = false; showToast("Erreur : " + err.message, "error"); })
@@ -1311,7 +1324,7 @@
 
       // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
-        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
+        fermerModale('modalOperations');
         showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
         chargerDetailOffre(idOperation, afficherDetailOffre);
       }
@@ -1381,7 +1394,7 @@
         // Les <select> de statut viennent d'être créés dans le tableau => les transformer.
         CustomSelect.enhanceAll(document.getElementById('tableInscritsBody'));
 
-        new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDetailOffre')).show();
       }
 
       // Fonction d'enregistrement à la volée du statut
@@ -1460,7 +1473,7 @@
                 : "Offre terminée !", "success");
               btn.disabled = false;
               btn.innerHTML = libelle;
-              bootstrap.Modal.getInstance(document.getElementById('modalDetailOffre')).hide();
+              fermerModale('modalDetailOffre');
               chargerListeOffres();
             })
             .withFailureHandler(function(err) {
@@ -1479,7 +1492,7 @@
         const n = op ? (op.count || 0) : 0;
         document.getElementById('confirmDeleteNom').textContent =
           op ? `« ${op.nom} »  —  ${n} réservation${n > 1 ? 's' : ''}` : '';
-        new bootstrap.Modal(document.getElementById('modalConfirmDelete')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConfirmDelete')).show();
       }
 
       // Récupère les détails d'une offre (lecture d'une seule feuille).
@@ -1491,7 +1504,7 @@
       function _executerSuppression() {
         const id = idOffreASupprimer;
         if (!id) return;
-        bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete')).hide();
+        fermerModale('modalConfirmDelete');
         google.script.run
           .withSuccessHandler(function() {
             showToast("Offre supprimée !", 'success');
