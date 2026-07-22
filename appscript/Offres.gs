@@ -524,7 +524,11 @@ function getOffreById(idOffre) {
   return {
     offre: {
       id: offre.id, nom: offre.nom, type: offre.type, modeSaisie: offre.modeSaisie,
-      statut: offre.statut, dateTerminaison: offre.dateTerminaison,
+      statut: offre.statut,
+      // Booléen explicite : le frontend ne doit pas dépendre d'une comparaison
+      // de chaîne accentuée ("Terminée") transitant par google.script.run.
+      isTerminee: offre.statut === OffresConfig.STATUT_TERMINEE,
+      dateTerminaison: offre.dateTerminaison,
       dateSuppressionPrevue: calculerDateSuppression(offre.dateTerminaison),
       nomFeuille: offre.nomFeuille,
       articles: articles.map(a => a.nom)
@@ -554,6 +558,10 @@ function _ajouterArticleSansVerrou(idOffre, nomArticle) {
 
   const index = feuille.getLastColumn(); // 0-based de la NOUVELLE colonne
   feuille.getRange(1, index + 1).setValue(nom).setFontWeight("bold");
+  // Écriture appliquée immédiatement : sans cela, un appel successif (plusieurs
+  // articles inconnus dans une même réservation) pourrait relire un getLastColumn()
+  // périmé et écrire le second article DANS LA MÊME COLONNE.
+  SpreadsheetApp.flush();
   return { nom: nom, index: index, cree: true };
 }
 

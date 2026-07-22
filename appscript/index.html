@@ -565,7 +565,7 @@
             modeSaisie: d.offre.modeSaisie,
             articles: d.offre.articles || [],
             articlesPredefinis: (d.offre.articles || []).join(','),
-            isTerminee: d.offre.statut === 'Terminée',
+            isTerminee: !!d.offre.isTerminee,
             dateTerminaison: d.offre.dateTerminaison,
             dateSuppressionPrevue: d.offre.dateSuppressionPrevue
           },
@@ -611,7 +611,7 @@
             resteTerminees = !!data.hasMore;
             afficherDonnees(allOperations);
           })
-          .withFailureHandler(function (e) { showToast("Erreur : " + e.message, "error"); })
+          .withFailureHandler(function (e) { showToast("Erreur : " + e.message, "error"); afficherDonnees(allOperations); })
           .getOffresTermineesPaginees(offresTermineesChargees, null);
       }
 
@@ -1030,7 +1030,7 @@
 
         tbody.innerHTML = '';
         if (filteredOps.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
           return;
         }
 
@@ -1227,17 +1227,26 @@
         // Ne pas bloquer l'UI - enregistrement en arrière-plan
         google.script.run
           .withSuccessHandler(function() {
-            // Mise à jour du compte localement
+            // Mise à jour du compteur SUR L'OFFRE CONCERNÉE, retrouvée par son id :
+            // le formulaire a déjà été réinitialisé, donc selectedIndex pointe sur
+            // le placeholder (c'est lui qui était incrémenté auparavant).
             const select = document.getElementById('operationSelect');
-            const selectedOption = select.options[select.selectedIndex];
-            if (selectedOption) {
-              const currentCount = parseInt(selectedOption.getAttribute('data-count')) || 0;
-              const newCount = currentCount + 1;
-              selectedOption.setAttribute('data-count', newCount);
-              const type = selectedOption.getAttribute('data-type');
-              const nom = selectedOption.textContent.replace(/\(\d+\)/, '').trim();
-              selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
+            const option = Array.from(select.options).find(o => o.value === data.operationId);
+            if (option) {
+              const nouveau = (parseInt(option.getAttribute('data-count'), 10) || 0) + 1;
+              option.setAttribute('data-count', nouveau);
+              const type = option.getAttribute('data-type');
+              // On retire le préfixe [Type] ET le compteur avant de reconstruire,
+              // sinon le préfixe se dédouble à chaque enregistrement.
+              const nom = option.textContent
+                .replace(/^\[[^\]]*\]\s*/, '')
+                .replace(/\s*\(\d+\)\s*$/, '')
+                .trim();
+              option.textContent = `[${type}] ${nom} (${nouveau})`;
+              CustomSelect.refresh(select);
             }
+            const offre = allOperations.find(o => o.id === data.operationId);
+            if (offre) offre.count = (offre.count || 0) + 1;
             lastReservationData = null;
           })
           .withFailureHandler(function(err) {
