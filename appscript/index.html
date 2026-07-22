@@ -212,20 +212,24 @@
       .toast-container { z-index: 3000; }
 
       /* --- CSS POUR L'IMPRESSION --- */
+      /* À L'ÉCRAN : la fiche existe en permanence dans le DOM mais reste HORS CHAMP.
+         Auparavant on la rendait visible le temps de l'impression, ce qui la faisait
+         apparaître par-dessus l'application pendant une seconde (effet de mélange). */
+      #zoneImpression { position: absolute; left: -99999px; top: 0; width: 210mm; }
       @media print {
         /* Masquer toute l'interface en la retirant du flux (display:none, pas visibility)
            pour éviter un grand espace vide en haut, ET pour que les sauts de page
            fonctionnent : ils sont ignorés sur un conteneur en position:absolute. */
         body > *:not(#zoneImpression) { display: none !important; }
-        /* La fiche d'impression occupe le flux normal du document => page-break OK */
-        #zoneImpression { display: block !important; position: static; width: 100%; padding: 20px; }
+        /* On repasse la fiche dans le flux normal : indispensable pour les sauts de page. */
+        #zoneImpression { display: block !important; position: static; left: auto; width: 100%; padding: 20px; }
         .modal, .modal-backdrop, .offcanvas, .offcanvas-backdrop, .toast-container { display: none !important; }
       }
     </style>
   </head>
   <body>
-    
-    <div id="zoneImpression" class="d-none"></div>
+
+    <div id="zoneImpression"></div>
 
     <header class="app-entete">
       <div class="app-entete__inner">
@@ -597,49 +601,108 @@
     </div>
 
     <div class="offcanvas offcanvas-end shadow" tabindex="-1" id="offcanvasHelp" aria-labelledby="offcanvasHelpLabel">
-      <div class="offcanvas-header bg-info text-white">
+      <div class="offcanvas-header" style="background: var(--surface-attenuee); border-bottom: 1px solid var(--bordure);">
         <h5 class="offcanvas-title fw-bold" id="offcanvasHelpLabel">
-          <i class="bi bi-question-circle"></i> Centre d'Aide
+          <i class="bi bi-question-circle" style="color: var(--marque);"></i> Centre d'aide
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
       </div>
       <div class="offcanvas-body">
-        <p class="text-muted small mb-4">Retrouvez ici les réponses aux questions les plus fréquentes pour utiliser l'application en magasin.</p>
+        <p class="small mb-4" style="color: var(--texte-doux);">
+          L'application comporte deux écrans, accessibles depuis le menu en haut :
+          <strong>Saisie</strong> pour enregistrer les réservations, et <strong>Offres</strong> pour les gérer.
+        </p>
 
         <div class="accordion accordion-flush" id="accordionHelp">
           <div class="accordion-item border-bottom">
             <h2 class="accordion-header">
               <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help1">
-                Comment enregistrer une réservation ?
+                Enregistrer une réservation
               </button>
             </h2>
             <div id="help1" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
-              <div class="accordion-body small text-muted">
-                Sélectionnez l'offre dans le menu déroulant. Renseignez les informations du client. Si c'est une offre de produits, ajoutez les quantités souhaitées (les lignes à zéro sont ignorées). Enfin, cliquez sur <strong>Vérifier et Valider</strong>.
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                Dans l'écran <strong>Saisie</strong>, choisissez l'offre concernée : le panneau de droite affiche aussitôt son récapitulatif. Renseignez le client (au moins un téléphone ou un email), puis les quantités s'il s'agit d'une offre de produits — les lignes à zéro sont ignorées. Cliquez sur <strong>Enregistrer la réservation</strong>.
+                <br><br>
+                L'offre reste sélectionnée après l'enregistrement : vous pouvez enchaîner les clients sans la choisir à nouveau.
               </div>
             </div>
           </div>
+
           <div class="accordion-item border-bottom">
             <h2 class="accordion-header">
               <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help2">
-                Comment modifier le statut d'un client ?
+                Modifier le statut d'un client
               </button>
             </h2>
             <div id="help2" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
-              <div class="accordion-body small text-muted">
-                Dans la gestion des opérations, cliquez sur une offre. Dans l'onglet <strong>Liste des Réservations</strong>, utilisez le menu déroulant dans la colonne "État" pour passer le client en "Retrait", "Contacté" ou "Annulé". La sauvegarde est automatique.
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                Écran <strong>Offres</strong> : cliquez sur une offre, son détail s'ouvre à droite. Dans l'onglet <strong>Réservations</strong>, changez la colonne « État » (Réservé, Contacté, Retrait, Annulé). L'enregistrement est immédiat.
+                <br><br>
+                Le statut reste modifiable même sur une offre terminée, pour pouvoir noter un retrait tardif.
               </div>
             </div>
           </div>
+
           <div class="accordion-item border-bottom">
             <h2 class="accordion-header">
               <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help3">
-                Comment imprimer la feuille de préparation ?
+                Imprimer la fiche
               </button>
             </h2>
             <div id="help3" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
-              <div class="accordion-body small text-muted">
-                Dans les détails d'une offre (onglet Liste des Réservations), cliquez sur le bouton bleu <strong>Imprimer le résumé</strong>. L'application générera un récapitulatif des quantités totales à préparer et la liste complète des clients à pointer.
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                Ouvrez l'offre dans l'écran <strong>Offres</strong>, puis cliquez sur <strong>Imprimer le résumé</strong>.
+                <br><br>
+                Le document s'adapte au type d'offre : une <strong>fiche de préparation</strong> pour une offre de produits (quantités totales à préparer, puis le détail par client), ou une <strong>liste de participants</strong> pour un événement.
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help4">
+                Créer et gérer les articles
+              </button>
+            </h2>
+            <div id="help4" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                À la création d'une offre, choisissez son <strong>type</strong> (Produit ou Événement) et, pour un produit, son <strong>mode de saisie</strong> :
+                <br><br>
+                <strong>Prédéfini</strong> — la liste d'articles est fixée à l'avance ; l'hôte ne saisit que les quantités.<br>
+                <strong>Libre</strong> — l'hôte saisit le nom de l'article au fil de l'eau ; les articles déjà utilisés sont proposés en autocomplétion.
+                <br><br>
+                Pour modifier les articles d'une offre existante : onglet <strong>Modifier</strong> du détail. Renommer un article <strong>conserve</strong> les quantités déjà saisies ; le supprimer les <strong>efface</strong>, et l'application vous indique combien de réservations sont concernées avant de confirmer.
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help5">
+                Terminer ou supprimer une offre
+              </button>
+            </h2>
+            <div id="help5" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                <strong>Terminer</strong> (onglet Modifier) clôt l'offre : elle disparaît de la liste de saisie et n'accepte plus de nouvelle réservation. Elle reste consultable et imprimable, et les statuts restent modifiables.
+                <br><br>
+                Une offre terminée est ensuite <strong>supprimée automatiquement au bout d'un an</strong>. La date est affichée dans la liste, et passe en rouge dans le dernier mois.
+                <br><br>
+                <strong>Supprimer</strong> (icône corbeille) est <strong>définitif et sans sauvegarde</strong> : l'offre et toutes ses réservations sont perdues. L'application propose de télécharger le récapitulatif en PDF avant de supprimer — utilisez-le si vous voulez en garder une trace.
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item border-bottom">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed fw-bold text-dark bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#help6">
+                Retrouver une ancienne offre
+              </button>
+            </h2>
+            <div id="help6" class="accordion-collapse collapse" data-bs-parent="#accordionHelp">
+              <div class="accordion-body small" style="color: var(--texte-doux);">
+                Écran <strong>Offres</strong>, changez le filtre en haut à droite pour <strong>Offres terminées</strong> ou <strong>Toutes les offres</strong>. Les plus récentes s'affichent d'abord ; le bouton <strong>Charger plus</strong> en bas du tableau remonte les suivantes.
               </div>
             </div>
           </div>
@@ -1815,6 +1878,9 @@
         const op = details.operation;
         const res = details.reservations;
         const resume = details.resume;
+        // Une offre "Evenement" produit une liste de participants, pas une fiche
+        // de préparation : ni résumé produits, ni colonne "détail de la commande".
+        const estEvenement = op.type === "Evenement";
         const now = new Date();
         const dateImpression = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
         const timeImpression = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -1846,14 +1912,17 @@
           <div class="print-header" style="text-align: center; margin-bottom: 20px;">
             <img src="https://raw.githubusercontent.com/BD56/reservation_offre/main/appscript/logo-transparent.png" style="max-width: 150px; height: auto; margin-bottom: 10px;" alt="Carrefour Logo" crossorigin="anonymous">
             <div class="print-title">HYPERMARCHÉ CARREFOUR VANNES</div>
-            <div class="print-subtitle">FICHE DE PRÉPARATION</div>
+            <div class="print-subtitle">${estEvenement ? "LISTE DES PARTICIPANTS" : "FICHE DE PRÉPARATION"}</div>
             <div style="font-size: 14px; margin-bottom: 15px;">
               <strong>Offre:</strong> ${op.nom} &nbsp;&nbsp;&nbsp; <strong>Date:</strong> ${dateImpression} ${timeImpression}
             </div>
           </div>
         `;
 
-        if (resume && resume.length > 0) {
+        // Une offre "Evenement" n'a pas d'articles : le résumé des produits à
+        // préparer n'a aucun sens, et la colonne "Détail de la commande" resterait
+        // vide sur toute la fiche.
+        if (!estEvenement && resume && resume.length > 0) {
           html += `
             <div class="print-section-title">📦 RÉSUMÉ DES PRODUITS À PRÉPARER</div>
             <table class="print-table">
@@ -1871,59 +1940,92 @@
           html += `</tbody></table>`;
         }
 
-        // On ne force le saut de page (commandes en page 2) que si un résumé occupe la page 1.
-        const pageBreakClass = (resume && resume.length > 0) ? 'page-commandes' : '';
-        html += `
-          <div class="print-section-title ${pageBreakClass}">📋 LISTE DES COMMANDES (${res.length})</div>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th style="width: 25%;">Nom & Prénom</th>
-                <th style="width: 25%;">Contact</th>
-                <th style="width: 40%;">Détail de la commande</th>
-                <th style="width: 10%; text-align: center;">État</th>
-              </tr>
-            </thead>
-        `;
-        if(res.length === 0) {
-          html += `<tbody><tr><td colspan="4" style="text-align: center;">Aucune réservation pour le moment.</td></tr></tbody>`;
+        // On ne force le saut de page (page 2) que si un résumé occupe la page 1.
+        const pageBreakClass = (!estEvenement && resume && resume.length > 0) ? 'page-commandes' : '';
+
+        if (estEvenement) {
+          // ---- ÉVÉNEMENT : liste d'émargement, sans colonne d'articles ----
+          html += `
+            <div class="print-section-title ${pageBreakClass}">👥 PARTICIPANTS (${res.length})</div>
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th style="width: 35%;">Nom & Prénom</th>
+                  <th style="width: 30%;">Contact</th>
+                  <th style="width: 20%;">Inscrit le</th>
+                  <th style="width: 15%; text-align: center;">État</th>
+                </tr>
+              </thead>
+          `;
+          if (res.length === 0) {
+            html += `<tbody><tr><td colspan="4" style="text-align: center;">Aucun participant inscrit.</td></tr></tbody>`;
+          } else {
+            res.forEach(r => {
+              html += `<tbody class="commande-group">
+                <tr>
+                  <td><strong>${r.nom} ${r.prenom}</strong></td>
+                  <td>${r.contact}</td>
+                  <td>${r.dateSaisie}</td>
+                  <td style="text-align: center;"><strong>${r.etat}</strong></td>
+                </tr>
+              </tbody>`;
+            });
+          }
+          html += `</table>`;
+
         } else {
-          res.forEach(r => {
-            const articles = r.articlesText ? r.articlesText.split(',').map(a => a.trim()) : [];
+          // ---- PRODUIT : fiche de préparation, une ligne par article ----
+          html += `
+            <div class="print-section-title ${pageBreakClass}">📋 LISTE DES COMMANDES (${res.length})</div>
+            <table class="print-table">
+              <thead>
+                <tr>
+                  <th style="width: 25%;">Nom & Prénom</th>
+                  <th style="width: 25%;">Contact</th>
+                  <th style="width: 40%;">Détail de la commande</th>
+                  <th style="width: 10%; text-align: center;">État</th>
+                </tr>
+              </thead>
+          `;
+          if(res.length === 0) {
+            html += `<tbody><tr><td colspan="4" style="text-align: center;">Aucune réservation pour le moment.</td></tr></tbody>`;
+          } else {
+            res.forEach(r => {
+              const articles = r.articlesText ? r.articlesText.split(',').map(a => a.trim()) : [];
 
-            // Chaque commande est dans son propre <tbody> pour ne jamais être coupée par un saut de page.
-            html += `<tbody class="commande-group">`;
+              // Chaque commande est dans son propre <tbody> pour ne jamais être coupée par un saut de page.
+              html += `<tbody class="commande-group">`;
 
-            if (articles.length === 0) {
-              // Pas d'articles
-              html += `<tr>
-                <td><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
-                <td>${r.contact}</td>
-                <td>-</td>
-                <td style="text-align: center;"><strong>${r.etat}</strong></td>
-              </tr>`;
-            } else {
-              // Premier article sur la même ligne que le client
-              const firstArticle = articles[0];
-              html += `<tr>
-                <td rowspan="${articles.length}"><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
-                <td rowspan="${articles.length}">${r.contact}</td>
-                <td>${firstArticle}</td>
-                <td rowspan="${articles.length}" style="text-align: center; vertical-align: middle;"><strong>${r.etat}</strong></td>
-              </tr>`;
-
-              // Articles suivants sur des lignes séparées
-              for (let i = 1; i < articles.length; i++) {
-                html += `<tr class="article-row">
-                  <td>${articles[i]}</td>
+              if (articles.length === 0) {
+                html += `<tr>
+                  <td><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
+                  <td>${r.contact}</td>
+                  <td>-</td>
+                  <td style="text-align: center;"><strong>${r.etat}</strong></td>
                 </tr>`;
-              }
-            }
+              } else {
+                // Premier article sur la même ligne que le client
+                const firstArticle = articles[0];
+                html += `<tr>
+                  <td rowspan="${articles.length}"><strong>${r.nom} ${r.prenom}</strong><br><small style="color: #666;">${r.dateSaisie}</small></td>
+                  <td rowspan="${articles.length}">${r.contact}</td>
+                  <td>${firstArticle}</td>
+                  <td rowspan="${articles.length}" style="text-align: center; vertical-align: middle;"><strong>${r.etat}</strong></td>
+                </tr>`;
 
-            html += `</tbody>`;
-          });
+                // Articles suivants sur des lignes séparées
+                for (let i = 1; i < articles.length; i++) {
+                  html += `<tr class="article-row">
+                    <td>${articles[i]}</td>
+                  </tr>`;
+                }
+              }
+
+              html += `</tbody>`;
+            });
+          }
+          html += `</table>`;
         }
-        html += `</table>`;
 
         html += `
           <div class="print-footer">Imprimé le ${dateImpression} à ${timeImpression}</div>
@@ -1936,13 +2038,12 @@
         if (!currentOperationDetails) return;
         const zoneImpression = document.getElementById('zoneImpression');
         zoneImpression.innerHTML = construireHtmlFiche(currentOperationDetails);
-        zoneImpression.classList.remove('d-none');
 
         // On attend que le logo soit décodé AVANT d'imprimer, sinon window.print()
         // capture la page avant que l'image ne soit peinte (iframe Apps Script).
         const lancerImpression = () => {
           window.print();
-          setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
+          setTimeout(() => { zoneImpression.innerHTML = ""; }, 1000);
         };
         const logo = zoneImpression.querySelector('img');
         if (logo) {
