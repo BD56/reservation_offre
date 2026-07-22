@@ -932,3 +932,298 @@ function testerOffresEtape3() {
     if (offreLibre) { try { supprimerOffre(offreLibre.id); } catch (e) {} }
   }
 }
+
+/**
+ * ============================================================================
+ * ÉTAPE 4 — LISTING + CHARGEMENT PROGRESSIF
+ * ============================================================================
+ * Ces fonctions ne lisent QUE la feuille Config : elles restent rapides quel
+ * que soit l'historique. Les détails d'une offre ne sont lus qu'à son ouverture
+ * (getOffreById).
+ */
+
+/**
+ * Nombre de réservations d'une offre, via getLastRow() : appel peu coûteux,
+ * il ne charge pas les données. Évite de dénormaliser un compteur dans Config
+ * (qui finirait par dériver).
+ */
+function _compterReservationsFeuille(nomFeuille) {
+  const feuille = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nomFeuille);
+  if (!feuille) return 0;
+  return Math.max(0, feuille.getLastRow() - 1);
+}
+
+/** Charge utile allégée d'une offre pour les listes. */
+function _versResumeOffre(offre) {
+  return {
+    id: offre.id,
+    nom: offre.nom,
+    type: offre.type,
+    modeSaisie: offre.modeSaisie,
+    statut: offre.statut,
+    isTerminee: offre.statut === OffresConfig.STATUT_TERMINEE,
+    dateTerminaison: offre.dateTerminaison,
+    dateSuppressionPrevue: calculerDateSuppression(offre.dateTerminaison),
+    count: _compterReservationsFeuille(offre.nomFeuille)
+  };
+}
+
+/** Tri des offres terminées : la plus récemment terminée d'abord (sans date = en dernier). */
+function _trierTermineesRecentesDabord(a, b) {
+  const da = (a.dateTerminaison instanceof Date) ? a.dateTerminaison.getTime() : -1;
+  const db = (b.dateTerminaison instanceof Date) ? b.dateTerminaison.getTime() : -1;
+  return db - da;
+}
+
+/** Tri des offres actives : la plus récemment créée d'abord (timestamp de l'ID). */
+function _trierActivesRecentesDabord(a, b) {
+  const ts = id => { const m = String(id).match(/OP-(\d+)/); return m ? parseInt(m[1], 10) : 0; };
+  return ts(b.id) - ts(a.id);
+}
+
+/**
+ * Chargement initial : toutes les offres actives + les N terminées les plus récentes.
+ */
+function getOffresActivesEtTermineesRecentes(limitTerminees) {
+  const limite = (limitTerminees === undefined || limitTerminees === null || limitTerminees === "")
+    ? getParametreOffre("LIMITE_TERMINEES_INITIALE")
+    : Math.max(0, parseInt(limitTerminees, 10) || 0);
+
+  const toutes = lireConfigOffres();
+  const actives = toutes.filter(o => o.statut !== OffresConfig.STATUT_TERMINEE).sort(_trierActivesRecentesDabord);
+  const terminees = toutes.filter(o => o.statut === OffresConfig.STATUT_TERMINEE).sort(_trierTermineesRecentesDabord);
+
+  return {
+    actives: actives.map(_versResumeOffre),
+    termineesRecentes: terminees.slice(0, limite).map(_versResumeOffre),
+    totalTerminees: terminees.length,
+    hasMoreTerminees: terminees.length > limite
+  };
+}
+
+/**
+ * Lazy loading : les offres terminées de `offset` à `offset + limit`.
+ */
+function getOffresTermineesPaginees(offset, limit) {
+  const debut = Math.max(0, parseInt(offset, 10) || 0);
+  const taille = (limit === undefined || limit === null || limit === "")
+    ? getParametreOffre("LIMITE_TERMINEES_PAGE")
+    : Math.max(1, parseInt(limit, 10) || 1);
+
+  const terminees = lireConfigOffres()
+    .filter(o => o.statut === OffresConfig.STATUT_TERMINEE)
+    .sort(_trierTermineesRecentesDabord);
+
+  const page = terminees.slice(debut, debut + taille);
+  return {
+    offres: page.map(_versResumeOffre),
+    offset: debut,
+    total: terminees.length,
+    hasMore: (debut + page.length) < terminees.length
+  };
+}
+
+/**
+ * ============================================================================
+ * ÉTAPE 5 — NETTOYAGE AUTOMATIQUE (⚠️ SEULE OPÉRATION IRRÉVERSIBLE)
+ * ============================================================================
+ * Aucune sauvegarde n'est réalisée (décision arbitrée) : la feuille Logs est la
+ * seule trace qui subsiste après une suppression.
+ */
+
+/**
+ * Coeur du nettoyage.
+ * @param {boolean} simulation  true = ne supprime RIEN, retourne seulement ce qui serait supprimé.
+ */
+function _nettoyageOffresTerminees(simulation) {
+  const jours = getParametreOffre("X_JOURS_AVANT_SUPPRESSION");
+  const maintenant = new Date();
+
+  const eligibles = [];
+  lireConfigOffres().forEach(offre => {
+    if (offre.statut !== OffresConfig.STATUT_TERMINEE) return;
+    // SÉCURITÉ : une offre terminée sans Date_Terminaison n'est JAMAIS supprimée.
+    // (Sans ce garde-fou, une date vide serait interprétée comme très ancienne.)
+    if (!(offre.dateTerminaison instanceof Date)) {
+      loggerOffre("ANOMALIE", offre.id, `"${offre.nom}" est terminée mais sans Date_Terminaison : ignorée par le nettoyage.`);
+      return;
+    }
+    const dateSuppression = calculerDateSuppression(offre.dateTerminaison);
+    if (dateSuppression && dateSuppression <= maintenant) {
+      eligibles.push({ offre: offre, dateSuppression: dateSuppression });
+    }
+  });
+
+  const supprimees = [];
+  const echecs = [];
+
+  if (!simulation) {
+    eligibles.forEach(element => {
+      try {
+        const resultat = supprimerOffre(element.offre.id); // journalise déjà SUPPRESSION_OFFRE
+        supprimees.push({ id: element.offre.id, nom: element.offre.nom, reservations: resultat.reservationsSupprimees });
+      } catch (e) {
+        echecs.push({ id: element.offre.id, nom: element.offre.nom, erreur: e.message });
+        loggerOffre("ECHEC_SUPPRESSION_AUTO", element.offre.id, e.message);
+      }
+    });
+    if (eligibles.length > 0) {
+      loggerOffre("NETTOYAGE_AUTO", "", `${supprimees.length} offre(s) supprimée(s), ${echecs.length} échec(s) — seuil ${jours} jours`);
+    }
+  }
+
+  return {
+    simulation: !!simulation,
+    seuilJours: jours,
+    executeLe: maintenant,
+    eligibles: eligibles.map(e => ({
+      id: e.offre.id, nom: e.offre.nom,
+      dateTerminaison: e.offre.dateTerminaison,
+      dateSuppressionPrevue: e.dateSuppression,
+      reservations: _compterReservationsFeuille(e.offre.nomFeuille)
+    })),
+    supprimees: supprimees,
+    echecs: echecs
+  };
+}
+
+/**
+ * SIMULATION — ne supprime rien. À lancer pour vérifier ce que le nettoyage ferait.
+ */
+function simulerNettoyageOffresTerminees() {
+  const resultat = _nettoyageOffresTerminees(true);
+  const lignes = [`SIMULATION (aucune suppression) — seuil : ${resultat.seuilJours} jours`];
+  if (resultat.eligibles.length === 0) {
+    lignes.push("Aucune offre à supprimer aujourd'hui.");
+  } else {
+    lignes.push(`${resultat.eligibles.length} offre(s) SERAIENT supprimées :`);
+    resultat.eligibles.forEach(e => {
+      lignes.push(`  - "${e.nom}" (${e.id}) — ${e.reservations} réservation(s), terminée le ${e.dateTerminaison.toISOString().slice(0, 10)}`);
+    });
+  }
+  const message = lignes.join("\n");
+  console.log(message);
+  return message;
+}
+
+/**
+ * NETTOYAGE RÉEL — supprime définitivement. C'est la fonction visée par le trigger.
+ * ⚠️ À n'installer qu'après validation via simulerNettoyageOffresTerminees().
+ */
+function nettoyerOffresTerminees() {
+  const resultat = _nettoyageOffresTerminees(false);
+  const message = `Nettoyage : ${resultat.supprimees.length} offre(s) supprimée(s), ${resultat.echecs.length} échec(s) (seuil ${resultat.seuilJours} jours).`;
+  console.log(message);
+  return message;
+}
+
+/**
+ * Installe le déclencheur quotidien. Idempotent : les triggers existants pour
+ * cette fonction sont supprimés avant d'en créer un nouveau (pas de doublon).
+ * ⚠️ Un trigger ne se déclare PAS dans appsscript.json.
+ */
+function installerTriggerNettoyage() {
+  const nomFonction = "nettoyerOffresTerminees";
+  let supprimes = 0;
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    if (trigger.getHandlerFunction() === nomFonction) { ScriptApp.deleteTrigger(trigger); supprimes++; }
+  });
+  ScriptApp.newTrigger(nomFonction).timeBased().everyDays(1).atHour(0).create();
+  const message = `Trigger quotidien (00:00) installé pour ${nomFonction}. ${supprimes} ancien(s) trigger(s) retiré(s).`;
+  console.log(message);
+  loggerOffre("TRIGGER", "", message);
+  return message;
+}
+
+/** Retire le déclencheur de nettoyage. */
+function desinstallerTriggerNettoyage() {
+  let supprimes = 0;
+  ScriptApp.getProjectTriggers().forEach(trigger => {
+    if (trigger.getHandlerFunction() === "nettoyerOffresTerminees") { ScriptApp.deleteTrigger(trigger); supprimes++; }
+  });
+  const message = `${supprimes} trigger(s) de nettoyage retiré(s).`;
+  console.log(message);
+  return message;
+}
+
+/** Liste les déclencheurs du projet (contrôle visuel). */
+function listerTriggersProjet() {
+  const triggers = ScriptApp.getProjectTriggers();
+  const message = triggers.length === 0
+    ? "Aucun trigger installé."
+    : triggers.map(t => `- ${t.getHandlerFunction()} (${t.getEventType()})`).join("\n");
+  console.log(message);
+  return message;
+}
+
+/**
+ * ----------------------------------------------------------------------------
+ * VÉRIFICATION DES ÉTAPES 4 ET 5
+ * Le nettoyage n'est testé QU'EN SIMULATION : le test ne déclenche jamais la
+ * suppression globale réelle. Il nettoie lui-même ses propres offres.
+ * ----------------------------------------------------------------------------
+ */
+function testerOffresEtapes4et5() {
+  const rapport = [];
+  const creees = [];
+
+  try {
+    const jours = getParametreOffre("X_JOURS_AVANT_SUPPRESSION");
+
+    // --- Jeu d'essai ---
+    const active = creerOffre({ nom: "TEST e4 active — à supprimer", type: "Produit", modeSaisie: "Libre" });
+    creees.push(active.id);
+
+    const vieille = creerOffre({ nom: "TEST e5 vieille — à supprimer", type: "Evenement" });
+    creees.push(vieille.id);
+    terminerOffre(vieille.id);
+    // On antidate la terminaison à (X + 1) jours => devient éligible.
+    const dateAncienne = new Date();
+    dateAncienne.setDate(dateAncienne.getDate() - (jours + 1));
+    avecVerrouOffre(() => majOffreDansConfig(vieille.id, { dateTerminaison: dateAncienne }));
+
+    const recente = creerOffre({ nom: "TEST e5 récente — à supprimer", type: "Evenement" });
+    creees.push(recente.id);
+    terminerOffre(recente.id); // terminée aujourd'hui => NON éligible
+
+    const sansDate = creerOffre({ nom: "TEST e5 sans date — à supprimer", type: "Evenement" });
+    creees.push(sansDate.id);
+    avecVerrouOffre(() => majOffreDansConfig(sansDate.id, { statut: OffresConfig.STATUT_TERMINEE, dateTerminaison: "" }));
+
+    // --- Étape 4 : listing ---
+    const initial = getOffresActivesEtTermineesRecentes(2);
+    const idsActifs = initial.actives.map(o => o.id);
+    if (idsActifs.indexOf(active.id) === -1) throw new Error("ÉCHEC : l'offre active n'apparaît pas dans les actives.");
+    if (idsActifs.indexOf(recente.id) !== -1) throw new Error("ÉCHEC : une offre terminée apparaît dans les actives.");
+    if (initial.termineesRecentes.length > 2) throw new Error("ÉCHEC : la limite de terminées n'est pas respectée.");
+    rapport.push(`Listing : ${initial.actives.length} active(s), ${initial.termineesRecentes.length} terminée(s) affichée(s) sur ${initial.totalTerminees}, hasMore=${initial.hasMoreTerminees}`);
+
+    // Pagination : aucun doublon entre la page 0 et la page 1
+    const page0 = getOffresTermineesPaginees(0, 1);
+    const page1 = getOffresTermineesPaginees(1, 1);
+    if (page0.offres.length && page1.offres.length && page0.offres[0].id === page1.offres[0].id) {
+      throw new Error("ÉCHEC : la pagination renvoie deux fois la même offre.");
+    }
+    rapport.push(`Pagination : page0=${page0.offres.length}, page1=${page1.offres.length}, total=${page0.total}, hasMore=${page0.hasMore}`);
+
+    // --- Étape 5 : simulation ---
+    const simulation = _nettoyageOffresTerminees(true);
+    const idsEligibles = simulation.eligibles.map(e => e.id);
+    if (idsEligibles.indexOf(vieille.id) === -1) throw new Error("ÉCHEC : l'offre antidatée n'est pas éligible au nettoyage.");
+    if (idsEligibles.indexOf(recente.id) !== -1) throw new Error("ÉCHEC : une offre terminée aujourd'hui est jugée éligible.");
+    if (idsEligibles.indexOf(sansDate.id) !== -1) throw new Error("ÉCHEC GRAVE : une offre sans Date_Terminaison est jugée éligible.");
+    if (idsEligibles.indexOf(active.id) !== -1) throw new Error("ÉCHEC GRAVE : une offre ACTIVE est jugée éligible.");
+    rapport.push(`Simulation : ${simulation.eligibles.length} éligible(s) — l'antidatée oui, la récente non, la sans-date non, l'active non`);
+
+    // La simulation ne doit RIEN avoir supprimé
+    if (!trouverOffreDansConfig(vieille.id)) throw new Error("ÉCHEC GRAVE : la simulation a supprimé une offre !");
+    rapport.push("La simulation n'a rien supprimé : OK");
+
+    const message = rapport.join("\n");
+    console.log(message);
+    return message;
+
+  } finally {
+    creees.forEach(id => { try { supprimerOffre(id); } catch (e) {} });
+  }
+}
