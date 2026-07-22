@@ -92,6 +92,20 @@ function initialiserParametresOffre() {
 
 /**
  * ----------------------------------------------------------------------------
+ * POINT D'ENTRÉE DE L'APPLICATION WEB
+ * Déplacé ici depuis Code.gs : c'était la dernière dépendance du projet envers
+ * l'ancien fichier, qui peut désormais être supprimé sans rien casser.
+ * ----------------------------------------------------------------------------
+ */
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('Application de Réservations')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * ----------------------------------------------------------------------------
  * VERROU (écritures concurrentes)
  * Deux réservations simultanées peuvent se marcher dessus — pire encore en mode
  * "Libre" où elles peuvent tenter de créer la même colonne d'article en même

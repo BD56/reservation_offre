@@ -353,13 +353,6 @@ function getResumeArticlesByOperation(operationId) {
 /**
  * Points d'entrée principaux.
  */
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('Application de Réservations')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
 function getOperationsData() {
   try {
     const operations = getAllOperationsWithCounts();
