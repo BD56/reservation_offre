@@ -1227,3 +1227,344 @@ function testerOffresEtapes4et5() {
     creees.forEach(id => { try { supprimerOffre(id); } catch (e) {} });
   }
 }
+
+/**
+ * ============================================================================
+ * ÉTAPE 6 — MIGRATION DEPUIS L'ANCIENNE ARCHITECTURE
+ * ============================================================================
+ * Lit les 3 anciennes feuilles et construit Config + une feuille par offre.
+ *
+ * ⚠️ NE SUPPRIME RIEN de l'ancienne structure : elle reste la source de vérité
+ *    tant que le frontend n'a pas basculé (étape 7).
+ * ⚠️ À exécuter AVANT la bascule du frontend.
+ *
+ * IDEMPOTENT : relançable sans créer de doublon (les offres déjà migrées sont
+ * ignorées).
+ */
+
+/** Colonnes de l'ANCIENNE structure. Dupliquées ici volontairement pour que
+ *  Offres.gs ne dépende pas de Code.gs (qui sera supprimé à la fin). */
+const MigrationAncien = {
+  SHEET_OPERATIONS: "Operations",
+  SHEET_RESERVATIONS: "Reservations",
+  SHEET_ARTICLES: "Articles",
+  COL_OP_ID: 0, COL_OP_NOM: 1, COL_OP_TYPE: 2, COL_OP_MODE: 5, COL_OP_ARTICLES: 6, COL_OP_TERMINEE: 7,
+  COL_RES_ID: 0, COL_RES_OP: 1, COL_RES_NOM: 2, COL_RES_PRENOM: 3, COL_RES_CONTACT: 4, COL_RES_ETAT: 5, COL_RES_DATE: 6,
+  COL_ART_RES: 1, COL_ART_NOM: 2, COL_ART_QTE: 3
+};
+
+/**
+ * L'ancienne structure stocke Date_Saisie en TEXTE ("15/07/2024 10:00").
+ * On le reconvertit en vraie Date. Retourne null si le format est inconnu.
+ */
+function _parserDateFrancaise(valeur) {
+  if (valeur instanceof Date) return valeur;
+  const texte = String(valeur || "").trim();
+  if (!texte) return null;
+  const m = texte.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2}))?$/);
+  if (!m) return null;
+  return new Date(
+    parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10),
+    m[4] ? parseInt(m[4], 10) : 0, m[5] ? parseInt(m[5], 10) : 0
+  );
+}
+
+/** Lit une ancienne feuille (tableau de lignes, en-tête compris). */
+function _lireAncienneFeuille(nom) {
+  const feuille = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nom);
+  if (!feuille || feuille.getLastRow() < 1) return [];
+  return feuille.getDataRange().getValues();
+}
+
+/**
+ * Exécute la migration.
+ * Les offres déjà TERMINÉES dans l'ancienne structure n'ont pas de date de
+ * terminaison (la colonne n'existait pas) : on leur attribue la DATE DU JOUR,
+ * ce qui leur donne un cycle de vie défini (suppression X jours plus tard).
+ */
+function migrerVersNouvelleArchitecture() {
+  return avecVerrouOffre(function () {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureConfigSheet();
+    ensureLogsSheet();
+
+    const opsData = _lireAncienneFeuille(MigrationAncien.SHEET_OPERATIONS);
+    if (opsData.length < 2) throw new Error(`Feuille "${MigrationAncien.SHEET_OPERATIONS}" vide ou absente : rien à migrer.`);
+    const resData = _lireAncienneFeuille(MigrationAncien.SHEET_RESERVATIONS);
+    const artData = _lireAncienneFeuille(MigrationAncien.SHEET_ARTICLES);
+
+    // --- Index : articles par réservation (quantités cumulées si doublons) ---
+    const articlesParRes = {};
+    for (let i = 1; i < artData.length; i++) {
+      const idRes = String(artData[i][MigrationAncien.COL_ART_RES] || "").trim();
+      const nomArticle = normaliserNomArticle(artData[i][MigrationAncien.COL_ART_NOM]);
+      const quantite = parseInt(artData[i][MigrationAncien.COL_ART_QTE], 10);
+      if (!idRes || !nomArticle || isNaN(quantite) || quantite <= 0) continue;
+      const cle = cleComparaisonArticle(nomArticle);
+      if (!articlesParRes[idRes]) articlesParRes[idRes] = {};
+      if (!articlesParRes[idRes][cle]) articlesParRes[idRes][cle] = { nom: nomArticle, quantite: 0 };
+      articlesParRes[idRes][cle].quantite += quantite;
+    }
+
+    // --- Index : réservations par offre ---
+    const resParOffre = {};
+    const orphelines = [];
+    const idsOffresConnues = {};
+    for (let i = 1; i < opsData.length; i++) {
+      const id = String(opsData[i][MigrationAncien.COL_OP_ID] || "").trim();
+      if (id) idsOffresConnues[id] = true;
+    }
+    for (let i = 1; i < resData.length; i++) {
+      const idOffre = String(resData[i][MigrationAncien.COL_RES_OP] || "").trim();
+      const idRes = String(resData[i][MigrationAncien.COL_RES_ID] || "").trim();
+      if (!idRes) continue;
+      if (!idOffre || !idsOffresConnues[idOffre]) { orphelines.push(idRes); continue; }
+      if (!resParOffre[idOffre]) resParOffre[idOffre] = [];
+      resParOffre[idOffre].push(resData[i]);
+    }
+
+    const rapport = { migrees: [], ignorees: [], anomalies: [], reservationsOrphelines: orphelines.length };
+    const dateMigration = new Date();
+
+    // --- Migration offre par offre ---
+    for (let i = 1; i < opsData.length; i++) {
+      const ligneOp = opsData[i];
+      const id = String(ligneOp[MigrationAncien.COL_OP_ID] || "").trim();
+      if (!id) continue;
+
+      const nom = String(ligneOp[MigrationAncien.COL_OP_NOM] || "").trim() || id;
+      let type = String(ligneOp[MigrationAncien.COL_OP_TYPE] || "").trim();
+      if (OffresConfig.TYPES.indexOf(type) === -1) {
+        rapport.anomalies.push(`Offre ${id} : type "${type}" inconnu → "Produit".`);
+        type = "Produit";
+      }
+      let modeSaisie = "";
+      if (type === "Produit") {
+        modeSaisie = String(ligneOp[MigrationAncien.COL_OP_MODE] || "").trim();
+        if (OffresConfig.MODES.indexOf(modeSaisie) === -1) {
+          rapport.anomalies.push(`Offre ${id} : mode "${modeSaisie}" inconnu → "Libre".`);
+          modeSaisie = "Libre";
+        }
+      }
+      const estTerminee = String(ligneOp[MigrationAncien.COL_OP_TERMINEE] || "").toLowerCase() === "true";
+      const nomFeuille = nomFeuilleDeOffre(id);
+
+      // --- Idempotence ---
+      const dansConfig = trouverOffreDansConfig(id);
+      const feuilleExistante = ss.getSheetByName(nomFeuille);
+      if (dansConfig && feuilleExistante) { rapport.ignorees.push(id); continue; }
+      if (feuilleExistante && !dansConfig) {
+        // Trace d'une exécution précédente interrompue : l'ancienne structure
+        // reste la source de vérité, on repart proprement.
+        rapport.anomalies.push(`Offre ${id} : feuille orpheline sans entrée Config → recréée.`);
+        ss.deleteSheet(feuilleExistante);
+      }
+
+      // --- Colonnes d'articles : prédéfinis puis ceux réellement utilisés ---
+      const reservations = resParOffre[id] || [];
+      const nomsArticles = [];
+      const vus = {};
+      const ajouterArticle = nomArticle => {
+        const propre = normaliserNomArticle(nomArticle);
+        if (!propre) return;
+        const cle = cleComparaisonArticle(propre);
+        if (vus[cle]) return;
+        vus[cle] = true;
+        nomsArticles.push(propre);
+      };
+      if (type === "Produit") {
+        if (modeSaisie === "Predefini") {
+          _normaliserListeArticles(ligneOp[MigrationAncien.COL_OP_ARTICLES]).forEach(ajouterArticle);
+        }
+        const decouverts = [];
+        reservations.forEach(ligneRes => {
+          const idRes = String(ligneRes[MigrationAncien.COL_RES_ID] || "").trim();
+          const articles = articlesParRes[idRes];
+          if (!articles) return;
+          Object.keys(articles).forEach(cle => decouverts.push(articles[cle].nom));
+        });
+        decouverts.sort((a, b) => a.localeCompare(b));
+        decouverts.forEach(ajouterArticle);
+      }
+
+      // --- Création de la feuille ---
+      const enTetes = OffresConfig.EN_TETES_FIXES.concat(nomsArticles);
+      const feuille = ss.insertSheet(nomFeuille);
+      feuille.getRange(1, 1, 1, enTetes.length).setValues([enTetes]).setFontWeight("bold");
+      feuille.setFrozenRows(1);
+
+      const indexParCle = {};
+      nomsArticles.forEach((nomArticle, position) => {
+        indexParCle[cleComparaisonArticle(nomArticle)] = OffresConfig.NB_COLONNES_FIXES + position;
+      });
+
+      // --- Lignes de réservation (écrites en un seul setValues) ---
+      const lignes = [];
+      reservations.forEach(ligneRes => {
+        const idRes = String(ligneRes[MigrationAncien.COL_RES_ID] || "").trim();
+        const ligne = new Array(enTetes.length).fill("");
+        ligne[OffresConfig.COL_RES_ID] = idRes;
+        ligne[OffresConfig.COL_RES_NOM] = String(ligneRes[MigrationAncien.COL_RES_NOM] || "");
+        ligne[OffresConfig.COL_RES_PRENOM] = String(ligneRes[MigrationAncien.COL_RES_PRENOM] || "");
+        ligne[OffresConfig.COL_RES_CONTACT] = String(ligneRes[MigrationAncien.COL_RES_CONTACT] || "");
+        const etat = String(ligneRes[MigrationAncien.COL_RES_ETAT] || "").trim();
+        ligne[OffresConfig.COL_RES_STATUT] =
+          OffresConfig.STATUTS_RESERVATION.indexOf(etat) === -1 ? OffresConfig.STATUTS_RESERVATION[0] : etat;
+
+        const dateSaisie = _parserDateFrancaise(ligneRes[MigrationAncien.COL_RES_DATE]);
+        if (dateSaisie) {
+          ligne[OffresConfig.COL_RES_DATE_SAISIE] = dateSaisie;
+        } else {
+          // Format inconnu : on conserve la valeur brute plutôt que de la perdre.
+          ligne[OffresConfig.COL_RES_DATE_SAISIE] = String(ligneRes[MigrationAncien.COL_RES_DATE] || "");
+          if (ligneRes[MigrationAncien.COL_RES_DATE]) {
+            rapport.anomalies.push(`Réservation ${idRes} : date "${ligneRes[MigrationAncien.COL_RES_DATE]}" non convertie.`);
+          }
+        }
+
+        const articles = articlesParRes[idRes];
+        if (articles) {
+          Object.keys(articles).forEach(cle => {
+            const index = indexParCle[cle];
+            if (index !== undefined) ligne[index] = articles[cle].quantite;
+          });
+        }
+        lignes.push(ligne);
+      });
+      if (lignes.length > 0) {
+        feuille.getRange(2, 1, lignes.length, enTetes.length).setValues(lignes);
+      }
+
+      // --- Entrée Config ---
+      // L'ancienne structure n'a pas de date de terminaison : on prend la date
+      // de migration, pour que les offres déjà terminées aient un cycle de vie.
+      if (dansConfig) {
+        majOffreDansConfig(id, {
+          nom: nom, type: type, modeSaisie: modeSaisie,
+          statut: estTerminee ? OffresConfig.STATUT_TERMINEE : OffresConfig.STATUT_EN_COURS,
+          dateTerminaison: estTerminee ? dateMigration : ""
+        });
+      } else {
+        ajouterOffreDansConfig({
+          id: id, nom: nom, type: type, modeSaisie: modeSaisie,
+          statut: estTerminee ? OffresConfig.STATUT_TERMINEE : OffresConfig.STATUT_EN_COURS,
+          dateTerminaison: estTerminee ? dateMigration : "",
+          nomFeuille: nomFeuille
+        });
+      }
+
+      rapport.migrees.push({ id: id, nom: nom, reservations: lignes.length, articles: nomsArticles.length });
+    }
+
+    loggerOffre("MIGRATION", "",
+      `${rapport.migrees.length} offre(s) migrée(s), ${rapport.ignorees.length} déjà présente(s), ${rapport.anomalies.length} anomalie(s)`);
+
+    const lignesRapport = [
+      `MIGRATION terminée — ${rapport.migrees.length} offre(s) migrée(s), ${rapport.ignorees.length} déjà présente(s).`
+    ];
+    rapport.migrees.forEach(m => lignesRapport.push(`  + "${m.nom}" (${m.id}) : ${m.reservations} réservation(s), ${m.articles} article(s)`));
+    if (rapport.reservationsOrphelines > 0) {
+      lignesRapport.push(`  ⚠️ ${rapport.reservationsOrphelines} réservation(s) orpheline(s) (offre inexistante) NON migrée(s).`);
+    }
+    if (rapport.anomalies.length > 0) {
+      lignesRapport.push(`  ⚠️ ${rapport.anomalies.length} anomalie(s) :`);
+      rapport.anomalies.forEach(a => lignesRapport.push(`     - ${a}`));
+    }
+    lignesRapport.push("");
+    lignesRapport.push("L'ancienne structure n'a PAS été modifiée. Lancez verifierMigration() pour contrôler.");
+
+    const message = lignesRapport.join("\n");
+    console.log(message);
+    return message;
+  });
+}
+
+/**
+ * Compare l'ANCIENNE et la NOUVELLE structure : nombre d'offres, nombre de
+ * réservations par offre, et total par article. C'est le filet de sécurité qui
+ * autorise (ou non) la bascule du frontend.
+ */
+function verifierMigration() {
+  const opsData = _lireAncienneFeuille(MigrationAncien.SHEET_OPERATIONS);
+  const resData = _lireAncienneFeuille(MigrationAncien.SHEET_RESERVATIONS);
+  const artData = _lireAncienneFeuille(MigrationAncien.SHEET_ARTICLES);
+
+  // --- Totaux attendus, calculés depuis l'ancienne structure ---
+  const attenduParOffre = {}; // idOffre -> { nom, reservations, articles: {cle: total} }
+  const offreDeReservation = {};
+
+  for (let i = 1; i < opsData.length; i++) {
+    const id = String(opsData[i][MigrationAncien.COL_OP_ID] || "").trim();
+    if (!id) continue;
+    attenduParOffre[id] = { nom: String(opsData[i][MigrationAncien.COL_OP_NOM] || ""), reservations: 0, articles: {} };
+  }
+  for (let i = 1; i < resData.length; i++) {
+    const idRes = String(resData[i][MigrationAncien.COL_RES_ID] || "").trim();
+    const idOffre = String(resData[i][MigrationAncien.COL_RES_OP] || "").trim();
+    if (!idRes || !attenduParOffre[idOffre]) continue;
+    attenduParOffre[idOffre].reservations++;
+    offreDeReservation[idRes] = idOffre;
+  }
+  for (let i = 1; i < artData.length; i++) {
+    const idRes = String(artData[i][MigrationAncien.COL_ART_RES] || "").trim();
+    const idOffre = offreDeReservation[idRes];
+    if (!idOffre) continue;
+    const nomArticle = normaliserNomArticle(artData[i][MigrationAncien.COL_ART_NOM]);
+    const quantite = parseInt(artData[i][MigrationAncien.COL_ART_QTE], 10);
+    if (!nomArticle || isNaN(quantite) || quantite <= 0) continue;
+    const cle = cleComparaisonArticle(nomArticle);
+    attenduParOffre[idOffre].articles[cle] = (attenduParOffre[idOffre].articles[cle] || 0) + quantite;
+  }
+
+  // --- Comparaison avec la nouvelle structure ---
+  const ecarts = [];
+  const idsAnciens = Object.keys(attenduParOffre);
+  let offresControlees = 0;
+
+  idsAnciens.forEach(id => {
+    const attendu = attenduParOffre[id];
+    let obtenu;
+    try {
+      obtenu = getOffreById(id);
+    } catch (e) {
+      ecarts.push(`Offre "${attendu.nom}" (${id}) : ABSENTE de la nouvelle structure (${e.message}).`);
+      return;
+    }
+    offresControlees++;
+
+    if (obtenu.reservations.length !== attendu.reservations) {
+      ecarts.push(`Offre "${attendu.nom}" : ${obtenu.reservations.length} réservation(s) migrée(s) contre ${attendu.reservations} attendue(s).`);
+    }
+
+    const totauxObtenus = {};
+    obtenu.resume.forEach(r => { totauxObtenus[cleComparaisonArticle(r.nom)] = r.total; });
+    Object.keys(attendu.articles).forEach(cle => {
+      const attenduTotal = attendu.articles[cle];
+      const obtenuTotal = totauxObtenus[cle] || 0;
+      if (obtenuTotal !== attenduTotal) {
+        ecarts.push(`Offre "${attendu.nom}", article "${cle}" : total ${obtenuTotal} contre ${attenduTotal} attendu.`);
+      }
+    });
+  });
+
+  const nouvelles = lireConfigOffres();
+  const enTrop = nouvelles.filter(o => idsAnciens.indexOf(o.id) === -1);
+  enTrop.forEach(o => ecarts.push(`Offre "${o.nom}" (${o.id}) présente dans Config mais absente de l'ancienne structure.`));
+
+  const lignes = [
+    `VÉRIFICATION — ${idsAnciens.length} offre(s) dans l'ancienne structure, ${nouvelles.length} dans Config.`,
+    `${offresControlees} offre(s) contrôlée(s) en détail (réservations + totaux par article).`
+  ];
+  if (ecarts.length === 0) {
+    lignes.push("");
+    lignes.push("✅ AUCUN ÉCART : la migration est fidèle. La bascule du frontend peut être envisagée.");
+  } else {
+    lignes.push("");
+    lignes.push(`❌ ${ecarts.length} ÉCART(S) DÉTECTÉ(S) — NE PAS BASCULER :`);
+    ecarts.forEach(e => lignes.push(`  - ${e}`));
+  }
+
+  const message = lignes.join("\n");
+  console.log(message);
+  return message;
+}
