@@ -1229,6 +1229,77 @@ function testerOffresEtapes4et5() {
 }
 
 /**
+ * Modifie les métadonnées d'une offre (nom / type / mode de saisie).
+ * Les ARTICLES ne sont volontairement pas gérés ici : leur ajout et surtout leur
+ * suppression passent par ajouterArticleOffre / supprimerArticleOffre, cette
+ * dernière devant être précédée de l'avertissement avec décompte.
+ */
+function modifierOffre(idOffre, champs) {
+  return avecVerrouOffre(function () {
+    const offre = _feuilleDeOffre(idOffre).offre;
+    const modifications = {};
+
+    if (champs && champs.nom !== undefined) {
+      const nom = String(champs.nom).trim();
+      if (!nom) throw new Error("Le nom de l'offre est obligatoire.");
+      modifications.nom = nom;
+    }
+
+    let typeFinal = offre.type;
+    if (champs && champs.type !== undefined) {
+      const type = String(champs.type).trim();
+      if (OffresConfig.TYPES.indexOf(type) === -1) {
+        throw new Error(`Type invalide : "${type}". Attendu : ${OffresConfig.TYPES.join(" ou ")}.`);
+      }
+      modifications.type = type;
+      typeFinal = type;
+      // Une offre Evenement n'a pas de mode de saisie.
+      if (type === "Evenement") modifications.modeSaisie = "";
+    }
+
+    if (champs && champs.modeSaisie !== undefined && typeFinal === "Produit") {
+      const mode = String(champs.modeSaisie).trim();
+      if (OffresConfig.MODES.indexOf(mode) === -1) {
+        throw new Error(`Mode de saisie invalide : "${mode}". Attendu : ${OffresConfig.MODES.join(" ou ")}.`);
+      }
+      modifications.modeSaisie = mode;
+    }
+
+    if (Object.keys(modifications).length === 0) return { modifie: false };
+    majOffreDansConfig(idOffre, modifications);
+    loggerOffre("MODIFICATION_OFFRE", idOffre, JSON.stringify(modifications));
+    return { modifie: true, champs: modifications };
+  });
+}
+
+/**
+ * Renomme une colonne d'article. Les quantités déjà saisies sont CONSERVÉES
+ * (on ne touche qu'à l'en-tête) — contrairement à une suppression.
+ */
+function renommerArticleOffre(idOffre, ancienNom, nouveauNom) {
+  return avecVerrouOffre(function () {
+    const nouveau = normaliserNomArticle(nouveauNom);
+    if (!nouveau) throw new Error("Le nouveau nom de l'article est vide.");
+
+    const feuille = _feuilleDeOffre(idOffre).feuille;
+    const colonne = trouverColonneArticle(feuille, ancienNom);
+    if (!colonne) throw new Error(`Article "${ancienNom}" introuvable dans cette offre.`);
+
+    // Si le nouveau nom correspond à une AUTRE colonne existante, on refuse :
+    // fusionner deux colonnes impliquerait d'additionner les quantités, ce qui
+    // n'est pas une simple opération de renommage.
+    const conflit = trouverColonneArticle(feuille, nouveau);
+    if (conflit && conflit.index !== colonne.index) {
+      throw new Error(`Un article "${conflit.nom}" existe déjà dans cette offre.`);
+    }
+
+    feuille.getRange(1, colonne.index + 1).setValue(nouveau);
+    loggerOffre("RENOMMAGE_ARTICLE", idOffre, `"${colonne.nom}" → "${nouveau}"`);
+    return { ancien: colonne.nom, nouveau: nouveau };
+  });
+}
+
+/**
  * ============================================================================
  * ÉTAPE 6 — MIGRATION DEPUIS L'ANCIENNE ARCHITECTURE
  * ============================================================================
