@@ -953,8 +953,20 @@ function _compterReservationsFeuille(nomFeuille) {
   return Math.max(0, feuille.getLastRow() - 1);
 }
 
-/** Charge utile allégée d'une offre pour les listes. */
+/**
+ * Charge utile allégée d'une offre pour les listes.
+ * Inclut la liste des articles : le formulaire de réservation en a besoin dès
+ * la sélection dans le dropdown (mode Predefini) et pour l'autocomplétion
+ * (mode Libre). Seule la ligne d'en-tête est lue — coût négligeable.
+ */
 function _versResumeOffre(offre) {
+  const feuille = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(offre.nomFeuille);
+  let articles = [];
+  let count = 0;
+  if (feuille) {
+    count = Math.max(0, feuille.getLastRow() - 1);
+    articles = lireArticlesOffre(feuille).map(a => a.nom);
+  }
   return {
     id: offre.id,
     nom: offre.nom,
@@ -964,7 +976,8 @@ function _versResumeOffre(offre) {
     isTerminee: offre.statut === OffresConfig.STATUT_TERMINEE,
     dateTerminaison: offre.dateTerminaison,
     dateSuppressionPrevue: calculerDateSuppression(offre.dateTerminaison),
-    count: _compterReservationsFeuille(offre.nomFeuille)
+    articles: articles,
+    count: count
   };
 }
 

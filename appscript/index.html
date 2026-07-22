@@ -130,6 +130,9 @@
 
           <div id="sectionProduits" class="mb-4 p-3 rounded" style="display: none; background-color: #f8f9fa; border: 1px dashed #ced4da;">
             <label class="form-label fw-bold text-secondary small">DÉTAIL DES ARTICLES</label>
+            <!-- Autocomplétion (mode Libre) : propose les articles déjà présents dans
+                 l'offre, pour éviter de créer une colonne doublon par faute de frappe. -->
+            <datalist id="datalistArticles"></datalist>
             <div id="listeProduits"></div>
             <button type="button" id="btnAjouterLigne" class="btn btn-sm btn-outline-secondary mt-2" onclick="ajouterLigneProduit()">
               <i class="bi bi-plus-circle"></i> Ajouter un article
@@ -385,7 +388,7 @@
                     <button type="button" class="btn btn-dark fw-bold me-2" id="btnUpdateOffre" onclick="sauvegarderModificationOffre()">
                       <i class="bi bi-check2-circle"></i> METTRE À JOUR L'OFFRE
                     </button>
-                    <button type="button" class="btn btn-warning fw-bold" id="btnTerminerOffre" onclick="terminerOffre()">
+                    <button type="button" class="btn btn-warning fw-bold" id="btnTerminerOffre" onclick="demanderTerminaisonOffre()">
                       <i class="bi bi-stop-circle"></i> TERMINER L'OFFRE
                     </button>
                   </div>
@@ -504,13 +507,132 @@
 
     <script>
       let currentOperationDetails = null;
-      let allOperations = []; // Stockage de toutes les opérations pour le filtrage
-      let detailsCache = {};  // Cache des détails de toutes les offres (préchargé en arrière-plan)
+      let allOperations = [];            // offres chargées (actives + terminées déjà chargées)
+      let offresTermineesChargees = 0;   // curseur du chargement progressif
+      let totalTerminees = 0;
+      let resteTerminees = false;
       let newOpArticlesList = [];
       let editOpArticlesList = [];
       let lastReservationData = null; // Pour stocker les données en cas d'erreur
 
+      // =====================================================================
+      // ADAPTATEUR VERS LA NOUVELLE ARCHITECTURE ("1 feuille par offre")
+      // Le backend renvoie des Date et des articles structurés ; l'UI existante
+      // (tableaux, impression, PDF) attend des chaînes formatées. On convertit
+      // ICI, en un seul endroit, plutôt que de réécrire tout l'affichage.
+      // =====================================================================
+
+      function formaterDate(valeur) {
+        const d = (valeur instanceof Date) ? valeur : (valeur ? new Date(valeur) : null);
+        if (!d || isNaN(d.getTime())) return '';
+        const p = n => String(n).padStart(2, '0');
+        return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+      }
+
+      function formaterDateHeure(valeur) {
+        const d = (valeur instanceof Date) ? valeur : (valeur ? new Date(valeur) : null);
+        if (!d || isNaN(d.getTime())) return '';
+        const p = n => String(n).padStart(2, '0');
+        return `${formaterDate(d)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      }
+
+      /** Jours restants avant suppression automatique (null si offre non terminée). */
+      function joursAvantSuppression(offre) {
+        if (!offre || !offre.dateSuppressionPrevue) return null;
+        const d = new Date(offre.dateSuppressionPrevue);
+        if (isNaN(d.getTime())) return null;
+        return Math.ceil((d - new Date()) / 86400000);
+      }
+
+      /** Offre (backend) -> forme attendue par l'UI existante. */
+      function _adapterOffre(o) {
+        return {
+          id: o.id, nom: o.nom, type: o.type, modeSaisie: o.modeSaisie,
+          articles: o.articles || [],
+          articlesPredefinis: (o.articles || []).join(','), // format historique de l'UI
+          count: o.count || 0,
+          isTerminee: !!o.isTerminee,
+          dateTerminaison: o.dateTerminaison,
+          dateSuppressionPrevue: o.dateSuppressionPrevue
+        };
+      }
+
+      /** Détail (backend) -> forme attendue par l'UI (operation + articlesText). */
+      function _adapterDetail(d) {
+        return {
+          operation: {
+            id: d.offre.id, nom: d.offre.nom, type: d.offre.type,
+            modeSaisie: d.offre.modeSaisie,
+            articles: d.offre.articles || [],
+            articlesPredefinis: (d.offre.articles || []).join(','),
+            isTerminee: d.offre.statut === 'Terminée',
+            dateTerminaison: d.offre.dateTerminaison,
+            dateSuppressionPrevue: d.offre.dateSuppressionPrevue
+          },
+          reservations: (d.reservations || []).map(r => ({
+            idRes: r.idRes, nom: r.nom, prenom: r.prenom, contact: r.contact, etat: r.etat,
+            dateSaisie: formaterDateHeure(r.dateSaisie),
+            articles: r.articles || [],
+            articlesText: (r.articles || []).map(a => `${a.quantite}x ${a.nom}`).join(', ')
+          })),
+          resume: (d.resume || []).filter(r => r.total > 0)
+        };
+      }
+
+      /** Chargement initial : toutes les actives + les N terminées les plus récentes. */
+      function chargerListeOffres(callback) {
+        google.script.run
+          .withSuccessHandler(function (data) {
+            const actives = (data.actives || []).map(_adapterOffre);
+            const terminees = (data.termineesRecentes || []).map(_adapterOffre);
+            allOperations = actives.concat(terminees);
+            offresTermineesChargees = terminees.length;
+            totalTerminees = data.totalTerminees || 0;
+            resteTerminees = !!data.hasMoreTerminees;
+            afficherDonnees(allOperations);
+            if (typeof callback === 'function') callback();
+          })
+          .withFailureHandler(function (e) { showToast("Erreur de connexion : " + e.message, "error"); })
+          .getOffresActivesEtTermineesRecentes(null);
+      }
+
+      /** Chargement progressif : lot suivant d'offres terminées. */
+      function chargerPlusTerminees() {
+        const btn = document.getElementById('btnChargerPlusTerminees');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Chargement...'; }
+        google.script.run
+          .withSuccessHandler(function (data) {
+            const connus = {};
+            allOperations.forEach(o => { connus[o.id] = true; });
+            (data.offres || []).map(_adapterOffre).forEach(o => {
+              if (!connus[o.id]) { allOperations.push(o); offresTermineesChargees++; }
+            });
+            totalTerminees = data.total || totalTerminees;
+            resteTerminees = !!data.hasMore;
+            afficherDonnees(allOperations);
+          })
+          .withFailureHandler(function (e) { showToast("Erreur : " + e.message, "error"); })
+          .getOffresTermineesPaginees(offresTermineesChargees, null);
+      }
+
+      /**
+       * Détail d'une offre. Plus de cache client : la lecture ne concerne
+       * désormais qu'UNE seule feuille, donc l'appel est déjà rapide.
+       */
+      function chargerDetailOffre(idOffre, callback) {
+        google.script.run
+          .withSuccessHandler(function (d) { callback(_adapterDetail(d)); })
+          .withFailureHandler(function (e) { showToast("Erreur : " + e.message, "error"); })
+          .getOffreById(idOffre);
+      }
+
       // --- NOUVELLES FONCTIONS POUR LES ARTICLES DYNAMIQUES ---
+      /**
+       * Ajout d'un article.
+       *  - 'new'  : l'offre n'existe pas encore => liste purement locale ;
+       *  - 'edit' : la colonne est créée immédiatement côté serveur (le serveur
+       *             réutilise une colonne existante si c'est une variante de casse).
+       */
       function ajouterArticleEtNouvelleCase(prefix) {
         const input = document.querySelector(`#${prefix}OpArticlesContainer .${prefix}-article-input`);
         const articleName = input.value.trim();
@@ -518,14 +640,40 @@
           showToast("Veuillez saisir un nom d'article.", "error");
           return;
         }
+
         if (prefix === 'new') {
           newOpArticlesList.push(articleName);
-        } else {
-          editOpArticlesList.push(articleName);
+          afficherListeArticles('new');
+          input.value = '';
+          input.focus();
+          return;
         }
-        afficherListeArticles(prefix);
-        input.value = '';
-        input.focus();
+
+        const idOffre = document.getElementById('editOpId').value;
+        input.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (res) {
+            input.disabled = false; input.value = ''; input.focus();
+            showToast(res && res.cree === false
+              ? `L'article « ${res.nom} » existe déjà dans cette offre.`
+              : `Article « ${res.nom} » ajouté.`, res && res.cree === false ? "info" : "success");
+            rafraichirArticlesOffre(idOffre);
+          })
+          .withFailureHandler(function (err) {
+            input.disabled = false;
+            showToast("Erreur : " + err.message, "error");
+          })
+          .ajouterArticleOffre(idOffre, articleName);
+      }
+
+      /** Recharge depuis le serveur la liste d'articles de l'offre en cours d'édition. */
+      function rafraichirArticlesOffre(idOffre) {
+        chargerDetailOffre(idOffre, function (details) {
+          currentOperationDetails = details;
+          editOpArticlesList = (details.operation.articles || []).slice();
+          afficherListeArticles('edit');
+          chargerListeOffres(); // le dropdown doit refléter la nouvelle liste d'articles
+        });
       }
 
       function afficherListeArticles(prefix) {
@@ -559,22 +707,61 @@
         input.select();
       }
 
+      /** Renommage d'un article. En édition, l'en-tête de colonne est renommé
+       *  côté serveur : les quantités déjà saisies sont CONSERVÉES. */
       function mettreAJourArticle(prefix, index, newValue) {
         const trimmedValue = newValue.trim();
         if (prefix === 'new') {
           newOpArticlesList[index] = trimmedValue;
-        } else {
-          editOpArticlesList[index] = trimmedValue;
+          return;
         }
+
+        const ancien = editOpArticlesList[index];
+        if (!trimmedValue || trimmedValue === ancien) { afficherListeArticles('edit'); return; }
+
+        const idOffre = document.getElementById('editOpId').value;
+        google.script.run
+          .withSuccessHandler(function (res) {
+            showToast(`Article renommé en « ${res.nouveau} ».`, "success");
+            rafraichirArticlesOffre(idOffre);
+          })
+          .withFailureHandler(function (err) {
+            showToast("Erreur : " + err.message, "error");
+            afficherListeArticles('edit'); // rétablit l'affichage précédent
+          })
+          .renommerArticleOffre(idOffre, ancien, trimmedValue);
       }
 
+      /** Suppression d'un article. En édition, c'est DESTRUCTIF (la colonne et
+       *  ses quantités disparaissent) => avertissement avec décompte réel. */
       function supprimerArticle(prefix, index) {
         if (prefix === 'new') {
           newOpArticlesList.splice(index, 1);
-        } else {
-          editOpArticlesList.splice(index, 1);
+          afficherListeArticles('new');
+          return;
         }
-        afficherListeArticles(prefix);
+
+        const idOffre = document.getElementById('editOpId').value;
+        const nomArticle = editOpArticlesList[index];
+        if (!nomArticle) return;
+
+        google.script.run
+          .withSuccessHandler(function (nb) {
+            const message = nb > 0
+              ? `${nb} réservation(s) ont une quantité sur « ${nomArticle} ». Supprimer cet article effacera ces quantités.`
+              : `Supprimer l'article « ${nomArticle} » ?`;
+            confirmerAction(message, function () {
+              google.script.run
+                .withSuccessHandler(function () {
+                  showToast(`Article « ${nomArticle} » supprimé.`, "success");
+                  rafraichirArticlesOffre(idOffre);
+                })
+                .withFailureHandler(function (err) { showToast("Erreur : " + err.message, "error"); })
+                .supprimerArticleOffre(idOffre, nomArticle);
+            }, "Supprimer l'article");
+          })
+          .withFailureHandler(function (err) { showToast("Erreur : " + err.message, "error"); })
+          .compterReservationsAvecArticle(idOffre, nomArticle);
       }
 
       function showToast(message, type = 'success') {
@@ -626,8 +813,6 @@
                 selectedOption.textContent = `[${type}] ${nom} (${newCount})`;
               }
 
-              // Une réservation a été ajoutée => rafraîchir le cache des détails.
-              prechargerDetails();
               // Le formulaire a été reset => resynchroniser le dropdown custom.
               CustomSelect.refresh(document.getElementById('operationSelect'));
             })
@@ -635,7 +820,7 @@
               btn.disabled = false; btn.innerHTML = originalText;
               showToast("Erreur : " + err.message, "error");
             })
-            .saveReservation(lastReservationData);
+            .ajouterReservationOffre(lastReservationData.operationId, lastReservationData);
         }
       }
 
@@ -785,19 +970,12 @@
 
       document.addEventListener('DOMContentLoaded', function() {
         CustomSelect.enhanceAll(); // transforme tous les <select> présents
-        google.script.run
-          .withSuccessHandler(afficherDonnees)
-          .withFailureHandler(function(e) { showToast("Erreur de connexion", "error"); })
-          .getOperationsData();
+        chargerListeOffres();
       });
 
       function afficherDonnees(operations) {
         // Stockage de toutes les opérations
         allOperations = operations;
-
-        // Précharge (ou rafraîchit) en arrière-plan le cache des détails de toutes
-        // les offres : appelé au chargement de la page et après chaque modification.
-        prechargerDetails();
 
         // Deux cibles distinctes, deux logiques :
         //  - le dropdown de réservation : UNIQUEMENT les offres actives ;
@@ -874,8 +1052,21 @@
           let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
           let statutOffre = op.isTerminee ? '<span class="badge bg-dark me-2">Terminée</span>' : '';
 
+          // Date de suppression automatique : simple information, sauf dans les
+          // 30 derniers jours où elle passe en alerte visible.
+          let infoSuppression = '';
+          if (op.isTerminee) {
+            const jours = joursAvantSuppression(op);
+            const date = formaterDate(op.dateSuppressionPrevue);
+            if (jours !== null && date) {
+              infoSuppression = (jours <= 30)
+                ? `<br><small class="text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> Suppression le ${date} (dans ${jours} j)</small>`
+                : `<br><small class="text-muted">Suppression le ${date}</small>`;
+            }
+          }
+
           tr.innerHTML = `
-            <td class="ps-4">${statutOffre}<span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
+            <td class="ps-4">${statutOffre}<span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}${infoSuppression}</td>
             <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
             <td class="text-end pe-4">
               <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
@@ -885,6 +1076,21 @@
           `;
           tbody.appendChild(tr);
         });
+
+        // Chargement progressif : bouton "Charger plus" quand des offres terminées
+        // restent à charger et que le filtre courant les affiche.
+        if (resteTerminees && filter !== 'actives') {
+          const restant = Math.max(0, totalTerminees - offresTermineesChargees);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td colspan="3" class="text-center py-3">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="btnChargerPlusTerminees" onclick="chargerPlusTerminees()">
+                <i class="bi bi-arrow-down-circle"></i> Charger plus d'offres terminées (${restant} restante${restant > 1 ? 's' : ''})
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        }
       }
 
       // --- OUVRIR MENTIONS LEGALES ET AIDE ---
@@ -907,6 +1113,19 @@
         const typeOperation = optionSelectionnee.getAttribute('data-type');
         const modeSaisie = optionSelectionnee.getAttribute('data-mode');
         const articlesPredefinis = optionSelectionnee.getAttribute('data-articles');
+
+        // Alimente l'autocomplétion avec les articles déjà présents dans l'offre.
+        const datalist = document.getElementById('datalistArticles');
+        if (datalist) {
+          datalist.innerHTML = '';
+          (articlesPredefinis || '').split(',').forEach(article => {
+            const nom = article.trim();
+            if (!nom) return;
+            const option = document.createElement('option');
+            option.value = nom;
+            datalist.appendChild(option);
+          });
+        }
         
         const sectionProduits = document.getElementById('sectionProduits');
         const conteneurListe = document.getElementById('listeProduits');
@@ -937,7 +1156,7 @@
       function ajouterLigneProduit() {
         const div = document.createElement('div');
         div.className = 'row g-2 mb-2 ligne-produit';
-        div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article" placeholder="Nom de l'article"></div><div class="col-3"><input type="number" class="form-control quantite-article" placeholder="Qté" min="1"></div><div class="col-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)"><i class="bi bi-x-lg"></i></button></div>`;
+        div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article" list="datalistArticles" placeholder="Nom de l'article" autocomplete="off"></div><div class="col-3"><input type="number" class="form-control quantite-article" placeholder="Qté" min="1"></div><div class="col-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)"><i class="bi bi-x-lg"></i></button></div>`;
         document.getElementById('listeProduits').appendChild(div);
       }
 
@@ -1025,7 +1244,7 @@
             // Afficher modale d'erreur avec les données
             showSaveError(err.message, data);
           })
-          .saveReservation(data); 
+          .ajouterReservationOffre(data.operationId, data); 
       }
 
       function gererChampsNouvelleOffre(prefix) {
@@ -1061,12 +1280,10 @@
         const type = document.getElementById('newOpType').value;
         const mode = type === 'Produit' ? document.getElementById('newOpMode').value : '';
         const data = {
-          nom: document.getElementById('newOpNom').value.trim(), 
-          type: type, 
+          nom: document.getElementById('newOpNom').value.trim(),
+          type: type,
           modeSaisie: mode,
-          dateDebut: '',
-          dateFin: '',
-          articlesPredefinis: mode === 'Predefini' ? newOpArticlesList.join(',') : ''
+          articlesPredefinis: mode === 'Predefini' ? newOpArticlesList : []
         };
         const btn = document.getElementById('btnSauvegarderOffre'); btn.disabled = true;
         google.script.run
@@ -1075,29 +1292,19 @@
             showToast("Nouvelle offre créée !", "success");
             btn.disabled = false;
             newOpArticlesList = [];
-            google.script.run.withSuccessHandler(ops => { afficherDonnees(ops); new bootstrap.Modal(document.getElementById('modalOperations')).show(); }).getOperationsData();
-          }).saveOperation(data);
+            chargerListeOffres(function () {
+              new bootstrap.Modal(document.getElementById('modalOperations')).show();
+            });
+          })
+          .withFailureHandler(function(err){ btn.disabled = false; showToast("Erreur : " + err.message, "error"); })
+          .creerOffre(data);
       }
 
       // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
         bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
-
-        // Cache prêt => affichage instantané, sans appel serveur.
-        if (detailsCache && detailsCache[idOperation]) {
-          afficherDetailOffre(detailsCache[idOperation]);
-          return;
-        }
-
-        // Sinon, repli sur l'appel serveur (et on alimente le cache au passage).
         showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
-        google.script.run
-          .withSuccessHandler(function(details) {
-            detailsCache[idOperation] = details;
-            afficherDetailOffre(details);
-          })
-          .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); })
-          .getOperationDetails(idOperation);
+        chargerDetailOffre(idOperation, afficherDetailOffre);
       }
 
       // Rendu du détail d'une offre (utilisé par le cache ET par l'appel serveur).
@@ -1125,7 +1332,7 @@
         gererChampsNouvelleOffre('edit');
 
         // Charger les articles prédéfinis dans la liste (après la réinitialisation ci-dessus)
-        editOpArticlesList = op.articlesPredefinis ? op.articlesPredefinis.split(',').map(a => a.trim()).filter(a => a) : [];
+        editOpArticlesList = (op.articles || []).slice();
         afficherListeArticles('edit');
 
         // Verrou "lecture seule" pour une offre terminée — APPLIQUÉ APRÈS le rendu de la
@@ -1168,84 +1375,91 @@
         new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
       }
 
-      // Précharge en arrière-plan les détails de toutes les offres (silencieux).
-      function prechargerDetails() {
-        google.script.run
-          .withSuccessHandler(function(map) { detailsCache = map || {}; })
-          .withFailureHandler(function() { /* silencieux : repli sur le chargement à la demande */ })
-          .getAllOperationsDetails();
-      }
-
       // Fonction d'enregistrement à la volée du statut
       function changerStatutReservation(idRes, nouveauStatut) {
+        // La nouvelle API cible la feuille de l'offre : il faut donc son identifiant.
+        const idOffre = currentOperationDetails && currentOperationDetails.operation
+          ? currentOperationDetails.operation.id : null;
+        if (!idOffre) { showToast("Offre inconnue : rouvrez le détail.", "error"); return; }
+
         showToast("<span class='spinner-border spinner-border-sm'></span> Mise à jour du statut...", "info");
         google.script.run
           .withSuccessHandler(function() {
             showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
-            
-            // Mise à jour de la donnée "en mémoire" pour que l'impression reflète le changement sans recharger
+            // Mise à jour en mémoire pour que l'impression reflète le changement sans recharger.
             if (currentOperationDetails) {
-              let resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
+              const resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
               if (resToUpdate) resToUpdate.etat = nouveauStatut;
             }
-
-            // Rafraîchir le cache des détails pour les prochaines ouvertures.
-            prechargerDetails();
           })
           .withFailureHandler(function(err) {
             showToast("Erreur lors de la mise à jour : " + err.message, "error");
           })
-          .updateReservationStatus(idRes, nouveauStatut);
+          .mettreAJourStatutReservation(idOffre, idRes, nouveauStatut);
       }
 
+      /**
+       * Sauvegarde les métadonnées de l'offre (nom / type / mode).
+       * Les ARTICLES ne passent plus par ici : ils sont ajoutés, renommés ou
+       * supprimés immédiatement côté serveur, la suppression étant précédée de
+       * son avertissement avec décompte.
+       */
       function sauvegarderModificationOffre() {
         const type = document.getElementById('editOpType').value;
         const mode = type === 'Produit' ? document.getElementById('editOpMode').value : '';
-        const data = {
-          id: document.getElementById('editOpId').value, 
-          nom: document.getElementById('editOpNom').value.trim(),
-          type: type, 
-          modeSaisie: mode,
-          dateDebut: '',
-          dateFin: '',
-          articlesPredefinis: mode === 'Predefini' ? editOpArticlesList.join(',') : ''
-        };
+        const id = document.getElementById('editOpId').value;
         const btn = document.getElementById('btnUpdateOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
-            showToast("Offre mise à jour !", "success"); 
+            showToast("Offre mise à jour !", "success");
             btn.disabled = false;
-            editOpArticlesList = [];
-            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            chargerListeOffres();
           })
           .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); btn.disabled = false; })
-          .updateOperation(data);
+          .modifierOffre(id, {
+            nom: document.getElementById('editOpNom').value.trim(),
+            type: type,
+            modeSaisie: mode
+          });
       }
 
-      function terminerOffre() {
+      // Nommée différemment de la fonction serveur terminerOffre() pour lever toute ambiguïté.
+      function demanderTerminaisonOffre() {
         const operationId = document.getElementById('editOpId').value;
         if (!operationId) return;
-        
-        confirmerAction("Êtes-vous sûr de vouloir terminer cette offre ? Les nouvelles réservations ne seront plus possibles.", function() {
+
+        const enCours = currentOperationDetails
+          ? currentOperationDetails.reservations.filter(r => r.etat === 'Réservé' || r.etat === 'Contacté').length
+          : 0;
+        let message = "Êtes-vous sûr de vouloir terminer cette offre ? Les nouvelles réservations ne seront plus possibles.";
+        if (enCours > 0) {
+          // On avertit, mais on ne bloque jamais (décision arbitrée).
+          message += ` ${enCours} commande(s) sont encore en cours (Réservé / Contacté).`;
+        }
+
+        confirmerAction(message, function() {
           const btn = document.getElementById('btnTerminerOffre');
+          const libelle = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
           btn.disabled = true;
           btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Terminaison...';
 
           google.script.run
-            .withSuccessHandler(function() {
-              showToast("Offre terminée !", "success");
+            .withSuccessHandler(function(resultat) {
+              const date = resultat && resultat.dateSuppressionPrevue ? formaterDate(resultat.dateSuppressionPrevue) : null;
+              showToast(date
+                ? `Offre terminée. Suppression automatique prévue le ${date}.`
+                : "Offre terminée !", "success");
               btn.disabled = false;
-              btn.innerHTML = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
-              // Fermer la modale et recharger
+              btn.innerHTML = libelle;
               bootstrap.Modal.getInstance(document.getElementById('modalDetailOffre')).hide();
-              google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+              chargerListeOffres();
             })
             .withFailureHandler(function(err) {
               showToast("Erreur : " + err.message, "error");
               btn.disabled = false;
-              btn.innerHTML = '<i class="bi bi-stop-circle"></i> TERMINER L\'OFFRE';
+              btn.innerHTML = libelle;
             })
-            .terminerOperation(operationId);
+            .terminerOffre(operationId);
         }, "Terminer l'offre");
       }
 
@@ -1259,13 +1473,9 @@
         new bootstrap.Modal(document.getElementById('modalConfirmDelete')).show();
       }
 
-      // Récupère les détails d'une offre : cache si dispo, sinon serveur.
+      // Récupère les détails d'une offre (lecture d'une seule feuille).
       function obtenirDetailsOffre(id, callback) {
-        if (detailsCache && detailsCache[id]) { callback(detailsCache[id]); return; }
-        google.script.run
-          .withSuccessHandler(function(d) { detailsCache[id] = d; callback(d); })
-          .withFailureHandler(function(e) { showToast("Erreur : " + e.message, "error"); })
-          .getOperationDetails(id);
+        chargerDetailOffre(id, callback);
       }
 
       // Suppression effective (après confirmation / éventuel téléchargement).
@@ -1276,10 +1486,10 @@
         google.script.run
           .withSuccessHandler(function() {
             showToast("Offre supprimée !", 'success');
-            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            chargerListeOffres();
           })
           .withFailureHandler(function(err) { showToast("Erreur : " + err.message, "error"); })
-          .deleteOperation(id);
+          .supprimerOffre(id);
       }
 
       // "Supprimer sans télécharger"
