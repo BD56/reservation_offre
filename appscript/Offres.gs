@@ -1087,56 +1087,44 @@ function getOffresActivesEtTermineesRecentes(limitTerminees) {
   const toutes = lireConfigOffres();
   const actives = toutes.filter(o => o.statut !== OffresConfig.STATUT_TERMINEE).sort(_trierActivesRecentesDabord);
   const terminees = toutes.filter(o => o.statut === OffresConfig.STATUT_TERMINEE).sort(_trierTermineesRecentesDabord);
+  const termineesRecentes = terminees.slice(0, limite);
+
+  // On renvoie AUSSI le contenu complet de ces offres, dans le MÊME aller-retour.
+  // Séparer les deux appels obligeait à attendre deux latences successives avant
+  // que le cache soit prêt ; ici il l'est dès le premier affichage.
+  // Chaque feuille n'est ouverte qu'une fois : la fiche allégée est dérivée du
+  // détail, au lieu de relire l'en-tête et le nombre de lignes séparément.
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const details = {};
+
+  const versLeger = function (offre) {
+    const feuille = ss.getSheetByName(offre.nomFeuille);
+    if (!feuille) {
+      // Feuille absente : on n'interrompt pas le chargement, l'offre est
+      // simplement listée sans contenu (et l'anomalie est tracée).
+      console.error('Chargement : feuille "' + offre.nomFeuille + '" introuvable.');
+      return _versResumeOffre(offre);
+    }
+    const detail = _construireDetailOffre(offre, feuille);
+    details[offre.id] = detail;
+    const meta = detail.offre;
+    return {
+      id: meta.id, nom: meta.nom, type: meta.type, modeSaisie: meta.modeSaisie,
+      statut: meta.statut, isTerminee: meta.isTerminee,
+      dateTerminaison: meta.dateTerminaison,
+      dateSuppressionPrevue: meta.dateSuppressionPrevue,
+      articles: meta.articles,
+      count: detail.reservations.length
+    };
+  };
 
   return {
-    actives: actives.map(_versResumeOffre),
-    termineesRecentes: terminees.slice(0, limite).map(_versResumeOffre),
+    actives: actives.map(versLeger),
+    termineesRecentes: termineesRecentes.map(versLeger),
     totalTerminees: terminees.length,
-    hasMoreTerminees: terminees.length > limite
+    hasMoreTerminees: terminees.length > limite,
+    details: details
   };
-}
-
-/**
- * PRÉCHARGEMENT — détails complets des offres actives + des N terminées les plus
- * récentes, en UN SEUL aller-retour.
- *
- * Raison d'être : le coût d'ouverture d'une offre n'est pas la lecture du Sheet
- * (une seule feuille) mais la LATENCE de l'appel google.script.run, de l'ordre de
- * plusieurs secondes. Précharger supprime tout appel réseau au moment de la
- * sélection. Côté client, l'appel est lancé en arrière-plan APRÈS l'affichage de
- * la liste, afin de ne pas retarder le premier rendu.
- *
- * Config n'est lue qu'une fois pour l'ensemble des offres.
- */
-function getDetailsOffresPrechargement(limitTerminees) {
-  try {
-    const limite = (limitTerminees === undefined || limitTerminees === null || limitTerminees === "")
-      ? getParametreOffre("LIMITE_TERMINEES_INITIALE")
-      : Math.max(0, parseInt(limitTerminees, 10) || 0);
-
-    const toutes = lireConfigOffres();
-    const actives = toutes.filter(o => o.statut !== OffresConfig.STATUT_TERMINEE);
-    const terminees = toutes
-      .filter(o => o.statut === OffresConfig.STATUT_TERMINEE)
-      .sort(_trierTermineesRecentesDabord)
-      .slice(0, limite);
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const resultat = {};
-    actives.concat(terminees).forEach(function (offre) {
-      const feuille = ss.getSheetByName(offre.nomFeuille);
-      // Une feuille manquante ne doit pas faire échouer tout le préchargement :
-      // l'offre sera simplement chargée à la demande (et l'anomalie est tracée).
-      if (!feuille) {
-        console.error('Préchargement : feuille "' + offre.nomFeuille + '" introuvable.');
-        return;
-      }
-      resultat[offre.id] = _construireDetailOffre(offre, feuille);
-    });
-    return resultat;
-  } catch (e) {
-    throw new Error("Impossible de précharger les détails : " + e.message);
-  }
 }
 
 /**

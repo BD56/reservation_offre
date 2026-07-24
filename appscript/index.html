@@ -813,11 +813,17 @@
             offresTermineesChargees = terminees.length;
             totalTerminees = (data && data.totalTerminees) || 0;
             resteTerminees = !!(data && data.hasMoreTerminees);
+            // Le contenu des offres arrive dans la MÊME réponse : le cache est donc
+            // prêt dès le premier affichage, sans second aller-retour. Défensif :
+            // si `details` manquait, l'application reste fonctionnelle et les
+            // détails seraient chargés à la demande.
+            if (data && data.details) {
+              Object.keys(data.details).forEach(function (id) {
+                detailsCache[id] = _adapterDetail(data.details[id]);
+              });
+            }
             afficherDonnees(allOperations);
             if (typeof callback === 'function') callback();
-            // Préchargement APRÈS le premier rendu : la liste est déjà à l'écran,
-            // le contenu des offres arrive en tâche de fond sans bloquer.
-            prechargerDetails();
           })
           .withFailureHandler(function (e) {
             dernierRetourServeur = { ok: false, erreur: e && e.message ? e.message : String(e) };
@@ -866,29 +872,14 @@
       }
 
       /**
-       * Cache des détails, alimenté en arrière-plan par prechargerDetails().
+       * Cache des détails, rempli par chargerListeOffres() : le contenu des offres
+       * arrive dans la même réponse que la liste, donc dès le chargement du site.
        * Ce n'est pas la lecture du Sheet qui coûte (une seule feuille), mais la
        * LATENCE de chaque appel google.script.run — plusieurs secondes ressenties
        * à la sélection d'une offre. Le cache supprime purement et simplement cet
        * aller-retour.
        */
       let detailsCache = {};
-
-      /**
-       * Précharge en arrière-plan les détails des offres actives + des N dernières
-       * terminées. Lancé APRÈS le premier rendu : la liste s'affiche immédiatement,
-       * le préchargement se fait sans bloquer. Silencieux par construction — en cas
-       * d'échec on retombe simplement sur le chargement à la demande.
-       */
-      function prechargerDetails() {
-        google.script.run
-          .withSuccessHandler(function (map) {
-            if (!map) return; // sérialisation ratée : on garde le repli serveur
-            Object.keys(map).forEach(function (id) { detailsCache[id] = _adapterDetail(map[id]); });
-          })
-          .withFailureHandler(function () { /* silencieux : repli sur la demande */ })
-          .getDetailsOffresPrechargement(null);
-      }
 
       /**
        * Détail d'une offre : servi depuis le cache si disponible (instantané),
