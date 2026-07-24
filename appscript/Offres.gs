@@ -467,6 +467,19 @@ function _normaliserListeArticles(liste) {
   return resultat;
 }
 
+/**
+ * Convertit une Date en chaîne ISO pour le TRANSPORT vers le frontend.
+ *
+ * ⚠️ google.script.run sérialise les valeurs de retour ; un objet contenant des
+ * Date peut échouer silencieusement à la sérialisation, et le handler de succès
+ * reçoit alors `null` SANS aucune erreur. Le piège est que l'éditeur ne sérialise
+ * rien : une fonction peut donc marcher en test et renvoyer null au web app.
+ * On ne fait donc traverser que des types simples (chaînes, nombres, booléens).
+ */
+function _dateISO(valeur) {
+  return (valeur instanceof Date && !isNaN(valeur.getTime())) ? valeur.toISOString() : null;
+}
+
 /** Date de suppression automatique prévue pour une offre terminée. */
 function calculerDateSuppression(dateTerminaison) {
   if (!(dateTerminaison instanceof Date)) return null;
@@ -565,7 +578,7 @@ function getOffreById(idOffre) {
         prenom: String(ligne[OffresConfig.COL_RES_PRENOM] || ""),
         contact: String(ligne[OffresConfig.COL_RES_CONTACT] || ""),
         etat: String(ligne[OffresConfig.COL_RES_STATUT] || OffresConfig.STATUTS_RESERVATION[0]),
-        dateSaisie: (dateSaisie instanceof Date) ? dateSaisie : null,
+        dateSaisie: _dateISO(dateSaisie),
         articles: detail
       });
     }
@@ -582,8 +595,8 @@ function getOffreById(idOffre) {
       // Booléen explicite : le frontend ne doit pas dépendre d'une comparaison
       // de chaîne accentuée ("Terminée") transitant par google.script.run.
       isTerminee: offre.statut === OffresConfig.STATUT_TERMINEE,
-      dateTerminaison: offre.dateTerminaison,
-      dateSuppressionPrevue: calculerDateSuppression(offre.dateTerminaison),
+      dateTerminaison: _dateISO(offre.dateTerminaison),
+      dateSuppressionPrevue: _dateISO(calculerDateSuppression(offre.dateTerminaison)),
       nomFeuille: offre.nomFeuille,
       articles: articles.map(a => a.nom)
     },
@@ -671,8 +684,8 @@ function terminerOffre(idOffre) {
     if (trouve.offre.statut === OffresConfig.STATUT_TERMINEE) {
       return {
         dejaTerminee: true,
-        dateTerminaison: trouve.offre.dateTerminaison,
-        dateSuppressionPrevue: calculerDateSuppression(trouve.offre.dateTerminaison)
+        dateTerminaison: _dateISO(trouve.offre.dateTerminaison),
+        dateSuppressionPrevue: _dateISO(calculerDateSuppression(trouve.offre.dateTerminaison))
       };
     }
 
@@ -683,7 +696,7 @@ function terminerOffre(idOffre) {
     loggerOffre("TERMINAISON_OFFRE", idOffre,
       `"${trouve.offre.nom}" — suppression prévue le ${dateSuppression ? dateSuppression.toISOString().slice(0, 10) : "?"}`);
 
-    return { dejaTerminee: false, dateTerminaison: maintenant, dateSuppressionPrevue: dateSuppression };
+    return { dejaTerminee: false, dateTerminaison: _dateISO(maintenant), dateSuppressionPrevue: _dateISO(dateSuppression) };
   });
 }
 
@@ -1036,8 +1049,8 @@ function _versResumeOffre(offre) {
     modeSaisie: offre.modeSaisie,
     statut: offre.statut,
     isTerminee: offre.statut === OffresConfig.STATUT_TERMINEE,
-    dateTerminaison: offre.dateTerminaison,
-    dateSuppressionPrevue: calculerDateSuppression(offre.dateTerminaison),
+    dateTerminaison: _dateISO(offre.dateTerminaison),
+    dateSuppressionPrevue: _dateISO(calculerDateSuppression(offre.dateTerminaison)),
     articles: articles,
     count: count
   };
