@@ -106,6 +106,46 @@ function doGet() {
 
 /**
  * ----------------------------------------------------------------------------
+ * DIAGNOSTIC
+ * À lancer depuis l'éditeur ET appelable par le frontend : compare ce que voit
+ * le script côté éditeur et côté web app déployée (les autorisations diffèrent).
+ * Ne modifie rien.
+ * ----------------------------------------------------------------------------
+ */
+function diagnostiquerLiaison() {
+  const lignes = [];
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      lignes.push("❌ getActiveSpreadsheet() = null");
+      lignes.push("   => le script n'est PAS lié à un classeur (script autonome).");
+      lignes.push("   Correctif : utiliser SpreadsheetApp.openById(<ID du classeur>).");
+      return lignes.join("\n");
+    }
+    lignes.push("✅ Classeur : « " + ss.getName() + " »");
+    lignes.push("   ID  : " + ss.getId());
+    lignes.push("   URL : " + ss.getUrl());
+
+    const feuilles = ss.getSheets().map(f => f.getName());
+    lignes.push("   Feuilles (" + feuilles.length + ") : " + feuilles.join(", "));
+
+    const cfg = ss.getSheetByName(OffresConfig.SHEET_CONFIG);
+    lignes.push(cfg ? "✅ Feuille Config présente (" + Math.max(0, cfg.getLastRow() - 1) + " offre(s))"
+                    : "❌ Feuille Config ABSENTE");
+
+    const offres = lireConfigOffres();
+    lignes.push("   Offres lues : " + offres.length +
+      (offres.length ? " -> " + offres.map(o => o.nom + " [" + o.statut + "]").join(" | ") : ""));
+  } catch (e) {
+    lignes.push("❌ ERREUR : " + e.message);
+  }
+  const message = lignes.join("\n");
+  console.log(message);
+  return message;
+}
+
+/**
+ * ----------------------------------------------------------------------------
  * VERROU (écritures concurrentes)
  * Deux réservations simultanées peuvent se marcher dessus — pire encore en mode
  * "Libre" où elles peuvent tenter de créer la même colonne d'article en même
