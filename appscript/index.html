@@ -798,21 +798,49 @@
         };
       }
 
+      // Dernière réponse/erreur du serveur, conservée pour le diagnostic : les
+      // toasts disparaissent après 4 s, ce qui rend une panne difficile à lire.
+      let dernierRetourServeur = null;
+
       /** Chargement initial : toutes les actives + les N terminées les plus récentes. */
       function chargerListeOffres(callback) {
         google.script.run
           .withSuccessHandler(function (data) {
-            const actives = (data.actives || []).map(_adapterOffre);
-            const terminees = (data.termineesRecentes || []).map(_adapterOffre);
+            dernierRetourServeur = { ok: true, data: data };
+            const actives = (data && data.actives ? data.actives : []).map(_adapterOffre);
+            const terminees = (data && data.termineesRecentes ? data.termineesRecentes : []).map(_adapterOffre);
             allOperations = actives.concat(terminees);
             offresTermineesChargees = terminees.length;
-            totalTerminees = data.totalTerminees || 0;
-            resteTerminees = !!data.hasMoreTerminees;
+            totalTerminees = (data && data.totalTerminees) || 0;
+            resteTerminees = !!(data && data.hasMoreTerminees);
             afficherDonnees(allOperations);
             if (typeof callback === 'function') callback();
           })
-          .withFailureHandler(function (e) { showToast("Erreur de connexion : " + e.message, "error"); })
+          .withFailureHandler(function (e) {
+            dernierRetourServeur = { ok: false, erreur: e && e.message ? e.message : String(e) };
+            afficherDonnees([]); // pour que l'état vide propose le diagnostic
+            showToast("Erreur de connexion : " + dernierRetourServeur.erreur, "error");
+          })
           .getOffresActivesEtTermineesRecentes(null);
+      }
+
+      /**
+       * Diagnostic exécuté DEPUIS LE WEB APP (et non depuis l'éditeur) : c'est le
+       * seul moyen de voir ce que le serveur renvoie réellement dans ce contexte,
+       * les autorisations n'étant pas les mêmes des deux côtés.
+       */
+      function lancerDiagnostic() {
+        const zone = document.getElementById('zoneDiagnostic');
+        if (!zone) return;
+        zone.hidden = false;
+        zone.textContent = 'Diagnostic en cours...';
+        const local = 'Réponse reçue par le site :\n' + JSON.stringify(dernierRetourServeur, null, 1) + '\n\n';
+        google.script.run
+          .withSuccessHandler(function (txt) { zone.textContent = local + 'Vu par le serveur :\n' + txt; })
+          .withFailureHandler(function (e) {
+            zone.textContent = local + 'Le serveur a renvoyé une ERREUR :\n' + (e && e.message ? e.message : String(e));
+          })
+          .diagnostiquerLiaison();
       }
 
       /** Chargement progressif : lot suivant d'offres terminées. */
@@ -1277,6 +1305,12 @@
                 <i class="bi bi-inbox"></i>
                 <div class="etat-vide__titre">Aucune offre ${filter === 'terminees' ? 'terminée' : filter === 'actives' ? 'active' : ''}</div>
                 <div class="small">Créez une offre pour commencer à enregistrer des réservations.</div>
+                <button type="button" class="btn-fantome mt-3" onclick="lancerDiagnostic()">
+                  <i class="bi bi-activity"></i> Diagnostic de connexion
+                </button>
+                <pre id="zoneDiagnostic" hidden style="text-align:left; white-space:pre-wrap; font-size:.75rem;
+                     background:var(--surface-attenuee); border:1px solid var(--bordure); border-radius:var(--r-s);
+                     padding:10px; margin-top:12px; max-height:320px; overflow:auto; color:var(--texte);"></pre>
               </div>
             </td></tr>`;
           return;
