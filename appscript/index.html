@@ -815,6 +815,9 @@
             resteTerminees = !!(data && data.hasMoreTerminees);
             afficherDonnees(allOperations);
             if (typeof callback === 'function') callback();
+            // Préchargement APRÈS le premier rendu : la liste est déjà à l'écran,
+            // le contenu des offres arrive en tâche de fond sans bloquer.
+            prechargerDetails();
           })
           .withFailureHandler(function (e) {
             dernierRetourServeur = { ok: false, erreur: e && e.message ? e.message : String(e) };
@@ -863,14 +866,54 @@
       }
 
       /**
-       * Détail d'une offre. Plus de cache client : la lecture ne concerne
-       * désormais qu'UNE seule feuille, donc l'appel est déjà rapide.
+       * Cache des détails, alimenté en arrière-plan par prechargerDetails().
+       * Ce n'est pas la lecture du Sheet qui coûte (une seule feuille), mais la
+       * LATENCE de chaque appel google.script.run — plusieurs secondes ressenties
+       * à la sélection d'une offre. Le cache supprime purement et simplement cet
+       * aller-retour.
        */
-      function chargerDetailOffre(idOffre, callback) {
+      let detailsCache = {};
+
+      /**
+       * Précharge en arrière-plan les détails des offres actives + des N dernières
+       * terminées. Lancé APRÈS le premier rendu : la liste s'affiche immédiatement,
+       * le préchargement se fait sans bloquer. Silencieux par construction — en cas
+       * d'échec on retombe simplement sur le chargement à la demande.
+       */
+      function prechargerDetails() {
         google.script.run
-          .withSuccessHandler(function (d) { callback(_adapterDetail(d)); })
+          .withSuccessHandler(function (map) {
+            if (!map) return; // sérialisation ratée : on garde le repli serveur
+            Object.keys(map).forEach(function (id) { detailsCache[id] = _adapterDetail(map[id]); });
+          })
+          .withFailureHandler(function () { /* silencieux : repli sur la demande */ })
+          .getDetailsOffresPrechargement(null);
+      }
+
+      /**
+       * Détail d'une offre : servi depuis le cache si disponible (instantané),
+       * sinon chargé auprès du serveur.
+       * @param {boolean} forcerServeur  ignore le cache (après une modification).
+       */
+      function chargerDetailOffre(idOffre, callback, forcerServeur) {
+        if (!forcerServeur && detailsCache[idOffre]) {
+          callback(detailsCache[idOffre]);
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function (d) {
+            const adapte = _adapterDetail(d);
+            detailsCache[idOffre] = adapte; // alimente le cache au passage
+            callback(adapte);
+          })
           .withFailureHandler(function (e) { showToast("Erreur : " + e.message, "error"); })
           .getOffreById(idOffre);
+      }
+
+      /** Invalide une offre (ou tout le cache) après une modification. */
+      function invaliderCacheDetails(idOffre) {
+        if (idOffre) delete detailsCache[idOffre];
+        else detailsCache = {};
       }
 
       // --- NOUVELLES FONCTIONS POUR LES ARTICLES DYNAMIQUES ---
@@ -920,7 +963,7 @@
           editOpArticlesList = (details.operation.articles || []).slice();
           afficherListeArticles('edit');
           chargerListeOffres(); // le dropdown doit refléter la nouvelle liste d'articles
-        });
+        }, true);
       }
 
       function afficherListeArticles(prefix) {
@@ -1613,6 +1656,7 @@
             // refaire. Manipuler directement le libellé de l'option était source de
             // deux bugs (placeholder ciblé après le reset, préfixe [Type] dédoublé)
             // et laissait le tableau de gestion sur un compteur périmé.
+            invaliderCacheDetails(data.operationId);
             const offre = allOperations.find(o => o.id === data.operationId);
             if (offre) offre.count = (offre.count || 0) + 1;
             afficherDonnees(allOperations); // dropdown ET tableau de gestion
@@ -1780,6 +1824,13 @@
               const resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
               if (resToUpdate) resToUpdate.etat = nouveauStatut;
             }
+            // Le cache doit refléter le nouveau statut, sinon une réouverture
+            // afficherait l'ancien.
+            const enCache = detailsCache[idOffre];
+            if (enCache) {
+              const r = enCache.reservations.find(x => x.idRes === idRes);
+              if (r) r.etat = nouveauStatut;
+            }
           })
           .withFailureHandler(function(err) {
             showToast("Erreur lors de la mise à jour : " + err.message, "error");
@@ -1800,6 +1851,7 @@
         const btn = document.getElementById('btnUpdateOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
+            invaliderCacheDetails(id);
             showToast("Offre mise à jour !", "success");
             btn.disabled = false;
             chargerListeOffres();
@@ -1838,6 +1890,7 @@
               showToast(date
                 ? `Offre terminée. Suppression automatique prévue le ${date}.`
                 : "Offre terminée !", "success");
+              invaliderCacheDetails(operationId);
               btn.disabled = false;
               btn.innerHTML = libelle;
               fermerDetailOffre();
@@ -1874,6 +1927,7 @@
         fermerModale('modalConfirmDelete');
         google.script.run
           .withSuccessHandler(function() {
+            invaliderCacheDetails(id);
             showToast("Offre supprimée !", 'success');
             chargerListeOffres();
           })

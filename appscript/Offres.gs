@@ -547,8 +547,15 @@ function creerOffre(data) {
  */
 function getOffreById(idOffre) {
   const contexte = _feuilleDeOffre(idOffre);
-  const feuille = contexte.feuille;
-  const offre = contexte.offre;
+  return _construireDetailOffre(contexte.offre, contexte.feuille);
+}
+
+/**
+ * Construit le détail d'une offre à partir d'une ligne Config DÉJÀ lue.
+ * Extrait de getOffreById pour que le préchargement puisse traiter N offres
+ * sans relire la feuille Config à chaque fois.
+ */
+function _construireDetailOffre(offre, feuille) {
   const articles = lireArticlesOffre(feuille);
 
   const totaux = {};
@@ -1087,6 +1094,49 @@ function getOffresActivesEtTermineesRecentes(limitTerminees) {
     totalTerminees: terminees.length,
     hasMoreTerminees: terminees.length > limite
   };
+}
+
+/**
+ * PRÉCHARGEMENT — détails complets des offres actives + des N terminées les plus
+ * récentes, en UN SEUL aller-retour.
+ *
+ * Raison d'être : le coût d'ouverture d'une offre n'est pas la lecture du Sheet
+ * (une seule feuille) mais la LATENCE de l'appel google.script.run, de l'ordre de
+ * plusieurs secondes. Précharger supprime tout appel réseau au moment de la
+ * sélection. Côté client, l'appel est lancé en arrière-plan APRÈS l'affichage de
+ * la liste, afin de ne pas retarder le premier rendu.
+ *
+ * Config n'est lue qu'une fois pour l'ensemble des offres.
+ */
+function getDetailsOffresPrechargement(limitTerminees) {
+  try {
+    const limite = (limitTerminees === undefined || limitTerminees === null || limitTerminees === "")
+      ? getParametreOffre("LIMITE_TERMINEES_INITIALE")
+      : Math.max(0, parseInt(limitTerminees, 10) || 0);
+
+    const toutes = lireConfigOffres();
+    const actives = toutes.filter(o => o.statut !== OffresConfig.STATUT_TERMINEE);
+    const terminees = toutes
+      .filter(o => o.statut === OffresConfig.STATUT_TERMINEE)
+      .sort(_trierTermineesRecentesDabord)
+      .slice(0, limite);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const resultat = {};
+    actives.concat(terminees).forEach(function (offre) {
+      const feuille = ss.getSheetByName(offre.nomFeuille);
+      // Une feuille manquante ne doit pas faire échouer tout le préchargement :
+      // l'offre sera simplement chargée à la demande (et l'anomalie est tracée).
+      if (!feuille) {
+        console.error('Préchargement : feuille "' + offre.nomFeuille + '" introuvable.');
+        return;
+      }
+      resultat[offre.id] = _construireDetailOffre(offre, feuille);
+    });
+    return resultat;
+  } catch (e) {
+    throw new Error("Impossible de précharger les détails : " + e.message);
+  }
 }
 
 /**
