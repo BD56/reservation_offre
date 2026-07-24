@@ -1535,7 +1535,11 @@
           return;
         }
 
-        panneau.innerHTML = '<div class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary"></span></div>';
+        // Idem : pas de spinner quand le contenu est déjà en cache, sinon il
+        // provoquerait un clignotement inutile avant un rendu immédiat.
+        if (!detailsCache[id]) {
+          panneau.innerHTML = '<div class="text-center py-4"><span class="spinner-border spinner-border-sm text-primary"></span></div>';
+        }
         chargerDetailOffre(id, function (d) {
           // L'utilisateur a pu changer d'offre pendant l'aller-retour serveur.
           const actuel = document.getElementById('operationSelect');
@@ -1713,7 +1717,12 @@
 
       // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
-        showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
+        // On n'annonce un chargement que s'il y en a vraiment un : avec le cache,
+        // l'ouverture est instantanée et le toast resterait 4 s à l'écran pour
+        // signaler une attente inexistante.
+        if (!detailsCache[idOperation]) {
+          showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
+        }
         chargerDetailOffre(idOperation, afficherDetailOffre);
       }
 
