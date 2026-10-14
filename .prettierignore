@@ -1,6 +1,7 @@
 # Mise en forme automatique (Prettier) : `npm run format`.
 node_modules/
 package-lock.json
+docs/
 *.md
 # Squelette de la page : les balises de modèle Apps Script (<?= … ?>) ne doivent pas
 # être retouchées.
