@@ -100,7 +100,7 @@
             </button>
           </div>
 
-          <button type="button" class="btn btn-primary w-100 fw-bold py-2" onclick="validerFormulaire()">
+          <button type="button" class="btn btn-primary w-100 fw-bold py-2" id="btnValiderReservation" onclick="validerFormulaire()">
             VÉRIFIER ET VALIDER
           </button>
         </form>
@@ -396,28 +396,59 @@
     <script>
       let currentOperationDetails = null;
 
+      // Échappe le texte saisi avant de l'insérer dans du HTML (noms avec < ' " & etc.)
+      function echapper(valeur) {
+        return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
+      // Réutilise l'instance existante pour éviter les fonds gris empilés
+      function modal(id) { return bootstrap.Modal.getOrCreateInstance(document.getElementById(id)); }
+
+      // yyyy-MM-dd -> dd/MM/yyyy
+      function dateFr(iso) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '-');
+      }
+
       function showToast(message, type = 'success') {
         const toastEl = document.getElementById('appToast');
         toastEl.className = `toast align-items-center border-0 text-white ${type === 'success' ? 'bg-success' : (type==='info' ? 'bg-info' : 'bg-danger')}`;
         document.getElementById('toastMessage').innerHTML = message;
-        new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+        bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
+      }
+
+      function showErreur(err) {
+        showToast("<i class='bi bi-exclamation-triangle'></i> Erreur : " + echapper(err && err.message ? err.message : err), "error");
+      }
+
+      function rechargerOperations(callback) {
+        google.script.run
+          .withSuccessHandler(function(ops) { afficherDonnees(ops); if (callback) callback(); })
+          .withFailureHandler(showErreur)
+          .getOperationsData();
       }
 
       document.addEventListener('DOMContentLoaded', function() {
         google.script.run
           .withSuccessHandler(afficherDonnees)
-          .withFailureHandler(function(e) { showToast("Erreur de connexion", "error"); })
-          .getOperationsData(); 
+          .withFailureHandler(function(e) {
+            document.getElementById('operationSelect').innerHTML = '<option value="" disabled selected>Impossible de charger les offres</option>';
+            showToast("Erreur de connexion : " + echapper(e.message), "error");
+          })
+          .getOperationsData();
       });
 
       function afficherDonnees(operations) {
         const select = document.getElementById('operationSelect');
         const tbody = document.getElementById('tableOperationsBody');
+        const selectionPrecedente = select.value;
         select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
         tbody.innerHTML = '';
 
         if (operations.length === 0) {
+          select.innerHTML = '<option value="" disabled selected>Aucune offre disponible</option>';
           tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+          gererAffichageProduits();
           return;
         }
 
@@ -432,46 +463,55 @@
 
           const tr = document.createElement('tr');
           tr.style.cursor = 'pointer';
-          tr.onclick = function() { voirReservationsDetail(op.id); }; 
-          
+          tr.onclick = function() { voirReservationsDetail(op.id); };
+
           let pastilleCouleur = op.count > 0 ? 'success' : 'secondary';
-          let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${op.modeSaisie}</small>` : '';
+          let infoMode = op.type === 'Produit' ? `<small class="text-muted">Saisie : ${echapper(op.modeSaisie)}</small>` : '';
 
           tr.innerHTML = `
-            <td class="ps-4"><span class="fw-bold text-dark">${op.nom}</span><br>${infoMode}</td>
-            <td><small>Du ${op.dateDebut}<br>Au ${op.dateFin}</small></td>
+            <td class="ps-4"><span class="fw-bold text-dark">${echapper(op.nom)}</span><br>${infoMode}</td>
+            <td><small>Du ${echapper(op.dateDebut || '-')}<br>Au ${echapper(op.dateFin || '-')}</small></td>
             <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
             <td class="text-end pe-4">
-              <button class="btn btn-sm btn-outline-danger border-0" onclick="event.stopPropagation(); demanderSuppression('${op.id}')" title="Supprimer l'offre">
+              <button class="btn btn-sm btn-outline-danger border-0" title="Supprimer l'offre">
                 <i class="bi bi-trash"></i>
               </button>
             </td>
           `;
+          tr.querySelector('button').addEventListener('click', function(event) {
+            event.stopPropagation();
+            demanderSuppression(op.id);
+          });
           tbody.appendChild(tr);
         });
+
+        // On conserve l'offre sélectionnée si elle existe toujours, sinon on masque les articles
+        if (selectionPrecedente && operations.some(op => op.id === selectionPrecedente)) {
+          select.value = selectionPrecedente;
+        } else {
+          gererAffichageProduits();
+        }
       }
 
       // --- OUVRIR MENTIONS LEGALES ET AIDE ---
       function ouvrirMentions() {
-        new bootstrap.Modal(document.getElementById('modalMentions')).show();
+        modal('modalMentions').show();
       }
 
       function ouvrirAide() {
-        const panneauAide = document.getElementById('offcanvasHelp');
-        const offcanvas = new bootstrap.Offcanvas(panneauAide);
-        offcanvas.show();
+        bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasHelp')).show();
       }
 
-      function ouvrirOperations() { new bootstrap.Modal(document.getElementById('modalOperations')).show(); }
+      function ouvrirOperations() { modal('modalOperations').show(); }
 
       function gererAffichageProduits() {
         const select = document.getElementById('operationSelect');
         const optionSelectionnee = select.options[select.selectedIndex];
-        
-        const typeOperation = optionSelectionnee.getAttribute('data-type');
-        const modeSaisie = optionSelectionnee.getAttribute('data-mode');
-        const articlesPredefinis = optionSelectionnee.getAttribute('data-articles');
-        
+
+        const typeOperation = optionSelectionnee ? optionSelectionnee.getAttribute('data-type') : null;
+        const modeSaisie = optionSelectionnee ? optionSelectionnee.getAttribute('data-mode') : null;
+        const articlesPredefinis = optionSelectionnee ? optionSelectionnee.getAttribute('data-articles') : null;
+
         const sectionProduits = document.getElementById('sectionProduits');
         const conteneurListe = document.getElementById('listeProduits');
         const btnAjouter = document.getElementById('btnAjouterLigne');
@@ -486,7 +526,7 @@
               if(!article.trim()) return;
               const div = document.createElement('div');
               div.className = 'row g-2 mb-2 ligne-produit';
-              div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${article.trim()}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
+              div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${echapper(article.trim())}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
               conteneurListe.appendChild(div);
             });
           } else {
@@ -511,7 +551,7 @@
         const telInput = document.getElementById('telClient');
         const emailInput = document.getElementById('emailClient');
         const alerteContact = document.getElementById('alerteContact');
-        
+
         const regexTel = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
         const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -520,7 +560,7 @@
 
         let telValide = telSaisi === '' || regexTel.test(telSaisi);
         let emailValide = emailSaisi === '' || regexEmail.test(emailSaisi);
-        
+
         telInput.classList.toggle('is-invalid', telSaisi !== '' && !telValide);
         telInput.classList.toggle('is-valid', telSaisi !== '' && telValide);
         emailInput.classList.toggle('is-invalid', emailSaisi !== '' && !emailValide);
@@ -532,20 +572,35 @@
       }
 
       function validerFormulaire() {
-        const operationId = document.getElementById('operationSelect').value;
-        if (!operationId || !document.getElementById('nomClient').value || !document.getElementById('prenomClient').value) {
+        const select = document.getElementById('operationSelect');
+        const operationId = select.value;
+        if (!operationId || !document.getElementById('nomClient').value.trim() || !document.getElementById('prenomClient').value.trim()) {
           showToast("Veuillez sélectionner une offre et remplir Nom/Prénom.", "error"); return;
         }
         if (!verifierContacts()) {
           document.getElementById('alerteContact').style.display = 'block'; return;
         }
 
+        const optionSelectionnee = select.options[select.selectedIndex];
+        const estProduit = optionSelectionnee.getAttribute('data-type') === 'Produit';
+        const modeLibre = !(optionSelectionnee.getAttribute('data-mode') === 'Predefini' && optionSelectionnee.getAttribute('data-articles'));
+
         const articlesSaisis = [];
+        let ligneIncomplete = null;
         document.querySelectorAll('.ligne-produit').forEach(ligne => {
           const n = ligne.querySelector('.nom-article').value.trim();
-          const q = ligne.querySelector('.quantite-article').value;
-          if (n && q && parseInt(q) > 0) articlesSaisis.push({ nom: n, quantite: parseInt(q) });
+          const q = parseInt(ligne.querySelector('.quantite-article').value, 10);
+          if (n && q > 0) articlesSaisis.push({ nom: n, quantite: q });
+          // En saisie libre, une ligne à moitié remplie est probablement un oubli
+          else if (modeLibre && (n || q > 0) && !ligneIncomplete) ligneIncomplete = n || 'sans nom';
         });
+
+        if (ligneIncomplete) {
+          showToast("Article incomplet (nom ou quantité manquant) : " + echapper(ligneIncomplete), "error"); return;
+        }
+        if (estProduit && articlesSaisis.length === 0) {
+          showToast("Veuillez saisir au moins un article avec une quantité.", "error"); return;
+        }
 
         const data = {
           operationId: operationId,
@@ -556,7 +611,7 @@
           articles: articlesSaisis
         };
 
-        const btn = document.querySelector('button[onclick="validerFormulaire()"]');
+        const btn = document.getElementById('btnValiderReservation');
         btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
 
         google.script.run
@@ -565,12 +620,12 @@
             document.getElementById('formReservation').reset();
             document.getElementById('telClient').classList.remove('is-valid', 'is-invalid');
             document.getElementById('emailClient').classList.remove('is-valid', 'is-invalid');
-            gererAffichageProduits(); 
+            gererAffichageProduits();
             btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER';
-            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            rechargerOperations();
           })
-          .withFailureHandler(function(err) { showToast("? Erreur : " + err.message, "error"); btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER'; })
-          .saveReservation(data); 
+          .withFailureHandler(function(err) { showErreur(err); btn.disabled = false; btn.innerHTML = 'VÉRIFIER ET VALIDER'; })
+          .saveReservation(data);
       }
 
       function gererChampsNouvelleOffre(prefix) {
@@ -580,47 +635,66 @@
         document.getElementById('blocArticlesPredefinis_' + prefix).style.display = (type === 'Produit' && mode === 'Predefini') ? 'block' : 'none';
       }
 
+      // Lit et vérifie le formulaire d'offre (prefix 'new' ou 'edit'). Renvoie null si invalide.
+      function lireFormulaireOffre(prefix) {
+        const form = document.getElementById(prefix === 'new' ? 'formNouvelleOffre' : 'formEditOffre');
+        if (!form.checkValidity()) { form.reportValidity(); return null; }
+
+        const type = document.getElementById(prefix + 'OpType').value;
+        const mode = type === 'Produit' ? document.getElementById(prefix + 'OpMode').value : '';
+        const data = {
+          nom: document.getElementById(prefix + 'OpNom').value.trim(), type: type, modeSaisie: mode,
+          dateDebut: document.getElementById(prefix + 'OpDateDebut').value, dateFin: document.getElementById(prefix + 'OpDateFin').value,
+          articlesPredefinis: mode === 'Predefini' ? document.getElementById(prefix + 'OpArticles').value.trim() : ''
+        };
+
+        if (!data.nom) { showToast("Le nom de l'offre est obligatoire.", "error"); return null; }
+        if (data.dateDebut && data.dateFin && data.dateFin < data.dateDebut) {
+          showToast("La date de fin doit être postérieure à la date de début.", "error"); return null;
+        }
+        if (mode === 'Predefini' && !data.articlesPredefinis.replace(/,/g, '').trim()) {
+          showToast("Le mode prédéfini nécessite au moins un article.", "error"); return null;
+        }
+        return data;
+      }
+
       function creerNouvelleOffre() {
-        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
+        modal('modalOperations').hide();
         document.getElementById('formNouvelleOffre').reset();
-        gererChampsNouvelleOffre('new'); 
-        new bootstrap.Modal(document.getElementById('modalCreerOffre')).show();
+        gererChampsNouvelleOffre('new');
+        modal('modalCreerOffre').show();
       }
 
       function sauvegarderNouvelleOffre() {
-        if (!document.getElementById('formNouvelleOffre').checkValidity()) { document.getElementById('formNouvelleOffre').reportValidity(); return; }
-        const type = document.getElementById('newOpType').value;
-        const mode = type === 'Produit' ? document.getElementById('newOpMode').value : '';
-        const data = {
-          nom: document.getElementById('newOpNom').value.trim(), type: type, modeSaisie: mode,
-          dateDebut: document.getElementById('newOpDateDebut').value, dateFin: document.getElementById('newOpDateFin').value,
-          articlesPredefinis: mode === 'Predefini' ? document.getElementById('newOpArticles').value.trim() : ''
-        };
+        const data = lireFormulaireOffre('new');
+        if (!data) return;
         const btn = document.getElementById('btnSauvegarderOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
-            bootstrap.Modal.getInstance(document.getElementById('modalCreerOffre')).hide();
+            modal('modalCreerOffre').hide();
             showToast("Nouvelle offre créée !", "success");
             btn.disabled = false;
-            google.script.run.withSuccessHandler(ops => { afficherDonnees(ops); new bootstrap.Modal(document.getElementById('modalOperations')).show(); }).getOperationsData();
-          }).saveOperation(data);
+            rechargerOperations(() => modal('modalOperations').show());
+          })
+          .withFailureHandler(function(err) { showErreur(err); btn.disabled = false; })
+          .saveOperation(data);
       }
 
       // --- DÉTAILS DE L'OFFRE ET STATUTS ---
       function voirReservationsDetail(idOperation) {
-        bootstrap.Modal.getInstance(document.getElementById('modalOperations')).hide();
+        modal('modalOperations').hide();
         showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
 
         google.script.run
           .withSuccessHandler(function(details) {
-            currentOperationDetails = details; 
+            currentOperationDetails = details;
             const op = details.operation;
-            
-            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${op.nom}`;
+
+            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${echapper(op.nom)}`;
             document.getElementById('editOpId').value = op.id;
             document.getElementById('editOpNom').value = op.nom;
             document.getElementById('editOpType').value = op.type;
-            document.getElementById('editOpMode').value = op.modeSaisie;
+            document.getElementById('editOpMode').value = op.modeSaisie || 'Libre';
             document.getElementById('editOpDateDebut').value = op.dateDebut;
             document.getElementById('editOpDateFin').value = op.dateFin;
             document.getElementById('editOpArticles').value = op.articlesPredefinis;
@@ -628,109 +702,127 @@
 
             const tbody = document.getElementById('tableInscritsBody');
             tbody.innerHTML = '';
-            
+
             if(details.reservations.length === 0) {
               tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
             } else {
               details.reservations.forEach(res => {
-                // Création du menu déroulant (Select) pour le statut
-                let selectHtml = `
-                  <select class="form-select form-select-sm fw-bold border-secondary text-secondary" onchange="changerStatutReservation('${res.idRes}', this.value)">
-                    <option value="Réservé" ${res.etat === 'Réservé' ? 'selected' : ''}>Réservé</option>
-                    <option value="Contacté" ${res.etat === 'Contacté' ? 'selected' : ''}>Contacté</option>
-                    <option value="Retrait" ${res.etat === 'Retrait' ? 'selected' : ''}>Retrait</option>
-                    <option value="Annulé" ${res.etat === 'Annulé' ? 'selected' : ''}>Annulé</option>
-                  </select>
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td><span class="fw-bold">${echapper(res.nom)} ${echapper(res.prenom)}</span><br><small>Saisi le ${echapper(res.dateSaisie)}</small></td>
+                  <td>${echapper(res.contact)}</td>
+                  <td><small>${echapper(texteArticles(res)) || '-'}</small></td>
+                  <td>
+                    <select class="form-select form-select-sm fw-bold border-secondary text-secondary">
+                      ${['Réservé', 'Contacté', 'Retrait', 'Annulé'].map(etat => `<option value="${etat}" ${res.etat === etat ? 'selected' : ''}>${etat}</option>`).join('')}
+                    </select>
+                  </td>
                 `;
-
-                tbody.innerHTML += `
-                  <tr>
-                    <td><span class="fw-bold">${res.nom} ${res.prenom}</span><br><small>Saisi le ${res.dateSaisie}</small></td>
-                    <td>${res.contact}</td>
-                    <td><small>${res.articlesText || '-'}</small></td>
-                    <td>${selectHtml}</td>
-                  </tr>
-                `;
+                const select = tr.querySelector('select');
+                select.addEventListener('change', function() { changerStatutReservation(res.idRes, select); });
+                tbody.appendChild(tr);
               });
             }
-            new bootstrap.Modal(document.getElementById('modalDetailOffre')).show();
+            modal('modalDetailOffre').show();
           })
-          .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); })
+          .withFailureHandler(showErreur)
           .getOperationDetails(idOperation);
       }
 
+      function texteArticles(res) {
+        return res.articles.map(a => `${a.quantite}x ${a.nom}`).join(', ');
+      }
+
       // Fonction d'enregistrement à la volée du statut
-      function changerStatutReservation(idRes, nouveauStatut) {
+      function changerStatutReservation(idRes, select) {
+        const nouveauStatut = select.value;
+        const resToUpdate = currentOperationDetails ? currentOperationDetails.reservations.find(r => r.idRes === idRes) : null;
+        const ancienStatut = resToUpdate ? resToUpdate.etat : null;
+
+        select.disabled = true;
         showToast("<span class='spinner-border spinner-border-sm'></span> Mise à jour du statut...", "info");
         google.script.run
           .withSuccessHandler(function() {
+            select.disabled = false;
             showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
-            
+
             // Mise à jour de la donnée "en mémoire" pour que l'impression reflète le changement sans recharger
-            if (currentOperationDetails) {
-              let resToUpdate = currentOperationDetails.reservations.find(r => r.idRes === idRes);
-              if (resToUpdate) resToUpdate.etat = nouveauStatut;
-            }
+            if (resToUpdate) resToUpdate.etat = nouveauStatut;
+            rechargerOperations(); // le compteur de réservations exclut les annulées
           })
           .withFailureHandler(function(err) {
-            showToast("Erreur lors de la mise à jour : " + err.message, "error");
+            select.disabled = false;
+            if (ancienStatut) select.value = ancienStatut; // on remet l'ancien statut affiché
+            showErreur(err);
           })
           .updateReservationStatus(idRes, nouveauStatut);
       }
 
       function sauvegarderModificationOffre() {
-        const type = document.getElementById('editOpType').value;
-        const mode = type === 'Produit' ? document.getElementById('editOpMode').value : '';
-        const data = {
-          id: document.getElementById('editOpId').value, nom: document.getElementById('editOpNom').value.trim(),
-          type: type, modeSaisie: mode, dateDebut: document.getElementById('editOpDateDebut').value,
-          dateFin: document.getElementById('editOpDateFin').value,
-          articlesPredefinis: mode === 'Predefini' ? document.getElementById('editOpArticles').value.trim() : ''
-        };
+        const data = lireFormulaireOffre('edit');
+        if (!data) return;
+        data.id = document.getElementById('editOpId').value;
+
         const btn = document.getElementById('btnUpdateOffre'); btn.disabled = true;
         google.script.run
           .withSuccessHandler(function() {
             showToast("Offre mise à jour !", "success"); btn.disabled = false;
-            google.script.run.withSuccessHandler(afficherDonnees).getOperationsData();
+            document.getElementById('detailModalTitle').innerHTML = `<i class="bi bi-box-seam"></i> ${echapper(data.nom)}`;
+            if (currentOperationDetails) Object.assign(currentOperationDetails.operation, data);
+            rechargerOperations();
           })
-          .withFailureHandler(function(err){ showToast("Erreur : " + err.message, "error"); btn.disabled = false; })
+          .withFailureHandler(function(err){ showErreur(err); btn.disabled = false; })
           .updateOperation(data);
       }
 
       let idOffreASupprimer = null;
       function demanderSuppression(idOperation) {
         idOffreASupprimer = idOperation;
-        new bootstrap.Modal(document.getElementById('modalConfirmDelete')).show();
+        modal('modalConfirmDelete').show();
       }
       document.getElementById('btnConfirmerSuppression').addEventListener('click', function() {
-        if (idOffreASupprimer) {
-          bootstrap.Modal.getInstance(document.getElementById('modalConfirmDelete')).hide();
-          google.script.run.withSuccessHandler(function() { showToast("Opération supprimée !", 'success'); google.script.run.withSuccessHandler(afficherDonnees).getOperationsData(); }).deleteOperation(idOffreASupprimer);
-        }
+        if (!idOffreASupprimer) return;
+        const id = idOffreASupprimer;
+        idOffreASupprimer = null;
+        modal('modalConfirmDelete').hide();
+        showToast("<span class='spinner-border spinner-border-sm'></span> Suppression en cours...", "info");
+        google.script.run
+          .withSuccessHandler(function() { showToast("Opération supprimée !", 'success'); rechargerOperations(); })
+          .withFailureHandler(showErreur)
+          .deleteOperation(id);
       });
+
+      // Totaux par article, hors réservations annulées
+      function calculerResume(reservations) {
+        const totaux = {};
+        reservations.filter(r => r.etat !== 'Annulé').forEach(r => {
+          r.articles.forEach(a => { totaux[a.nom] = (totaux[a.nom] || 0) + a.quantite; });
+        });
+        return Object.keys(totaux).sort((a, b) => a.localeCompare(b)).map(nom => ({ nom: nom, total: totaux[nom] }));
+      }
 
       function imprimerReservations() {
         if (!currentOperationDetails) return;
 
         const op = currentOperationDetails.operation;
         const res = currentOperationDetails.reservations;
-        const resume = currentOperationDetails.resume;
+        const resume = calculerResume(res);
 
         let html = `
           <div class="mb-4 text-center">
-            <h2 class="mb-1">${op.nom}</h2>
-            <p class="text-muted">Dates : Du ${op.dateDebut || '-'} au ${op.dateFin || '-'}</p>
+            <h2 class="mb-1">${echapper(op.nom)}</h2>
+            <p class="text-muted">Dates : Du ${echapper(dateFr(op.dateDebut))} au ${echapper(dateFr(op.dateFin))}</p>
           </div>
         `;
 
-        if (resume && resume.length > 0) {
+        if (resume.length > 0) {
           html += `
             <h4 class="mb-2">Résumé des Produits à préparer</h4>
             <table class="table table-bordered border-dark mb-5">
               <thead class="table-light"><tr><th>Désignation du produit</th><th style="width: 150px" class="text-center">Quantité Totale</th></tr></thead>
               <tbody>
           `;
-          resume.forEach(r => { html += `<tr><td>${r.nom}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`; });
+          resume.forEach(r => { html += `<tr><td>${echapper(r.nom)}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`; });
           html += `</tbody></table>`;
         }
 
@@ -746,7 +838,7 @@
           html += `<tr><td colspan="4" class="text-center">Aucune réservation pour le moment.</td></tr>`;
         } else {
           res.forEach(r => {
-            html += `<tr><td><strong>${r.nom} ${r.prenom}</strong><br><small class="text-muted">${r.dateSaisie}</small></td><td>${r.contact}</td><td>${r.articlesText || '-'}</td><td class="text-center"><strong>${r.etat}</strong></td></tr>`;
+            html += `<tr><td><strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong><br><small class="text-muted">${echapper(r.dateSaisie)}</small></td><td>${echapper(r.contact)}</td><td>${echapper(texteArticles(r)) || '-'}</td><td class="text-center"><strong>${echapper(r.etat)}</strong></td></tr>`;
           });
         }
         html += `</tbody></table>`;
@@ -754,9 +846,13 @@
         const zoneImpression = document.getElementById('zoneImpression');
         zoneImpression.innerHTML = html;
         zoneImpression.classList.remove('d-none');
-        
-        window.print(); 
-        setTimeout(() => { zoneImpression.classList.add('d-none'); zoneImpression.innerHTML = ""; }, 1000);
+
+        // On vide la zone après l'impression (afterprint est plus fiable qu'un délai fixe, notamment sur Safari)
+        window.addEventListener('afterprint', function() {
+          zoneImpression.classList.add('d-none');
+          zoneImpression.innerHTML = "";
+        }, { once: true });
+        window.print();
       }
 
     </script>
