@@ -42,8 +42,18 @@
 ## Plan validé (une étape = un commit, tests verts, point à Bryan)
 1. ✅ Socle.
 2. ✅ Rapidité (voir ci-dessus).
-3. Design « Comptoir » (maquette cliquable d'abord) : sans Bootstrap/CDN, logo à
-   l'impression, recherche/filtre des inscrits, modifier/supprimer une réservation.
+3. Design « Comptoir » : sans Bootstrap/CDN, recherche/filtre des inscrits,
+   modifier/supprimer une réservation. **Pas de logo** (décision de Bryan, 14/10).
+   Maquette cliquable (14/10, EN ATTENTE de validation) : `docs/maquettes/comptoir-reservations.html`,
+   artefact privé https://claude.ai/artifact/7rAHc1LAay3N4j62ZBzX4r. Propositions :
+   2 écrans (Réservations / Offres) ; saisie en 3 étapes (tuiles d'offres, client,
+   articles en + / −) à gauche, réservations de l'offre à droite (recherche, filtres par
+   état, « reste à préparer », bouton « Retiré » + Annuler dans le message) ; fiche
+   réservation (état, coordonnées, quantités, suppression confirmée dans la page) ;
+   doublon = comparaison côte à côte (orange) + « Modifier l'existante » ; échec d'envoi
+   (rouge, Réessayer) ; écran Offres (en cours / à venir / terminées, suppression
+   confirmée) ; éditeur d'offre (articles en puces) ; feuille de préparation (total,
+   liste à pointer triée par nom, annulées en option).
 4. Sécurité : code responsable (+ appareils autorisés ?) pour créer/modifier/supprimer
    les offres — à discuter (aujourd'hui tout le monde ayant le lien peut supprimer).
 5. RGPD : purge automatique (durée à décider), mentions.

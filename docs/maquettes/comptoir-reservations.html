@@ -1,0 +1,902 @@
+<title>Comptoir Réservations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* PC de l'accueil : saisie à gauche, réservations de l'offre choisie à droite. Clair uniquement (choix « Comptoir »). */
+  :root {
+    --fond: #f5f3f0; --surface: #ffffff; --encre: #1c1917; --doux: #6f6863; --trait: #e5dfd8; --champ: #fbfaf8;
+    --accent: #0f766e; --accent-fonce: #0b5d57; --accent-doux: #e3f1ef;
+    --ok: #15803d; --ok-doux: #e7f4eb; --danger: #c81e1e; --danger-doux: #fcebea; --orange: #b45309; --orange-doux: #fdf1e2;
+    --info: #3f3a36; --info-doux: #efebe7;
+    --demo: #2b2724; --demo-texte: #f2efeb; --voile: rgba(28,25,23,.45); --blanc: #ffffff;
+    --texte: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --chiffres: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --gouttiere: max(16px, env(safe-area-inset-left, 0px));
+    --gouttiere-d: max(16px, env(safe-area-inset-right, 0px));
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: var(--fond); color: var(--encre); font-family: var(--texte); font-size: 15px; display: flex; flex-direction: column; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; opacity: .5; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  h1, h2, h3 { text-wrap: balance; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+  /* --- Bandeau de démonstration (hors application) --- */
+  .demo { background: var(--demo); color: var(--demo-texte); padding-block: 10px; padding-left: var(--gouttiere); padding-right: var(--gouttiere-d); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; }
+  .demo .essais { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .demo .essai { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); color: var(--demo-texte); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; }
+  .demo .essai:hover { background: rgba(255,255,255,.18); }
+  .demo .lien { margin-left: auto; background: none; border: 0; color: var(--demo-texte); text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+
+  /* --- Application --- */
+  .app { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+  .haut { display: flex; align-items: center; gap: 12px; padding-block: 10px; padding-left: var(--gouttiere); padding-right: var(--gouttiere-d); background: var(--surface); border-bottom: 1px solid var(--trait); flex-wrap: wrap; }
+  .marque { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; background: var(--encre); color: var(--blanc); display: grid; place-items: center; flex: 0 0 auto; }
+  .marque b { display: block; font-size: 15.5px; }
+  .marque small { color: var(--doux); font-size: 12px; }
+  .onglets { display: flex; background: var(--fond); border-radius: 12px; padding: 4px; gap: 4px; margin-left: 12px; }
+  .onglets button { border: 0; background: none; padding: 8px 14px; border-radius: 9px; font-weight: 700; color: var(--doux); display: inline-flex; align-items: center; gap: 8px; }
+  .onglets button[aria-current="true"] { background: var(--surface); color: var(--encre); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .espace { flex: 1; }
+  .puce { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+  .puce.envoi { background: var(--accent-doux); color: var(--accent); }
+  .icone-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--trait); background: var(--surface); display: grid; place-items: center; }
+  .icone-btn:hover { background: var(--champ); }
+  .ico { width: 20px; height: 20px; flex: 0 0 auto; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ico.p { width: 16px; height: 16px; }
+  .rond { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tourne .8s linear infinite; display: inline-block; flex: 0 0 auto; }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+
+  /* Écran Réservations : saisie | liste */
+  .milieu { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
+  .zone-form { overflow: auto; padding-block: 24px 30px; padding-left: var(--gouttiere); padding-right: 22px; display: flex; justify-content: center; }
+  form.saisie { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 20px; }
+  .etape { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
+  .num { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: var(--encre); color: var(--blanc); transition: background .2s; }
+  .num.fait { background: var(--ok); }
+  .etape h2 { margin: 6px 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--doux); font-weight: 750; display: flex; align-items: center; gap: 10px; }
+  .etape h2 .lien-doux { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .lien-doux { border: 0; background: none; color: var(--accent); font-weight: 700; padding: 2px 0; }
+  .lien-doux:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .tuile { text-align: left; border: 1.5px solid var(--trait); background: var(--surface); border-radius: 14px; padding: 12px 13px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .tuile:hover { border-color: var(--doux); }
+  .tuile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-doux); box-shadow: 0 0 0 3px var(--accent-doux); }
+  .tuile b { font-size: 15px; line-height: 1.25; }
+  .tuile .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--doux); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .tuile.terminee { opacity: .75; }
+  .chip { font-size: 11px; font-weight: 750; padding: 2px 7px; border-radius: 6px; white-space: nowrap; letter-spacing: .2px; }
+  .chip.produit { background: var(--accent-doux); color: var(--accent); }
+  .chip.evenement { background: var(--orange-doux); color: var(--orange); }
+  .chip.encours { background: var(--ok-doux); color: var(--ok); }
+  .chip.avenir { background: var(--info-doux); color: var(--info); }
+  .chip.terminee { background: var(--info-doux); color: var(--doux); }
+
+  .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .champ label { font-size: 12.5px; color: var(--doux); font-weight: 650; }
+  .champ input, .champ select { width: 100%; height: 48px; border: 1.5px solid var(--trait); border-radius: 12px; background: var(--surface); padding: 0 13px; font-size: 16px; font-weight: 600; }
+  .champ input::placeholder { font-weight: 400; color: #a8a29e; }
+  .champ input.maj { text-transform: uppercase; }
+  .champ input.maj::placeholder { text-transform: none; }
+  .champ input:focus, .champ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-doux); }
+  .champ input.erreur { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger-doux); }
+  .champ input.tel { font-variant-numeric: tabular-nums; }
+  .indice { font-size: 12.5px; color: var(--doux); }
+
+  .articles { display: flex; flex-direction: column; gap: 8px; }
+  .article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px 8px 14px; border: 1.5px solid var(--trait); border-radius: 12px; background: var(--surface); }
+  .article.choisi { border-color: var(--accent); background: var(--accent-doux); }
+  .article .nom-art { font-weight: 650; min-width: 0; overflow-wrap: anywhere; }
+  .article.libre { grid-template-columns: minmax(0, 1fr) auto auto; padding: 6px; }
+  .article.libre input { height: 40px; border: 1.5px solid var(--trait); border-radius: 10px; padding: 0 10px; font-weight: 600; min-width: 0; width: 100%; background: var(--champ); }
+  .article.libre input:focus { outline: none; border-color: var(--accent); }
+  .pas { display: inline-flex; align-items: center; border: 1.5px solid var(--trait); border-radius: 11px; background: var(--surface); overflow: hidden; }
+  .pas button { width: 40px; height: 40px; border: 0; background: none; display: grid; place-items: center; font-size: 20px; font-weight: 700; color: var(--encre); }
+  .pas button:hover { background: var(--champ); }
+  .pas output { min-width: 34px; text-align: center; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .retirer { width: 40px; height: 40px; border: 0; background: none; color: var(--doux); border-radius: 10px; display: grid; place-items: center; }
+  .retirer:hover { background: var(--danger-doux); color: var(--danger); }
+  .ajouter { align-self: flex-start; height: 40px; padding: 0 14px; border-radius: 11px; border: 1.5px dashed var(--trait); background: none; color: var(--accent); font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+  .sans-article { border: 1.5px dashed var(--trait); border-radius: 12px; padding: 14px; color: var(--doux); font-size: 14px; background: var(--surface); }
+
+  .valider { margin-left: 44px; height: 58px; border-radius: 14px; border: 0; background: var(--accent); color: var(--blanc); font-size: 17px; font-weight: 750; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .valider:hover { background: var(--accent-fonce); }
+  .valider kbd { font: 600 11px var(--chiffres); background: rgba(255,255,255,.2); padding: 3px 7px; border-radius: 6px; }
+  .message { margin-left: 44px; min-height: 22px; font-size: 14px; font-weight: 650; color: var(--danger); margin-top: -8px; }
+
+  /* Liste des réservations de l'offre choisie */
+  .liste-res { background: var(--surface); border-left: 1px solid var(--trait); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .liste-tete { padding-block: 18px 10px; padding-left: 22px; padding-right: var(--gouttiere-d); display: flex; flex-direction: column; gap: 12px; }
+  .liste-tete h2 { margin: 0; font-size: 18px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .liste-tete h2 small { color: var(--doux); font-size: 13px; font-weight: 600; }
+  .recherche { position: relative; }
+  .recherche .ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--doux); }
+  .recherche input { width: 100%; height: 46px; border: 1.5px solid var(--trait); border-radius: 12px; padding: 0 14px 0 42px; background: var(--champ); font-size: 15px; }
+  .recherche input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-doux); background: var(--surface); }
+  .filtres { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filtre { border: 1.5px solid var(--trait); background: var(--surface); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 650; color: var(--doux); display: inline-flex; gap: 6px; align-items: center; }
+  .filtre b { color: var(--encre); font-variant-numeric: tabular-nums; }
+  .filtre[aria-pressed="true"] { border-color: var(--encre); background: var(--encre); color: var(--blanc); }
+  .filtre[aria-pressed="true"] b { color: var(--blanc); }
+  .preparer { margin-left: 22px; margin-right: var(--gouttiere-d); background: var(--fond); border-radius: 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; align-items: center; }
+  .preparer > span:first-child { color: var(--doux); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; }
+  .preparer b { font-variant-numeric: tabular-nums; }
+  .lignes { overflow: auto; flex: 1; min-height: 0; padding-block: 6px; padding-left: 22px; padding-right: var(--gouttiere-d); }
+  .ligne { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 8px; border-bottom: 1px solid var(--trait); border-radius: 10px; cursor: pointer; }
+  .ligne:hover { background: var(--champ); }
+  .ligne.neuve { animation: neuve 1.8s ease-out; }
+  @keyframes neuve { from { background: var(--accent-doux); } to { background: transparent; } }
+  .ligne.annulee .qui b { text-decoration: line-through; color: var(--doux); }
+  .qui { min-width: 0; }
+  .qui b { display: block; font-size: 14.5px; overflow-wrap: anywhere; }
+  .qui small, .commande { color: var(--doux); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .commande { font-size: 13px; color: var(--encre); }
+  .actions-ligne { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+  .etat { font-size: 11.5px; font-weight: 750; padding: 4px 8px; border-radius: 7px; white-space: nowrap; }
+  .etat.reserve { background: var(--accent-doux); color: var(--accent); }
+  .etat.contacte { background: var(--info-doux); color: var(--info); }
+  .etat.retrait { background: var(--ok-doux); color: var(--ok); }
+  .etat.annule { background: var(--danger-doux); color: var(--danger); }
+  .etat.envoi { background: var(--fond); color: var(--doux); display: inline-flex; gap: 6px; align-items: center; }
+  .retire-btn { height: 32px; padding: 0 10px; border-radius: 9px; border: 1.5px solid var(--ok); color: var(--ok); background: var(--surface); font-weight: 700; font-size: 12.5px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .retire-btn:hover { background: var(--ok-doux); }
+  .vide { color: var(--doux); font-size: 14px; padding: 22px 8px; text-align: center; }
+  .liste-pied { padding-block: 12px 16px; padding-left: 22px; padding-right: var(--gouttiere-d); border-top: 1px solid var(--trait); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--doux); }
+  .lien-fort { border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 750; font-size: 15px; }
+  .lien-fort:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Écran Offres */
+  .ecran-offres { flex: 1; min-height: 0; overflow: auto; padding-block: 24px 40px; padding-left: var(--gouttiere); padding-right: var(--gouttiere-d); }
+  .ecran-offres .cadre { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .titre-ecran { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .titre-ecran h1 { margin: 0; font-size: 22px; flex: 1; }
+  .groupe-titre { margin: 8px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--doux); }
+  .offre { background: var(--surface); border: 1px solid var(--trait); border-radius: 16px; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+  .offre h3 { margin: 0 0 6px; font-size: 17px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .offre .infos { display: flex; gap: 6px 16px; flex-wrap: wrap; color: var(--doux); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .offre .infos b { color: var(--encre); }
+  .offre .boutons-offre { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .offre.terminee { background: var(--champ); }
+  .sec { height: 42px; padding: 0 14px; border-radius: 11px; border: 1.5px solid var(--trait); background: var(--surface); display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 14px; white-space: nowrap; }
+  .sec:hover { background: var(--champ); }
+  .sec.accent { background: var(--accent); color: var(--blanc); border-color: var(--accent); }
+  .sec.accent:hover { background: var(--accent-fonce); }
+  .sec.danger { color: var(--danger); border-color: var(--danger-doux); }
+  .confirme { grid-column: 1 / -1; border: 1.5px solid var(--danger); background: var(--danger-doux); border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .confirme p { margin: 0; color: var(--danger); font-weight: 650; font-size: 14px; flex: 1 1 260px; }
+  .confirme .sec.plein-danger { background: var(--danger); color: var(--blanc); border-color: var(--danger); }
+
+  /* Tiroirs (fiche réservation, éditeur d'offre) */
+  .voile { position: absolute; inset: 0; background: var(--voile); z-index: 5; display: flex; }
+  .tiroir { margin-left: auto; width: min(520px, 100%); height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -20px 0 40px rgba(0,0,0,.15); }
+  .tiroir-tete { display: flex; align-items: flex-start; gap: 12px; padding-block: 18px 12px; padding-left: 22px; padding-right: max(22px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--trait); }
+  .tiroir-tete h2 { margin: 0; font-size: 19px; flex: 1; overflow-wrap: anywhere; }
+  .tiroir-tete small { display: block; color: var(--doux); font-size: 13px; font-weight: 500; margin-top: 3px; }
+  .tiroir-corps { flex: 1; overflow: auto; padding-block: 18px; padding-left: 22px; padding-right: max(22px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+  .tiroir-pied { padding-block: 14px 18px; padding-left: 22px; padding-right: max(22px, env(safe-area-inset-right, 0px)); border-top: 1px solid var(--trait); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .bloc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--doux); }
+  .bloc { display: flex; flex-direction: column; gap: 8px; }
+  .segment { display: flex; background: var(--fond); border-radius: 12px; padding: 4px; gap: 4px; flex-wrap: wrap; }
+  .segment button { flex: 1 1 auto; padding: 10px 12px; border-radius: 9px; border: 0; background: none; font-weight: 700; color: var(--doux); white-space: nowrap; }
+  .segment button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.12); color: var(--encre); }
+  .segment button[data-etat="Retrait"][aria-pressed="true"] { color: var(--ok); }
+  .segment button[data-etat="Annulé"][aria-pressed="true"] { color: var(--danger); }
+  .segment button[data-etat="Réservé"][aria-pressed="true"] { color: var(--accent); }
+  .plein { height: 50px; flex: 1 1 200px; border-radius: 13px; border: 0; background: var(--accent); color: var(--blanc); font-weight: 750; font-size: 15.5px; }
+  .plein:hover:not(:disabled) { background: var(--accent-fonce); }
+  .lien-danger { border: 0; background: none; color: var(--danger); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; padding: 8px 4px; }
+  .puces-articles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .puce-article { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-doux); color: var(--accent-fonce); font-weight: 650; border-radius: 9px; padding: 5px 4px 5px 10px; font-size: 14px; }
+  .puce-article button { border: 0; background: none; color: inherit; width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
+  .puce-article button:hover { background: rgba(0,0,0,.08); }
+  .ajout-article { display: flex; gap: 8px; }
+  .ajout-article input { flex: 1; min-width: 0; height: 44px; border: 1.5px solid var(--trait); border-radius: 11px; padding: 0 12px; background: var(--champ); }
+  .ajout-article input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+  .erreur-texte { color: var(--danger); font-size: 13.5px; font-weight: 650; min-height: 18px; margin: 0; }
+
+  /* Fenêtres centrées (doublon, échec, aperçu) */
+  .voile.centre { align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .comparer { width: 100%; max-width: 660px; background: var(--surface); border-radius: 20px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.3); max-height: 100%; overflow-y: auto; }
+  .comparer .tete { color: var(--blanc); padding: 18px 22px; display: flex; gap: 14px; align-items: center; background: var(--orange); }
+  .comparer .tete.rouge { background: var(--danger); }
+  .comparer .tete .ico { width: 34px; height: 34px; }
+  .comparer .tete b { font-size: 21px; display: block; }
+  .comparer .tete span { font-size: 13.5px; opacity: .92; }
+  .comparer .consigne { padding: 14px 22px 0; font-size: 15px; font-weight: 600; line-height: 1.45; margin: 0; }
+  .tableau { padding: 10px 22px 4px; overflow-x: auto; }
+  .rang { display: grid; grid-template-columns: 96px minmax(110px,1fr) minmax(110px,1fr) 92px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--trait); font-size: 14.5px; min-width: 470px; }
+  .rang.entete { color: var(--doux); font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; font-weight: 750; }
+  .rang:last-child { border-bottom: 0; }
+  .rang .lib { color: var(--doux); }
+  .rang .pareil { color: var(--orange); font-weight: 750; }
+  .tag { font-size: 11px; font-weight: 800; padding: 3px 7px; border-radius: 6px; text-align: center; letter-spacing: .3px; }
+  .tag.eg { color: var(--orange); background: var(--orange-doux); }
+  .tag.dif { color: var(--doux); background: var(--fond); }
+  .boutons { display: flex; gap: 12px; padding: 16px 22px 20px; align-items: center; flex-wrap: wrap; }
+  .stop { flex: 1 1 220px; height: 54px; border-radius: 14px; border: 0; background: var(--encre); color: var(--blanc); font-weight: 750; font-size: 16px; }
+  .quand-meme { background: none; border: 0; color: var(--orange); font-weight: 700; font-size: 14.5px; text-decoration: underline; text-underline-offset: 3px; padding: 8px; }
+  .confirmer { margin: 0 22px 20px; border: 1.5px solid var(--orange); background: var(--orange-doux); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .confirmer p { margin: 0; font-size: 14px; color: var(--orange); font-weight: 650; }
+  .confirmer .act { display: flex; gap: 10px; flex-wrap: wrap; }
+  .confirmer button { height: 44px; border-radius: 12px; padding: 0 16px; font-weight: 700; border: 1.5px solid var(--trait); background: var(--surface); }
+  .confirmer .forcer { background: var(--orange); color: var(--blanc); border-color: var(--orange); }
+  .resume { margin: 12px 22px 0; padding: 12px 14px; background: var(--fond); border-radius: 12px; font-size: 14.5px; display: flex; flex-direction: column; gap: 4px; }
+  .resume b { overflow-wrap: anywhere; }
+
+  /* Aperçu de la feuille de préparation */
+  .apercu { width: 100%; max-width: 860px; max-height: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .apercu-barre { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--blanc); }
+  .apercu-barre b { flex: 1; font-size: 15px; }
+  .apercu-barre label { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; cursor: pointer; }
+  .feuille { background: var(--blanc); color: var(--encre); border-radius: 4px; padding: 34px 40px; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.35); font-size: 13px; }
+  .feuille header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; border-bottom: 2px solid var(--encre); padding-bottom: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .feuille h1 { margin: 0; font-size: 22px; }
+  .feuille header p { margin: 4px 0 0; color: var(--doux); }
+  .feuille .imprime { text-align: right; color: var(--doux); font-size: 12px; }
+  .feuille h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; margin: 18px 0 8px; }
+  .feuille .defile { overflow-x: auto; }
+  .feuille table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .feuille th, .feuille td { border: 1px solid #bdb5ad; padding: 6px 8px; text-align: left; vertical-align: top; }
+  .feuille th { background: #f1ede8; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+  .feuille td.qte { text-align: center; font-weight: 800; font-size: 16px; width: 110px; }
+  .feuille td.case { width: 34px; text-align: center; font-size: 16px; }
+  .feuille tr.barre td { color: var(--doux); text-decoration: line-through; }
+  .feuille .pied { margin-top: 14px; color: var(--doux); font-size: 11.5px; }
+
+  .toast { position: absolute; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--encre); color: var(--blanc); padding: 11px 14px 11px 16px; border-radius: 12px; font-weight: 650; font-size: 14px; display: flex; gap: 10px; align-items: center; z-index: 9; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+  .toast button { border: 0; background: rgba(255,255,255,.14); color: var(--blanc); border-radius: 8px; padding: 6px 10px; font-weight: 700; }
+  .aide { position: absolute; top: 0; right: 0; bottom: 0; width: min(400px, 100%); background: var(--surface); border-left: 1px solid var(--trait); z-index: 7; padding-block: 20px; padding-left: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; box-shadow: -20px 0 40px rgba(0,0,0,.1); overflow: auto; }
+  .aide .tete-aide { display: flex; align-items: center; gap: 10px; }
+  .aide h2 { margin: 0; font-size: 18px; flex: 1; }
+  .aide p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--doux); }
+  .aide b { color: var(--encre); }
+
+  /* Écran étroit : une colonne */
+  @media (max-width: 900px) {
+    .milieu { grid-template-columns: 1fr; overflow: auto; }
+    .zone-form { overflow: visible; padding-right: var(--gouttiere-d); }
+    .liste-res { border-left: 0; border-top: 1px solid var(--trait); }
+    .liste-tete, .lignes, .liste-pied { padding-left: var(--gouttiere); }
+    .preparer { margin-left: var(--gouttiere); }
+    .lignes { overflow: visible; }
+    .etape { grid-template-columns: minmax(0, 1fr); }
+    .num { display: none; }
+    .valider, .message { margin-left: 0; }
+    .onglets { margin-left: 0; }
+    .offre { grid-template-columns: minmax(0, 1fr); }
+    .offre .boutons-offre { justify-content: flex-start; }
+    .rang { min-width: 0; grid-template-columns: 74px 1fr 1fr; font-size: 14px; }
+    .rang .tag { grid-column: 2 / 4; justify-self: start; }
+    .rang.entete > span:last-child { display: none; }
+    .feuille { padding: 20px 16px; }
+  }
+  @media (max-width: 560px) {
+    .deux { grid-template-columns: 1fr; }
+    .marque small { display: none; }
+    .ligne { grid-template-columns: minmax(0, 1fr) auto; }
+    .ligne .commande { grid-column: 1 / -1; grid-row: 2; }
+    .demo .essais { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+    .demo .essai { white-space: nowrap; }
+  }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-sac" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></symbol>
+  <symbol id="i-aide" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-calendrier" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-alerte" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-fermer" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-recherche" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-imprimer" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+  <symbol id="i-crayon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-poubelle" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+  <symbol id="i-hors-ligne" viewBox="0 0 24 24"><path d="M1 1l22 22M16.7 11.1A10.9 10.9 0 0 1 19 12.6M5 12.6a10.9 10.9 0 0 1 5.2-2.5M10.7 5.1A16 16 0 0 1 22.6 9M1.4 9a16 16 0 0 1 4.4-2.8M8.5 16.1a5 5 0 0 1 7 0M12 20h.01"/></symbol>
+</defs></svg>
+
+<div class="demo" role="note">
+  <span><b>Maquette</b> · données fictives, rien n'est enregistré.</span>
+  <span class="essais"><span style="white-space:nowrap">À essayer :</span>
+    <button class="essai" data-essai="doublon">Client déjà inscrit</button>
+    <button class="essai" data-essai="retrait">Un client vient retirer</button>
+    <button class="essai" data-essai="echec">Échec d'envoi</button>
+    <button class="essai" data-essai="feuille">Feuille de préparation</button>
+    <button class="essai" data-essai="offre">Nouvelle offre</button>
+  </span>
+  <button class="lien" id="reinit">Réinitialiser</button>
+</div>
+
+<div class="app" id="app">
+  <header class="haut">
+    <div class="marque"><div class="logo"><svg class="ico"><use href="#i-sac"/></svg></div>
+      <div><b>Réservations</b><small>Accueil du magasin</small></div></div>
+    <nav class="onglets" aria-label="Écrans">
+      <button id="ongletSaisie" aria-current="true"><svg class="ico p"><use href="#i-liste"/></svg>Réservations</button>
+      <button id="ongletOffres" aria-current="false"><svg class="ico p"><use href="#i-calendrier"/></svg>Offres</button>
+    </nav>
+    <div class="espace"></div>
+    <span class="puce envoi" id="puceEnvoi" role="status" hidden><span class="rond"></span><span id="txtEnvoi"></span></span>
+    <button class="icone-btn" id="btnAide" title="Aide" aria-label="Aide"><svg class="ico"><use href="#i-aide"/></svg></button>
+  </header>
+
+  <!-- Écran 1 : saisie + réservations de l'offre -->
+  <main class="milieu" id="ecranSaisie">
+    <div class="zone-form">
+      <form class="saisie" id="formSaisie" novalidate autocomplete="off">
+        <div class="etape"><div class="num" id="n1">1</div><div>
+          <h2>Offre <button type="button" class="lien-doux" id="voirTerminees">Offres terminées</button></h2>
+          <div class="tuiles" id="tuiles"></div></div></div>
+        <div class="etape"><div class="num" id="n2">2</div><div>
+          <h2>Client</h2>
+          <div class="deux">
+            <div class="champ"><label for="nom">Nom</label><input id="nom" class="maj" placeholder="Ex. : Le Gall"></div>
+            <div class="champ"><label for="prenom">Prénom</label><input id="prenom" placeholder="Ex. : Yannick"></div>
+            <div class="champ"><label for="tel">Téléphone</label><input id="tel" class="tel" inputmode="tel" placeholder="06 12 34 56 78"></div>
+            <div class="champ"><label for="email">Email</label><input id="email" inputmode="email" placeholder="nom@exemple.fr"></div>
+          </div>
+          <p class="indice" style="margin:8px 0 0">Téléphone ou email : au moins l'un des deux.</p></div></div>
+        <div class="etape"><div class="num" id="n3">3</div><div>
+          <h2 id="titreEtape3">Articles</h2>
+          <div class="articles" id="articles"></div></div></div>
+        <button class="valider" type="submit"><svg class="ico"><use href="#i-check"/></svg>Enregistrer la réservation <kbd>Entrée</kbd></button>
+        <div class="message" id="message" role="status"></div>
+      </form>
+    </div>
+
+    <section class="liste-res" aria-labelledby="titreListe">
+      <div class="liste-tete">
+        <h2 id="titreListe"></h2>
+        <div class="recherche"><svg class="ico p"><use href="#i-recherche"/></svg>
+          <input id="recherche" type="search" placeholder="Rechercher un nom, un téléphone, un email…" aria-label="Rechercher une réservation"></div>
+        <div class="filtres" id="filtres"></div>
+      </div>
+      <div class="preparer" id="preparer"></div>
+      <div class="lignes" id="lignes"></div>
+      <div class="liste-pied"><button class="lien-fort" id="ouvrirFeuille">Feuille de préparation →</button><span>Clic sur une ligne : modifier la réservation</span></div>
+    </section>
+  </main>
+
+  <!-- Écran 2 : offres -->
+  <main class="ecran-offres" id="ecranOffres" hidden>
+    <div class="cadre">
+      <div class="titre-ecran"><h1>Offres</h1><button class="sec accent" id="nouvelleOffre"><svg class="ico p"><use href="#i-plus"/></svg>Nouvelle offre</button></div>
+      <div id="listeOffres" style="display:flex;flex-direction:column;gap:12px"></div>
+    </div>
+  </main>
+
+  <!-- Fiche d'une réservation -->
+  <div class="voile" id="voileFiche" hidden>
+    <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
+      <div class="tiroir-tete"><h2 id="ficheTitre"></h2><button class="icone-btn" data-fermer="voileFiche" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+      <div class="tiroir-corps">
+        <div class="bloc"><h3>État</h3><div class="segment" id="ficheEtat"></div></div>
+        <div class="bloc"><h3>Client</h3><div class="deux">
+          <div class="champ"><label for="fNom">Nom</label><input id="fNom" class="maj"></div>
+          <div class="champ"><label for="fPrenom">Prénom</label><input id="fPrenom"></div>
+          <div class="champ"><label for="fTel">Téléphone</label><input id="fTel" class="tel"></div>
+          <div class="champ"><label for="fEmail">Email</label><input id="fEmail"></div></div></div>
+        <div class="bloc" id="ficheBlocArticles"><h3>Articles</h3><div class="articles" id="ficheArticles"></div></div>
+        <div class="confirme" id="ficheConfirme" hidden><p>Supprimer définitivement cette réservation ? (Pour un client qui renonce, préférez l'état « Annulé » : il reste visible.)</p>
+          <button class="sec plein-danger" id="ficheSupprimerOui">Supprimer</button><button class="sec" id="ficheSupprimerNon">Garder</button></div>
+      </div>
+      <div class="tiroir-pied"><button class="plein" id="ficheEnregistrer" disabled>Enregistrer les modifications</button><button class="lien-danger" id="ficheSupprimer">Supprimer…</button></div>
+    </aside>
+  </div>
+
+  <!-- Éditeur d'offre -->
+  <div class="voile" id="voileOffre" hidden>
+    <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="offreTitre">
+      <div class="tiroir-tete"><h2 id="offreTitre">Nouvelle offre</h2><button class="icone-btn" data-fermer="voileOffre" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+      <div class="tiroir-corps">
+        <div class="champ"><label for="oNom">Nom de l'offre</label><input id="oNom" placeholder="Ex. : Foie gras de Noël"></div>
+        <div class="bloc"><h3>Type</h3><div class="segment" id="oType">
+          <button type="button" data-val="Produit">Produits à préparer</button><button type="button" data-val="Evenement">Évènement</button></div></div>
+        <div class="deux">
+          <div class="champ"><label for="oDebut">Début</label><input id="oDebut" type="date"></div>
+          <div class="champ"><label for="oFin">Fin (dernier jour)</label><input id="oFin" type="date"></div></div>
+        <div class="bloc" id="oBlocMode"><h3>Articles</h3><div class="segment" id="oMode">
+          <button type="button" data-val="Predefini">Liste fixe</button><button type="button" data-val="Libre">Saisie libre à l'accueil</button></div>
+          <p class="indice" id="oIndiceMode" style="margin:0"></p></div>
+        <div class="bloc" id="oBlocArticles"><div class="puces-articles" id="oArticles"></div>
+          <div class="ajout-article"><input id="oNouvelArticle" placeholder="Ajouter un article, puis Entrée" aria-label="Nouvel article"><button type="button" class="sec" id="oAjouter"><svg class="ico p"><use href="#i-plus"/></svg>Ajouter</button></div></div>
+        <p class="erreur-texte" id="oErreur" role="status"></p>
+      </div>
+      <div class="tiroir-pied"><button class="plein" id="oEnregistrer">Enregistrer l'offre</button></div>
+    </aside>
+  </div>
+
+  <!-- Alerte doublon -->
+  <div class="voile centre" id="voileDoublon" hidden>
+    <div class="comparer" role="alertdialog" aria-modal="true" aria-labelledby="doublonTitre">
+      <div class="tete"><svg class="ico"><use href="#i-alerte"/></svg><div><b id="doublonTitre">Ce client a déjà réservé</b><span id="doublonSous"></span></div></div>
+      <p class="consigne">Vérifiez avec le client : s'il veut ajouter des articles, modifiez plutôt sa réservation existante.</p>
+      <div class="tableau"><div id="tableauDoublon"></div></div>
+      <div class="boutons"><button class="stop" id="doublonStop">Ne pas enregistrer</button><button class="sec" id="doublonOuvrir"><svg class="ico p"><use href="#i-crayon"/></svg>Modifier l'existante</button><button class="quand-meme" id="doublonQuandMeme">Enregistrer quand même…</button></div>
+      <div class="confirmer" id="doublonConfirmer" hidden><p>Une 2e réservation sera créée pour ce client sur cette offre.</p>
+        <div class="act"><button class="forcer" id="doublonForcer">Confirmer la 2e réservation</button><button id="doublonAnnuler">Annuler</button></div></div>
+    </div>
+  </div>
+
+  <!-- Échec d'envoi -->
+  <div class="voile centre" id="voileEchec" hidden>
+    <div class="comparer" role="alertdialog" aria-modal="true" aria-labelledby="echecTitre">
+      <div class="tete rouge"><svg class="ico"><use href="#i-hors-ligne"/></svg><div><b id="echecTitre">Réservation NON enregistrée</b><span>Connexion au serveur perdue</span></div></div>
+      <div class="resume" id="echecResume"></div>
+      <p class="consigne">La réservation n'est pas dans le Google Sheets. Réessayez ; si le problème continue, notez-la sur papier.</p>
+      <div class="boutons"><button class="stop" id="echecReessayer">Réessayer</button><button class="quand-meme" id="echecAbandon" style="color:var(--danger)">Abandonner cette réservation</button></div>
+    </div>
+  </div>
+
+  <!-- Aperçu de la feuille de préparation -->
+  <div class="voile centre" id="voileFeuille" hidden>
+    <div class="apercu">
+      <div class="apercu-barre"><b>Aperçu avant impression</b>
+        <label><input type="checkbox" id="feuilleAnnulees"> Inclure les annulées</label>
+        <button class="sec accent" id="feuilleImprimer"><svg class="ico p"><use href="#i-imprimer"/></svg>Imprimer</button>
+        <button class="sec" data-fermer="voileFeuille">Fermer</button></div>
+      <div class="feuille" id="feuille"></div>
+    </div>
+  </div>
+
+  <aside class="aide" id="aide" hidden aria-label="Aide">
+    <div class="tete-aide"><h2>Aide</h2><button class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+    <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités, puis Entrée. La réservation apparaît tout de suite à droite ; « en cours d'envoi » le temps que le Google Sheets l'enregistre.</p>
+    <p><b>Un client vient chercher sa commande :</b> tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
+    <p><b>Modifier ou supprimer :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
+    <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
+    <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer (les annulées ne comptent pas).</p>
+  </aside>
+
+  <div class="toast" id="toast" role="status" hidden><svg class="ico"><use href="#i-check"/></svg><span id="toastTxt"></span><button id="toastAnnuler" hidden>Annuler</button></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const AUJ = "2026-10-14";
+  const ETATS = ["Réservé", "Contacté", "Retrait", "Annulé"];
+  const CLASSE_ETAT = { "Réservé": "reserve", "Contacté": "contacte", "Retrait": "retrait", "Annulé": "annule" };
+
+  function donneesDepart() {
+    const offres = [
+      { id: "o1", nom: "Plateaux de fruits de mer", type: "Produit", mode: "Predefini", debut: "2026-10-05", fin: "2026-10-31", articles: ["Plateau Océan 2 pers.", "Plateau Prestige 4 pers.", "Douzaine d'huîtres n°3"] },
+      { id: "o2", nom: "Chocolats artisanaux", type: "Produit", mode: "Libre", debut: "2026-10-01", fin: "2026-10-31", articles: [] },
+      { id: "o3", nom: "Atelier cuisine enfants", type: "Evenement", mode: "", debut: "2026-10-25", fin: "2026-10-25", articles: [] },
+      { id: "o4", nom: "Foie gras de Noël", type: "Produit", mode: "Predefini", debut: "2026-11-15", fin: "2026-12-24", articles: ["Bloc 200 g", "Bloc 400 g", "Foie gras entier", "Médaillon"] },
+      { id: "o5", nom: "Galettes des rois", type: "Produit", mode: "Predefini", debut: "2026-01-02", fin: "2026-01-31", articles: ["Frangipane 6 parts", "Frangipane 8 parts", "Pomme"] },
+      { id: "o6", nom: "Muguet du 1er mai", type: "Produit", mode: "Libre", debut: "2026-04-25", fin: "2026-05-01", articles: [] },
+    ];
+    const r = (id, op, nom, prenom, tel, email, articles, etat, date) => ({ id, op, nom, prenom, tel, email, articles, etat, date, envoi: false });
+    const reservations = [
+      r("r1", "o1", "LE GALL", "Yannick", "06 12 34 56 78", "", [["Plateau Océan 2 pers.", 1], ["Douzaine d'huîtres n°3", 2]], "Réservé", "06/10/2026 10:12"),
+      r("r2", "o1", "MORVAN", "Anne", "06 98 76 54 32", "anne.morvan@exemple.fr", [["Plateau Prestige 4 pers.", 1]], "Contacté", "06/10/2026 11:40"),
+      r("r3", "o1", "GUÉGUEN", "Paul", "", "p.gueguen@exemple.fr", [["Plateau Océan 2 pers.", 2]], "Retrait", "07/10/2026 09:05"),
+      r("r4", "o1", "TANGUY", "Lucie", "07 61 22 33 44", "", [["Douzaine d'huîtres n°3", 3]], "Réservé", "08/10/2026 16:20"),
+      r("r5", "o1", "DUPONT", "Marc", "06 45 45 12 12", "", [["Plateau Prestige 4 pers.", 1], ["Douzaine d'huîtres n°3", 1]], "Annulé", "09/10/2026 14:02"),
+      r("r6", "o1", "KERJEAN", "Sophie", "06 11 22 33 44", "", [["Plateau Océan 2 pers.", 1]], "Réservé", "12/10/2026 10:47"),
+      r("r7", "o1", "RIOU", "Thomas", "", "thomas.riou@exemple.fr", [["Plateau Prestige 4 pers.", 2]], "Réservé", "13/10/2026 18:31"),
+      r("r8", "o2", "BERNARD", "Claire", "06 70 80 90 10", "", [["Ballotin 500 g", 2], ["Truffes 250 g", 1]], "Réservé", "03/10/2026 12:00"),
+      r("r9", "o2", "LE ROUX", "Hervé", "06 55 44 33 22", "", [["Ballotin 1 kg", 1]], "Retrait", "05/10/2026 17:15"),
+      r("r10", "o3", "PRIGENT", "Emma", "06 21 43 65 87", "", [], "Réservé", "10/10/2026 09:30"),
+      r("r11", "o3", "CADIOU", "Noé", "", "famille.cadiou@exemple.fr", [], "Réservé", "11/10/2026 15:50"),
+      r("r12", "o5", "JAOUEN", "Marie", "06 33 22 11 00", "", [["Frangipane 8 parts", 1]], "Retrait", "10/01/2026 10:00"),
+    ];
+    return { offres, reservations };
+  }
+
+  let D = donneesDepart();
+  let etat = { offre: "o1", filtre: "Toutes", recherche: "", terminees: false, fiche: null, ficheBrouillon: null, editeur: null, echecProchain: false, enSuspens: null, doublonDe: null, echec: null, compteur: 100 };
+  let saisie = {};
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const dateCourte = (iso) => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) : "";
+  const dateLongue = (iso) => iso ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) : "";
+  const offre = (id) => D.offres.find((o) => o.id === id);
+  const statut = (o) => (!o.fin || o.fin >= AUJ) ? (o.debut && o.debut > AUJ ? "avenir" : "encours") : "terminee";
+  const LIB_STATUT = { encours: "En cours", avenir: "À venir", terminee: "Terminée" };
+  const resaDe = (idOp) => D.reservations.filter((r) => r.op === idOp);
+  const actives = (liste) => liste.filter((r) => r.etat !== "Annulé");
+  const texteArticles = (r) => r.articles.map((a) => a[1] + " × " + a[0]).join(", ");
+  const contact = (r) => [r.tel, r.email].filter(Boolean).join(" · ");
+  function maintenant() { const d = new Date(); const p = (n) => String(n).padStart(2, "0"); return "14/10/2026 " + p(d.getHours()) + ":" + p(d.getMinutes()); }
+  function normNom(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+  function normTel(t) { let d = String(t || "").replace(/\D/g, ""); if (/^33\d{9}$/.test(d)) d = "0" + d.slice(2); return d; }
+
+  // ---------- Toast ----------
+  let minuteurToast = null, annulerToast = null;
+  function toast(texte, annuler) {
+    $("toastTxt").textContent = texte;
+    annulerToast = annuler || null;
+    $("toastAnnuler").hidden = !annuler;
+    $("toast").hidden = false;
+    clearTimeout(minuteurToast);
+    minuteurToast = setTimeout(() => { $("toast").hidden = true; annulerToast = null; }, annuler ? 6000 : 3200);
+  }
+  $("toastAnnuler").addEventListener("click", () => { if (annulerToast) annulerToast(); $("toast").hidden = true; });
+
+  // ---------- Écrans ----------
+  function allerEcran(nom) {
+    $("ecranSaisie").hidden = nom !== "saisie";
+    $("ecranOffres").hidden = nom !== "offres";
+    $("ongletSaisie").setAttribute("aria-current", String(nom === "saisie"));
+    $("ongletOffres").setAttribute("aria-current", String(nom === "offres"));
+    if (nom === "offres") dessinerOffres();
+  }
+  $("ongletSaisie").addEventListener("click", () => allerEcran("saisie"));
+  $("ongletOffres").addEventListener("click", () => allerEcran("offres"));
+  document.querySelectorAll("[data-fermer]").forEach((b) => b.addEventListener("click", () => { $(b.dataset.fermer).hidden = true; }));
+  document.querySelectorAll(".voile").forEach((v) => v.addEventListener("click", (e) => { if (e.target === v && !v.classList.contains("centre")) v.hidden = true; }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    ["voileFeuille", "voileFiche", "voileOffre", "aide"].forEach((id) => { $(id).hidden = true; });
+  });
+
+  // ---------- Étape 1 : offres ----------
+  function dessinerTuiles() {
+    const liste = D.offres.filter((o) => etat.terminees || statut(o) !== "terminee");
+    $("tuiles").innerHTML = liste.map((o) => {
+      const s = statut(o);
+      return `<button type="button" class="tuile ${s === "terminee" ? "terminee" : ""}" data-offre="${o.id}" aria-pressed="${o.id === etat.offre}">
+        <b>${esc(o.nom)}</b>
+        <span class="meta"><span class="chip ${o.type === "Produit" ? "produit" : "evenement"}">${o.type === "Produit" ? "Produits" : "Évènement"}</span>${s !== "encours" ? `<span class="chip ${s}">${LIB_STATUT[s]}</span>` : ""}</span>
+        <span class="meta">${o.debut === o.fin ? "Le " + dateCourte(o.debut) : dateCourte(o.debut) + " → " + dateCourte(o.fin)} · ${actives(resaDe(o.id)).length} résa.</span>
+      </button>`;
+    }).join("");
+    $("tuiles").querySelectorAll(".tuile").forEach((b) => b.addEventListener("click", () => choisirOffre(b.dataset.offre)));
+    const n = D.offres.filter((o) => statut(o) === "terminee").length;
+    $("voirTerminees").textContent = etat.terminees ? "Masquer les terminées" : `Offres terminées (${n})`;
+  }
+  $("voirTerminees").addEventListener("click", () => { etat.terminees = !etat.terminees; dessinerTuiles(); });
+
+  function choisirOffre(id) {
+    etat.offre = id; etat.filtre = "Toutes"; etat.recherche = ""; $("recherche").value = "";
+    saisie = {};
+    dessinerTuiles(); dessinerArticles(); dessinerListe(); majEtapes();
+  }
+
+  // ---------- Étape 3 : articles ----------
+  function dessinerArticles() {
+    const o = offre(etat.offre);
+    const zone = $("articles");
+    if (!o) { zone.innerHTML = ""; return; }
+    if (o.type === "Evenement") {
+      $("titreEtape3").textContent = "Inscription";
+      zone.innerHTML = `<div class="sans-article">Évènement : pas d'article à choisir. Le client est inscrit dès l'enregistrement.</div>`;
+      return;
+    }
+    $("titreEtape3").textContent = "Articles";
+    if (o.mode === "Predefini") {
+      zone.innerHTML = o.articles.map((a, i) => {
+        const q = saisie[a] || 0;
+        return `<div class="article ${q ? "choisi" : ""}"><span class="nom-art">${esc(a)}</span>
+          <span class="pas"><button type="button" data-moins="${i}" aria-label="Retirer un ${esc(a)}">−</button><output>${q}</output><button type="button" data-plus="${i}" aria-label="Ajouter un ${esc(a)}">+</button></span></div>`;
+      }).join("");
+      zone.querySelectorAll("[data-plus]").forEach((b) => b.addEventListener("click", () => { const a = o.articles[b.dataset.plus]; saisie[a] = (saisie[a] || 0) + 1; dessinerArticles(); majEtapes(); }));
+      zone.querySelectorAll("[data-moins]").forEach((b) => b.addEventListener("click", () => { const a = o.articles[b.dataset.moins]; saisie[a] = Math.max(0, (saisie[a] || 0) - 1); dessinerArticles(); majEtapes(); }));
+    } else {
+      if (!saisie.lignes) saisie.lignes = [{ nom: "", q: 1 }];
+      zone.innerHTML = saisie.lignes.map((l, i) => `<div class="article libre">
+          <input data-nom="${i}" value="${esc(l.nom)}" placeholder="Article (ex. : Ballotin 500 g)" aria-label="Article ${i + 1}">
+          <span class="pas"><button type="button" data-moins="${i}" aria-label="Moins">−</button><output>${l.q}</output><button type="button" data-plus="${i}" aria-label="Plus">+</button></span>
+          <button type="button" class="retirer" data-retirer="${i}" aria-label="Retirer la ligne"><svg class="ico p"><use href="#i-fermer"/></svg></button></div>`).join("")
+        + `<button type="button" class="ajouter" id="ajouterLigne"><svg class="ico p"><use href="#i-plus"/></svg>Ajouter un article</button>`;
+      zone.querySelectorAll("[data-nom]").forEach((inp) => inp.addEventListener("input", () => { saisie.lignes[inp.dataset.nom].nom = inp.value; majEtapes(); }));
+      zone.querySelectorAll("[data-plus]").forEach((b) => b.addEventListener("click", () => { saisie.lignes[b.dataset.plus].q++; dessinerArticles(); }));
+      zone.querySelectorAll("[data-moins]").forEach((b) => b.addEventListener("click", () => { const l = saisie.lignes[b.dataset.moins]; l.q = Math.max(1, l.q - 1); dessinerArticles(); }));
+      zone.querySelectorAll("[data-retirer]").forEach((b) => b.addEventListener("click", () => { saisie.lignes.splice(b.dataset.retirer, 1); if (!saisie.lignes.length) saisie.lignes.push({ nom: "", q: 1 }); dessinerArticles(); majEtapes(); }));
+      $("ajouterLigne").addEventListener("click", () => { saisie.lignes.push({ nom: "", q: 1 }); dessinerArticles(); const champs = zone.querySelectorAll("[data-nom]"); champs[champs.length - 1].focus(); });
+    }
+  }
+
+  function articlesSaisis() {
+    const o = offre(etat.offre);
+    if (!o || o.type === "Evenement") return [];
+    if (o.mode === "Predefini") return o.articles.filter((a) => saisie[a] > 0).map((a) => [a, saisie[a]]);
+    return (saisie.lignes || []).filter((l) => l.nom.trim()).map((l) => [l.nom.trim(), l.q]);
+  }
+
+  function majEtapes() {
+    const o = offre(etat.offre);
+    $("n1").classList.toggle("fait", !!o);
+    $("n2").classList.toggle("fait", !!($("nom").value.trim() && $("prenom").value.trim() && ($("tel").value.trim() || $("email").value.trim())));
+    $("n3").classList.toggle("fait", !!o && (o.type === "Evenement" || articlesSaisis().length > 0));
+  }
+  ["nom", "prenom", "tel", "email"].forEach((id) => $(id).addEventListener("input", () => { $(id).classList.remove("erreur"); $("message").textContent = ""; majEtapes(); }));
+
+  // ---------- Enregistrement ----------
+  $("formSaisie").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const o = offre(etat.offre);
+    const nouvelle = { op: etat.offre, nom: $("nom").value.trim().toUpperCase(), prenom: $("prenom").value.trim(), tel: $("tel").value.trim(), email: $("email").value.trim(), articles: articlesSaisis() };
+    const manque = [];
+    if (!nouvelle.nom) manque.push("nom");
+    if (!nouvelle.prenom) manque.push("prenom");
+    if (!nouvelle.tel && !nouvelle.email) manque.push("tel", "email");
+    manque.forEach((id) => $(id).classList.add("erreur"));
+    if (manque.length) { $("message").textContent = "Nom, prénom et un téléphone ou un email sont nécessaires."; $(manque[0]).focus(); return; }
+    if (nouvelle.tel && !/^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/.test(nouvelle.tel)) { $("tel").classList.add("erreur"); $("message").textContent = "Téléphone incomplet (ex. : 06 12 34 56 78)."; $("tel").focus(); return; }
+    if (nouvelle.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nouvelle.email)) { $("email").classList.add("erreur"); $("message").textContent = "Email incomplet (ex. : nom@exemple.fr)."; $("email").focus(); return; }
+    if (o.type === "Produit" && !nouvelle.articles.length) { $("message").textContent = "Choisissez au moins un article (bouton +)."; return; }
+    const doublon = chercherDoublon(nouvelle);
+    if (doublon) { etat.enSuspens = nouvelle; afficherDoublon(nouvelle, doublon); return; }
+    enregistrer(nouvelle);
+  });
+
+  function enregistrer(n) {
+    const r = Object.assign({ id: "r" + (++etat.compteur), etat: "Réservé", date: maintenant(), envoi: true }, n);
+    D.reservations.push(r);
+    viderFormulaire();
+    toast(`${r.nom} ${r.prenom} : réservation enregistrée`);
+    dessinerTout(r.id);
+    envoyer(r);
+  }
+
+  function envoyer(r) {
+    r.envoi = true; majEnvoi();
+    const echoue = etat.echecProchain; etat.echecProchain = false;
+    setTimeout(() => {
+      if (echoue) {
+        D.reservations = D.reservations.filter((x) => x !== r);
+        etat.echec = r; afficherEchec(r);
+      } else r.envoi = false;
+      majEnvoi(); dessinerTout();
+    }, 1400);
+  }
+
+  function majEnvoi() {
+    const n = D.reservations.filter((r) => r.envoi).length;
+    $("puceEnvoi").hidden = !n;
+    $("txtEnvoi").textContent = n + " en cours d'envoi";
+  }
+
+  function viderFormulaire() {
+    ["nom", "prenom", "tel", "email"].forEach((id) => { $(id).value = ""; $(id).classList.remove("erreur"); });
+    $("message").textContent = ""; saisie = {};
+    dessinerArticles(); majEtapes(); $("nom").focus();
+  }
+
+  // ---------- Doublon ----------
+  function chercherDoublon(n) {
+    const cles = [normTel(n.tel), n.email.toLowerCase()].filter(Boolean);
+    return actives(resaDe(n.op)).find((r) => normNom(r.nom) === normNom(n.nom) && normNom(r.prenom) === normNom(n.prenom)
+      && [normTel(r.tel), r.email.toLowerCase()].filter(Boolean).some((k) => cles.includes(k))) || null;
+  }
+  function afficherDoublon(n, r) {
+    etat.doublonDe = r;
+    $("doublonSous").textContent = `${offre(n.op).nom} · réservé le ${r.date.slice(0, 10)} · état : ${r.etat}`;
+    const rangs = [["Nom", n.nom, r.nom, normNom(n.nom) === normNom(r.nom)], ["Prénom", n.prenom, r.prenom, normNom(n.prenom) === normNom(r.prenom)],
+      ["Téléphone", n.tel || "—", r.tel || "—", !n.tel && !r.tel ? null : !!n.tel && normTel(n.tel) === normTel(r.tel)], ["Email", n.email || "—", r.email || "—", !n.email && !r.email ? null : !!n.email && n.email.toLowerCase() === r.email.toLowerCase()],
+      ["Articles", texteArticles(n) || "—", texteArticles(r) || "—", null]];
+    $("tableauDoublon").innerHTML = `<div class="rang entete"><span></span><span>Maintenant</span><span>Déjà réservé</span><span></span></div>` + rangs.map(([lib, a, b, eg]) =>
+      `<div class="rang"><span class="lib">${lib}</span><span class="${eg ? "pareil" : ""}">${esc(a)}</span><span class="${eg ? "pareil" : ""}">${esc(b)}</span>${eg === null ? "<span></span>" : `<span class="tag ${eg ? "eg" : "dif"}">${eg ? "IDENTIQUE" : "DIFFÉRENT"}</span>`}</div>`).join("");
+    $("doublonConfirmer").hidden = true; $("doublonQuandMeme").hidden = false;
+    $("voileDoublon").hidden = false; $("doublonStop").focus();
+  }
+  $("doublonStop").addEventListener("click", () => { $("voileDoublon").hidden = true; etat.enSuspens = null; });
+  $("doublonQuandMeme").addEventListener("click", () => { $("doublonConfirmer").hidden = false; $("doublonQuandMeme").hidden = true; });
+  $("doublonAnnuler").addEventListener("click", () => { $("doublonConfirmer").hidden = true; $("doublonQuandMeme").hidden = false; });
+  $("doublonForcer").addEventListener("click", () => { $("voileDoublon").hidden = true; const n = etat.enSuspens; etat.enSuspens = null; if (n) enregistrer(n); });
+  $("doublonOuvrir").addEventListener("click", () => { $("voileDoublon").hidden = true; etat.enSuspens = null; viderFormulaire(); ouvrirFiche(etat.doublonDe.id); });
+
+  // ---------- Échec ----------
+  function afficherEchec(r) {
+    $("echecResume").innerHTML = `<span>Client : <b>${esc(r.nom)} ${esc(r.prenom)}</b> (${esc(contact(r))})</span><span>Offre : ${esc(offre(r.op).nom)}</span>${r.articles.length ? `<span>Articles : ${esc(texteArticles(r))}</span>` : ""}`;
+    $("voileEchec").hidden = false; $("echecReessayer").focus();
+  }
+  $("echecReessayer").addEventListener("click", () => { $("voileEchec").hidden = true; const r = etat.echec; etat.echec = null; if (r) { D.reservations.push(r); dessinerTout(r.id); envoyer(r); } });
+  $("echecAbandon").addEventListener("click", () => { $("voileEchec").hidden = true; etat.echec = null; toast("Réservation abandonnée"); });
+
+  // ---------- Liste des réservations ----------
+  function dessinerListe(nouvelle) {
+    const o = offre(etat.offre);
+    const toutes = resaDe(etat.offre);
+    $("titreListe").innerHTML = `${esc(o.nom)} <small>${actives(toutes).length} réservation${actives(toutes).length > 1 ? "s" : ""} · ${statut(o) === "terminee" ? "terminée le " + dateLongue(o.fin) : o.debut === o.fin ? "le " + dateLongue(o.debut) : "du " + dateCourte(o.debut) + " au " + dateLongue(o.fin)}</small>`;
+    const compte = (e) => e === "Toutes" ? toutes.length : toutes.filter((r) => r.etat === e).length;
+    $("filtres").innerHTML = ["Toutes", "Réservé", "Contacté", "Retrait", "Annulé"].map((f) =>
+      `<button type="button" class="filtre" data-filtre="${f}" aria-pressed="${etat.filtre === f}">${f === "Retrait" ? "Retirées" : f === "Toutes" ? "Toutes" : f === "Réservé" ? "À retirer" : f === "Contacté" ? "Contactés" : "Annulées"} <b>${compte(f)}</b></button>`).join("");
+    $("filtres").querySelectorAll(".filtre").forEach((b) => b.addEventListener("click", () => { etat.filtre = b.dataset.filtre; dessinerListe(); }));
+
+    // À préparer : totaux des réservations non annulées et pas encore retirées
+    const totaux = {};
+    toutes.filter((r) => r.etat !== "Annulé" && r.etat !== "Retrait").forEach((r) => r.articles.forEach(([a, q]) => { totaux[a] = (totaux[a] || 0) + q; }));
+    const cles = Object.keys(totaux).sort((a, b) => a.localeCompare(b));
+    $("preparer").hidden = o.type === "Evenement";
+    $("preparer").innerHTML = `<span>Reste à préparer</span>` + (cles.length ? cles.map((a) => `<span><b>${totaux[a]}</b> ${esc(a)}</span>`).join("") : `<span>rien</span>`);
+
+    const q = normNom(etat.recherche), qTel = normTel(etat.recherche);
+    const visibles = toutes.filter((r) => (etat.filtre === "Toutes" || r.etat === etat.filtre)
+      && (!etat.recherche.trim() || normNom(r.nom + r.prenom).includes(q) || normNom(r.prenom + r.nom).includes(q) || (qTel.length >= 3 && normTel(r.tel).includes(qTel)) || r.email.toLowerCase().includes(etat.recherche.trim().toLowerCase())))
+      .slice().reverse();
+    $("lignes").innerHTML = visibles.length ? visibles.map((r) => `<div class="ligne ${r.etat === "Annulé" ? "annulee" : ""} ${r.id === nouvelle ? "neuve" : ""}" data-res="${r.id}" tabindex="0" role="button" aria-label="Modifier la réservation de ${esc(r.nom)} ${esc(r.prenom)}">
+        <div class="qui"><b>${esc(r.nom)} ${esc(r.prenom)}</b><small>${esc(contact(r))}</small></div>
+        <div class="commande">${o.type === "Evenement" ? `<span style="color:var(--doux)">Inscrit le ${esc(r.date.slice(0, 5))}</span>` : esc(texteArticles(r))}</div>
+        <div class="actions-ligne">${r.envoi ? `<span class="etat envoi"><span class="rond"></span>envoi…</span>` :
+          (r.etat === "Réservé" || r.etat === "Contacté") && o.type === "Produit" ? `<span class="etat ${CLASSE_ETAT[r.etat]}">${r.etat}</span><button type="button" class="retire-btn" data-retire="${r.id}"><svg class="ico p"><use href="#i-check"/></svg>Retiré</button>` :
+          `<span class="etat ${CLASSE_ETAT[r.etat]}">${r.etat === "Retrait" ? "Retiré" : r.etat}</span>`}</div>
+      </div>`).join("") : `<div class="vide">${etat.recherche.trim() ? "Aucune réservation ne correspond à « " + esc(etat.recherche.trim()) + " »." : "Aucune réservation pour le moment."}</div>`;
+    $("lignes").querySelectorAll(".ligne").forEach((l) => {
+      l.addEventListener("click", (e) => { if (e.target.closest(".retire-btn")) return; const r = D.reservations.find((x) => x.id === l.dataset.res); if (r && !r.envoi) ouvrirFiche(r.id); });
+      l.addEventListener("keydown", (e) => { if (e.key === "Enter") l.click(); });
+    });
+    $("lignes").querySelectorAll("[data-retire]").forEach((b) => b.addEventListener("click", () => {
+      const r = D.reservations.find((x) => x.id === b.dataset.retire); const avant = r.etat;
+      r.etat = "Retrait"; dessinerTout();
+      toast(`${r.nom} ${r.prenom} : retrait noté`, () => { r.etat = avant; dessinerTout(); toast("Retrait annulé"); });
+    }));
+  }
+  $("recherche").addEventListener("input", () => { etat.recherche = $("recherche").value; dessinerListe(); });
+
+  // ---------- Fiche réservation ----------
+  function ouvrirFiche(id) {
+    const r = D.reservations.find((x) => x.id === id); if (!r) return;
+    const o = offre(r.op);
+    etat.fiche = id;
+    etat.ficheBrouillon = { etat: r.etat, articles: r.articles.map((a) => a.slice()) };
+    $("ficheTitre").innerHTML = `${esc(r.nom)} ${esc(r.prenom)}<small>${esc(o.nom)} · saisie le ${esc(r.date)}</small>`;
+    $("fNom").value = r.nom; $("fPrenom").value = r.prenom; $("fTel").value = r.tel; $("fEmail").value = r.email;
+    $("ficheBlocArticles").hidden = o.type === "Evenement";
+    $("ficheConfirme").hidden = true;
+    dessinerFiche(); $("ficheEnregistrer").disabled = true;
+    $("voileFiche").hidden = false;
+  }
+  function dessinerFiche() {
+    const r = D.reservations.find((x) => x.id === etat.fiche); const o = offre(r.op); const b = etat.ficheBrouillon;
+    $("ficheEtat").innerHTML = ETATS.map((e) => `<button type="button" data-etat="${e}" aria-pressed="${b.etat === e}">${e === "Retrait" ? "Retiré" : e}</button>`).join("");
+    $("ficheEtat").querySelectorAll("button").forEach((btn) => btn.addEventListener("click", () => { b.etat = btn.dataset.etat; dessinerFiche(); ficheModifiee(); }));
+    if (o.type === "Evenement") return;
+    const noms = o.mode === "Predefini" ? o.articles.slice() : b.articles.map((a) => a[0]);
+    b.articles.forEach(([a]) => { if (!noms.includes(a)) noms.push(a); });
+    $("ficheArticles").innerHTML = noms.map((a, i) => { const ligne = b.articles.find((x) => x[0] === a); const q = ligne ? ligne[1] : 0;
+      return `<div class="article ${q ? "choisi" : ""}"><span class="nom-art">${esc(a)}</span><span class="pas"><button type="button" data-fm="${i}" aria-label="Moins">−</button><output>${q}</output><button type="button" data-fp="${i}" aria-label="Plus">+</button></span></div>`; }).join("");
+    const regler = (i, delta) => { const a = noms[i]; let l = b.articles.find((x) => x[0] === a); if (!l) { l = [a, 0]; b.articles.push(l); } l[1] = Math.max(0, l[1] + delta); if (!l[1] && o.mode === "Predefini") b.articles = b.articles.filter((x) => x[1]); dessinerFiche(); ficheModifiee(); };
+    $("ficheArticles").querySelectorAll("[data-fp]").forEach((x) => x.addEventListener("click", () => regler(+x.dataset.fp, 1)));
+    $("ficheArticles").querySelectorAll("[data-fm]").forEach((x) => x.addEventListener("click", () => regler(+x.dataset.fm, -1)));
+  }
+  function ficheModifiee() { $("ficheEnregistrer").disabled = false; }
+  ["fNom", "fPrenom", "fTel", "fEmail"].forEach((id) => $(id).addEventListener("input", ficheModifiee));
+  $("ficheEnregistrer").addEventListener("click", () => {
+    const r = D.reservations.find((x) => x.id === etat.fiche); const b = etat.ficheBrouillon;
+    if (offre(r.op).type === "Produit" && !b.articles.some((a) => a[1] > 0)) { toast("Au moins un article : sinon, passez la réservation en « Annulé »"); return; }
+    Object.assign(r, { nom: $("fNom").value.trim().toUpperCase(), prenom: $("fPrenom").value.trim(), tel: $("fTel").value.trim(), email: $("fEmail").value.trim(), etat: b.etat, articles: b.articles.filter((a) => a[1] > 0) });
+    $("voileFiche").hidden = true; dessinerTout(); toast(`${r.nom} ${r.prenom} : modifications enregistrées`);
+  });
+  $("ficheSupprimer").addEventListener("click", () => { $("ficheConfirme").hidden = false; $("ficheSupprimerOui").focus(); });
+  $("ficheSupprimerNon").addEventListener("click", () => { $("ficheConfirme").hidden = true; });
+  $("ficheSupprimerOui").addEventListener("click", () => {
+    const r = D.reservations.find((x) => x.id === etat.fiche);
+    D.reservations = D.reservations.filter((x) => x !== r); $("voileFiche").hidden = true; dessinerTout();
+    toast(`Réservation de ${r.nom} ${r.prenom} supprimée`);
+  });
+
+  // ---------- Écran Offres ----------
+  function dessinerOffres() {
+    const groupes = [["En cours et à venir", D.offres.filter((o) => statut(o) !== "terminee")], ["Terminées", D.offres.filter((o) => statut(o) === "terminee")]];
+    $("listeOffres").innerHTML = groupes.map(([titre, liste]) => !liste.length ? "" : `<h2 class="groupe-titre">${titre}</h2>` + liste.map((o) => {
+      const s = statut(o), toutes = resaDe(o.id), act = actives(toutes), retirees = toutes.filter((r) => r.etat === "Retrait").length;
+      return `<article class="offre ${s === "terminee" ? "terminee" : ""}" data-offre="${o.id}">
+        <div><h3>${esc(o.nom)} <span class="chip ${o.type === "Produit" ? "produit" : "evenement"}">${o.type === "Produit" ? "Produits" : "Évènement"}</span><span class="chip ${s}">${LIB_STATUT[s]}</span></h3>
+          <div class="infos"><span>${o.debut === o.fin ? "Le " + dateLongue(o.debut) : "Du " + dateLongue(o.debut) + " au " + dateLongue(o.fin)}</span>
+            <span><b>${act.length}</b> réservation${act.length > 1 ? "s" : ""}${o.type === "Produit" ? ` · <b>${retirees}</b> retirée${retirees > 1 ? "s" : ""}` : ""}</span>
+            ${o.type === "Produit" ? `<span>${o.mode === "Predefini" ? esc(o.articles.join(", ")) : "Saisie libre des articles"}</span>` : ""}</div></div>
+        <div class="boutons-offre">
+          <button class="sec" data-act="voir"><svg class="ico p"><use href="#i-liste"/></svg>Réservations</button>
+          <button class="sec" data-act="feuille"><svg class="ico p"><use href="#i-imprimer"/></svg>Feuille</button>
+          <button class="sec" data-act="modifier"><svg class="ico p"><use href="#i-crayon"/></svg>Modifier</button>
+          <button class="sec danger" data-act="supprimer" aria-label="Supprimer ${esc(o.nom)}"><svg class="ico p"><use href="#i-poubelle"/></svg></button></div>
+      </article>`;
+    }).join("")).join("");
+    $("listeOffres").querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
+      const art = b.closest(".offre"); const id = art.dataset.offre; const o = offre(id);
+      if (b.dataset.act === "voir") { if (statut(o) === "terminee") etat.terminees = true; choisirOffre(id); allerEcran("saisie"); }
+      if (b.dataset.act === "feuille") ouvrirFeuille(id);
+      if (b.dataset.act === "modifier") ouvrirEditeur(id);
+      if (b.dataset.act === "supprimer") {
+        if (art.querySelector(".confirme")) return;
+        const n = resaDe(id).length;
+        art.insertAdjacentHTML("beforeend", `<div class="confirme"><p>Supprimer « ${esc(o.nom)} » et ${n ? "ses " + n + " réservation" + (n > 1 ? "s" : "") : "(aucune réservation)"} ? C'est définitif.</p><button class="sec plein-danger" data-oui>Supprimer l'offre</button><button class="sec" data-non>Garder</button></div>`);
+        art.querySelector("[data-non]").addEventListener("click", () => art.querySelector(".confirme").remove());
+        art.querySelector("[data-oui]").addEventListener("click", () => {
+          D.offres = D.offres.filter((x) => x.id !== id); D.reservations = D.reservations.filter((r) => r.op !== id);
+          if (etat.offre === id) etat.offre = (D.offres.find((x) => statut(x) !== "terminee") || D.offres[0] || {}).id;
+          dessinerTout(); dessinerOffres(); toast(`Offre « ${o.nom} » supprimée`);
+        });
+      }
+    }));
+  }
+
+  // ---------- Éditeur d'offre ----------
+  function ouvrirEditeur(id) {
+    const o = id ? offre(id) : null;
+    etat.editeur = { id: id || null, type: o ? o.type : "Produit", mode: o ? (o.mode || "Predefini") : "Predefini", articles: o ? o.articles.slice() : [] };
+    $("offreTitre").textContent = o ? "Modifier l'offre" : "Nouvelle offre";
+    $("oNom").value = o ? o.nom : ""; $("oDebut").value = o ? o.debut : ""; $("oFin").value = o ? o.fin : "";
+    $("oErreur").textContent = ""; $("oNouvelArticle").value = "";
+    dessinerEditeur(); $("voileOffre").hidden = false; $("oNom").focus();
+  }
+  function dessinerEditeur() {
+    const ed = etat.editeur;
+    $("oType").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.val === ed.type)));
+    $("oMode").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.val === ed.mode)));
+    $("oBlocMode").hidden = ed.type !== "Produit";
+    $("oBlocArticles").hidden = ed.type !== "Produit" || ed.mode !== "Predefini";
+    $("oIndiceMode").textContent = ed.mode === "Predefini" ? "L'accueil choisit les quantités dans cette liste (boutons + / −)." : "L'accueil tape le nom de chaque article commandé.";
+    $("oArticles").innerHTML = ed.articles.length ? ed.articles.map((a, i) => `<span class="puce-article">${esc(a)}<button type="button" data-i="${i}" aria-label="Retirer ${esc(a)}"><svg class="ico p"><use href="#i-fermer"/></svg></button></span>`).join("") : `<span class="indice">Aucun article pour l'instant.</span>`;
+    $("oArticles").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { ed.articles.splice(+b.dataset.i, 1); dessinerEditeur(); }));
+  }
+  $("oType").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { etat.editeur.type = b.dataset.val; dessinerEditeur(); }));
+  $("oMode").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { etat.editeur.mode = b.dataset.val; dessinerEditeur(); }));
+  function ajouterArticle() { const v = $("oNouvelArticle").value.trim(); if (!v) return; if (!etat.editeur.articles.includes(v)) etat.editeur.articles.push(v); $("oNouvelArticle").value = ""; dessinerEditeur(); $("oNouvelArticle").focus(); }
+  $("oAjouter").addEventListener("click", ajouterArticle);
+  $("oNouvelArticle").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ajouterArticle(); } });
+  $("oEnregistrer").addEventListener("click", () => {
+    const ed = etat.editeur; const nom = $("oNom").value.trim(); const debut = $("oDebut").value, fin = $("oFin").value;
+    if (!nom) { $("oErreur").textContent = "Donnez un nom à l'offre."; $("oNom").focus(); return; }
+    if (debut && fin && fin < debut) { $("oErreur").textContent = "La date de fin est avant la date de début."; $("oFin").focus(); return; }
+    if (ed.type === "Produit" && ed.mode === "Predefini" && !ed.articles.length) { $("oErreur").textContent = "Ajoutez au moins un article à la liste fixe."; $("oNouvelArticle").focus(); return; }
+    const valeurs = { nom, type: ed.type, mode: ed.type === "Produit" ? ed.mode : "", debut, fin, articles: ed.type === "Produit" && ed.mode === "Predefini" ? ed.articles : [] };
+    if (ed.id) Object.assign(offre(ed.id), valeurs); else { const id = "o" + (++etat.compteur); D.offres.unshift(Object.assign({ id }, valeurs)); }
+    $("voileOffre").hidden = true; dessinerTout(); dessinerOffres(); toast(ed.id ? `Offre « ${nom} » mise à jour` : `Offre « ${nom} » créée`);
+  });
+
+  // ---------- Feuille de préparation ----------
+  let feuilleOffre = null;
+  function ouvrirFeuille(id) { feuilleOffre = id; dessinerFeuille(); $("voileFeuille").hidden = false; }
+  function dessinerFeuille() {
+    const o = offre(feuilleOffre); const toutes = resaDe(o.id);
+    const avecAnnulees = $("feuilleAnnulees").checked;
+    const listees = toutes.filter((r) => avecAnnulees || r.etat !== "Annulé").slice().sort((a, b) => a.nom.localeCompare(b.nom));
+    const totaux = {};
+    actives(toutes).forEach((r) => r.articles.forEach(([a, q]) => { totaux[a] = (totaux[a] || 0) + q; }));
+    const cles = Object.keys(totaux).sort((a, b) => a.localeCompare(b));
+    const d = new Date(); const p = (n) => String(n).padStart(2, "0");
+    $("feuille").innerHTML = `<header><div><h1>${esc(o.nom)}</h1><p>${o.debut === o.fin ? "Le " + dateLongue(o.debut) : "Du " + dateLongue(o.debut) + " au " + dateLongue(o.fin)} · ${actives(toutes).length} réservation${actives(toutes).length > 1 ? "s" : ""}</p></div>
+        <div class="imprime">Imprimée le 14/10/2026<br>à ${p(d.getHours())}:${p(d.getMinutes())}</div></header>
+      ${o.type === "Produit" ? `<h2>Total à préparer</h2><div class="defile"><table><thead><tr><th>Article</th><th style="text-align:center">Quantité</th></tr></thead><tbody>${cles.map((a) => `<tr><td>${esc(a)}</td><td class="qte">${totaux[a]}</td></tr>`).join("") || `<tr><td colspan="2">Rien à préparer</td></tr>`}</tbody></table></div>` : ""}
+      <h2>${o.type === "Produit" ? "Commandes à pointer" : "Inscrits"} (${listees.length})</h2>
+      <div class="defile"><table><thead><tr><th>✓</th><th>Client</th><th>Contact</th>${o.type === "Produit" ? "<th>Commande</th>" : ""}<th>État</th></tr></thead><tbody>
+      ${listees.map((r) => `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${r.etat === "Retrait" ? "☑" : "☐"}</td><td><b>${esc(r.nom)}</b> ${esc(r.prenom)}</td><td>${esc(contact(r))}</td>${o.type === "Produit" ? `<td>${esc(texteArticles(r))}</td>` : ""}<td>${r.etat === "Retrait" ? "Retiré" : esc(r.etat)}</td></tr>`).join("") || `<tr><td colspan="5">Aucune réservation</td></tr>`}
+      </tbody></table></div>
+      <p class="pied">Classement par nom. Les réservations annulées ne comptent pas dans le total.</p>`;
+  }
+  $("feuilleAnnulees").addEventListener("change", dessinerFeuille);
+  $("feuilleImprimer").addEventListener("click", () => toast("Dans l'application : ouvre la fenêtre d'impression du navigateur"));
+  $("ouvrirFeuille").addEventListener("click", () => ouvrirFeuille(etat.offre));
+
+  // ---------- Aide ----------
+  $("btnAide").addEventListener("click", () => { $("aide").hidden = false; });
+  $("fermerAide").addEventListener("click", () => { $("aide").hidden = true; });
+
+  // ---------- Essais ----------
+  function remplir(n, quantites) {
+    allerEcran("saisie"); choisirOffre(n.op);
+    $("nom").value = n.nom; $("prenom").value = n.prenom; $("tel").value = n.tel || ""; $("email").value = n.email || "";
+    Object.assign(saisie, quantites || {}); dessinerArticles(); majEtapes();
+  }
+  document.querySelectorAll("[data-essai]").forEach((b) => b.addEventListener("click", () => {
+    ["voileFiche", "voileOffre", "voileDoublon", "voileEchec", "voileFeuille", "aide"].forEach((id) => { $(id).hidden = true; });
+    const e = b.dataset.essai;
+    if (e === "doublon") { remplir({ op: "o1", nom: "Le Gall", prenom: "yannick", tel: "+33 6 12 34 56 78" }, { "Plateau Prestige 4 pers.": 1 }); $("formSaisie").requestSubmit(); }
+    if (e === "echec") { etat.echecProchain = true; remplir({ op: "o1", nom: "Nédélec", prenom: "Julie", tel: "06 40 50 60 70" }, { "Plateau Océan 2 pers.": 1 }); $("formSaisie").requestSubmit(); }
+    if (e === "retrait") { allerEcran("saisie"); choisirOffre("o1"); $("recherche").value = "morv"; etat.recherche = "morv"; dessinerListe(); $("recherche").focus(); toast("Recherche « morv » : cliquez sur « Retiré »"); }
+    if (e === "feuille") { allerEcran("saisie"); ouvrirFeuille("o1"); }
+    if (e === "offre") { allerEcran("offres"); ouvrirEditeur(null); }
+  }));
+  $("reinit").addEventListener("click", () => {
+    D = donneesDepart(); etat = Object.assign(etat, { offre: "o1", filtre: "Toutes", recherche: "", terminees: false, echecProchain: false });
+    ["voileFiche", "voileOffre", "voileDoublon", "voileEchec", "voileFeuille", "aide", "toast"].forEach((id) => { $(id).hidden = true; });
+    $("recherche").value = ""; allerEcran("saisie"); viderFormulaire(); dessinerTout(); majEnvoi();
+  });
+
+  function dessinerTout(nouvelle) { dessinerTuiles(); dessinerListe(nouvelle); majEtapes(); if (!$("ecranOffres").hidden) dessinerOffres(); }
+  dessinerTout(); dessinerArticles();
+})();
+</script>
