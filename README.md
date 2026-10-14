@@ -12,13 +12,30 @@ magasin (produits à préparer ou évènements), utilisée **à l'accueil sur PC
 Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**) :
 - **00_Constantes.gs** — noms des onglets, colonnes (`OP`, `RES`, `ART`), états, liste des fichiers.
 - **Application.gs** — `doGet`, `include_`, outils communs (`avecVerrou_`, `texte_`, `nouvelId_`…).
+- **Copie.gs** — copie de la page : toutes les offres + réservations des offres actives
+  (glissée dans la page par `doGet`, rechargée par `chargerCopie`).
 - **Installation.gs** — contrôle « tous les fichiers à la même version ».
-- **Operations.gs** — offres : liste, détail, création, modification, suppression en cascade.
-- **Reservations.gs** — enregistrement d'une réservation et de ses articles, changement d'état.
+- **Operations.gs** — offres : détail (offres terminées), création, modification, suppression
+  en cascade (onglets réécrits en une fois). Chaque modification renvoie la copie à jour.
+- **Reservations.gs** — enregistrement d'une réservation (identifiant donné par la page :
+  un réessai n'écrit pas deux fois) et de ses articles, changement d'état.
 
 Page :
-- **Index.html** — squelette qui inclut **Style.html** et les scripts **ScriptCommun**,
+- **Index.html** — squelette (+ `COPIE_INITIALE` injectée) qui inclut **Style.html** et les
+  scripts **ScriptCommun**, **ScriptCopie** (copie locale, envois en arrière-plan, doublons),
   **ScriptSaisie**, **ScriptOffres**, **ScriptImpression** (`<?!= include_('Nom') ?>`).
+
+## Rapidité (copie locale)
+- À l'ouverture, les offres et les réservations des offres **actives** (fin non passée ou
+  sans date) sont déjà dans la page : listes et détail sans attendre le serveur.
+- Une réservation est confirmée **tout de suite** et écrite en arrière-plan (« n
+  réservation(s) en cours d'envoi… ») ; en cas d'échec, fenêtre « Réservation NON
+  enregistrée » avec RÉESSAYER. Le changement d'état est aussi immédiat (remis comme
+  avant si le serveur refuse).
+- La copie est rechargée au retour sur la fenêtre (si plus de 30 s) et toutes les 2 min
+  (saisies de l'autre PC). Offres terminées : réservations chargées à la demande.
+- **Alerte doublon** : même offre, même nom et prénom (sans accents ni casse) et même
+  téléphone ou email → « Ce client a déjà réservé » (enregistrer quand même possible).
 
 Les fonctions serveur dont le nom finit par `_` ne sont pas appelables depuis la page.
 

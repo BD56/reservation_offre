@@ -33,8 +33,12 @@ const PROXY = `
 async function ouvrir(repo, opts = {}) {
   const env = makeEnv(Object.assign({ repo }, opts));
   env.pannes = {}; // { nomFonction: "message" } : la fonction serveur échoue
+  env.pannesApres = {}; // { nomFonction: "message" } : elle écrit, mais la réponse se perd
+  env.retards = {}; // { nomFonction: ms } : réponse retardée (envoi « en cours »)
   if (opts.preparer) opts.preparer(env); // données de départ (offres, réservations…)
-  const html = rendrePage(repo, {}).replace(
+  // Comme doGet : la copie est glissée dans la page (opts.sansCopie : lecture échouée -> null)
+  const copieJson = opts.sansCopie ? "null" : env.ctx.jsonPourPage_(env.ctx.copie_());
+  const html = rendrePage(repo, { copieJson }).replace(
     "<head>",
     // comme doGet (addMetaTag)
     '<head><meta name="viewport" content="width=device-width, initial-scale=1"><script>' + PROXY + "</script>"
@@ -50,12 +54,15 @@ async function ouvrir(repo, opts = {}) {
     if (fichier && fs.existsSync(fichier)) return route.fulfill({ path: fichier });
     return route.fulfill({ status: 404, body: "" });
   });
-  await page.exposeFunction("__serveur", (nom, argsJson) => {
+  await page.exposeFunction("__serveur", async (nom, argsJson) => {
+    if (env.retards[nom]) await new Promise((ok) => setTimeout(ok, env.retards[nom]));
     try {
       if (typeof env.ctx[nom] !== "function" || /_$/.test(nom))
         throw new Error("fonction inconnue/privée : " + nom);
       if (env.pannes[nom]) throw new Error(env.pannes[nom]);
-      return JSON.stringify({ val: J(env.ctx[nom].apply(null, JSON.parse(argsJson))) });
+      const val = J(env.ctx[nom].apply(null, JSON.parse(argsJson)));
+      if (env.pannesApres[nom]) throw new Error(env.pannesApres[nom]);
+      return JSON.stringify({ val });
     } catch (e) {
       return JSON.stringify({ err: e.message });
     }

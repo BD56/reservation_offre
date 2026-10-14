@@ -21,9 +21,9 @@ const repo = process.argv[2];
       await page.$$eval("#tableOperationsBody tr td:first-child .fw-bold", (x) =>
         x.map((e) => e.textContent)
       ),
-      ['Foie <b>gras</b> "Noël"', "Chocolats", "Atelier"]
+      ['Foie <b>gras</b> "Noël"', "Chocolats", "Atelier", "Galettes 2025"]
     );
-    assert.deepStrictEqual(await badges(), ["2", "0", "0"]);
+    assert.deepStrictEqual(await badges(), ["2", "0", "0", "1"]);
 
     // --- Détail ---
     await page.click("#tableOperationsBody tr:first-child td:first-child");
@@ -112,7 +112,7 @@ const repo = process.argv[2];
     await page.click("text=CRÉER UNE NOUVELLE OFFRE");
     await attendre(page);
     await page.click("#btnSauvegarderOffre");
-    assert.strictEqual(lignes(env, "Operations").length, 3, "nom obligatoire");
+    assert.strictEqual(lignes(env, "Operations").length, 4, "nom obligatoire");
     await page.fill("#newOpNom", "Galettes");
     await page.selectOption("#newOpMode", "Predefini");
     await page.click("#btnSauvegarderOffre");
@@ -128,7 +128,7 @@ const repo = process.argv[2];
     await page.click("#btnSauvegarderOffre");
     await attendre(page, 800);
     assert.match(await toast(), /Nouvelle offre créée/);
-    op = lignes(env, "Operations")[3];
+    op = lignes(env, "Operations")[4];
     assert.deepStrictEqual(op.slice(1, 3).concat(op.slice(5)), [
       "Galettes",
       "Produit",
@@ -136,7 +136,7 @@ const repo = process.argv[2];
       "Frangipane, Pomme",
     ]);
     assert.ok(await page.isVisible("#modalOperations"), "retour à la liste des offres");
-    assert.deepStrictEqual(await badges(), ["1", "0", "0", "0"], "réservation annulée non comptée");
+    assert.deepStrictEqual(await badges(), ["1", "0", "0", "1", "0"], "réservation annulée non comptée");
 
     // --- Suppression ---
     await page.click("#tableOperationsBody tr:first-child button");
@@ -145,19 +145,27 @@ const repo = process.argv[2];
     await page.click("#btnConfirmerSuppression");
     await attendre(page);
     assert.match(await toast(), /Opération supprimée/);
-    assert.strictEqual(lignes(env, "Operations").length, 3);
-    assert.deepStrictEqual(lignes(env, "Reservations"), [], "réservations supprimées avec l'offre");
-    assert.deepStrictEqual(lignes(env, "Articles"), [], "articles supprimés avec l'offre");
+    assert.strictEqual(lignes(env, "Operations").length, 4);
+    assert.deepStrictEqual(
+      lignes(env, "Reservations").map((r) => r[2]),
+      ["Ancien"],
+      "réservations de l'offre supprimées, pas les autres"
+    );
+    assert.deepStrictEqual(
+      lignes(env, "Articles").map((a) => a[2]),
+      ["Frangipane"],
+      "articles de l'offre supprimés, pas les autres"
+    );
     // Échec de la suppression : message affiché
     assert.ok(await page.isVisible("#modalOperations"), "la liste des offres reste ouverte");
-    assert.deepStrictEqual(await badges(), ["0", "0", "0"]);
+    assert.deepStrictEqual(await badges(), ["0", "0", "1", "0"]);
     env.pannes.deleteOperation = "Feuille protégée";
     await page.click("#tableOperationsBody tr:first-child button");
     await attendre(page);
     await page.click("#btnConfirmerSuppression");
     await attendre(page);
     assert.match(await toast(), /Feuille protégée/);
-    assert.strictEqual(lignes(env, "Operations").length, 3);
+    assert.strictEqual(lignes(env, "Operations").length, 4);
 
     assert.strictEqual(await page.evaluate(() => window.__xss || 0), 0, "aucun code injecté");
     assert.deepStrictEqual(o.erreursPage, [], "aucune erreur dans la page");

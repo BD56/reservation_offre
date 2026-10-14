@@ -2,10 +2,12 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Reservations_() {
-  return "2026.10.14-1959";
+  return "2026.10.14-2030";
 }
 
 // --- SAUVEGARDER UNE NOUVELLE RÉSERVATION ---
+// La page l'affiche tout de suite et l'envoie en arrière-plan avec son propre identifiant
+// (data.idRes) : renvoyée après une réponse perdue, elle n'est pas écrite deux fois.
 function saveReservation(data) {
   if (!data || !data.operationId) throw new Error("Aucune offre sélectionnée.");
   if (!String(data.nom || "").trim() || !String(data.prenom || "").trim()) {
@@ -19,15 +21,22 @@ function saveReservation(data) {
     if (!operationExiste_(data.operationId)) {
       throw new Error("Cette offre n'existe plus. Rechargez la page.");
     }
+    const sheetRes = feuille_(FEUILLE_RESERVATIONS);
+    const idRes = FORMAT_ID_RES.test(String(data.idRes || "")) ? data.idRes : nouvelId_("RES");
+    const dejaEcrite = sheetRes
+      .getDataRange()
+      .getValues()
+      .some(function (row) {
+        return String(row[RES.ID]).trim() === idRes;
+      });
+    if (dejaEcrite) return { idRes: idRes, dejaEnregistree: true };
 
-    const idRes = nouvelId_("RES");
     const dateSaisie = Utilities.formatDate(new Date(), fuseau_(), "dd/MM/yyyy HH:mm");
-
     let contact = String(data.telephone || "").trim();
     const email = String(data.email || "").trim();
     if (email) contact += (contact ? " / " : "") + email;
 
-    feuille_(FEUILLE_RESERVATIONS).appendRow([
+    sheetRes.appendRow([
       idRes,
       data.operationId,
       texte_(data.nom),
@@ -37,15 +46,24 @@ function saveReservation(data) {
       dateSaisie,
     ]);
 
-    const sheetArt = feuille_(FEUILLE_ARTICLES);
-    (data.articles || []).forEach(function (art) {
-      const qte = parseInt(art.quantite, 10);
-      if (!String(art.nom || "").trim() || !(qte > 0)) return;
-      const idArt = "ART-" + Utilities.getUuid().substring(0, 8);
-      sheetArt.appendRow([idArt, idRes, texte_(art.nom), qte]);
-    });
-
-    return true;
+    // Articles écrits en une fois
+    const articles = (data.articles || [])
+      .filter(function (art) {
+        return String(art.nom || "").trim() && parseInt(art.quantite, 10) > 0;
+      })
+      .map(function (art) {
+        return [
+          "ART-" + Utilities.getUuid().substring(0, 8),
+          idRes,
+          texte_(art.nom),
+          parseInt(art.quantite, 10),
+        ];
+      });
+    if (articles.length) {
+      const sheetArt = feuille_(FEUILLE_ARTICLES);
+      sheetArt.getRange(sheetArt.getLastRow() + 1, 1, articles.length, 4).setValues(articles);
+    }
+    return { idRes: idRes, dateSaisie: dateSaisie };
   });
 }
 

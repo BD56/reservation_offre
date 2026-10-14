@@ -2,14 +2,17 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Application_() {
-  return "2026.10.14-1959";
+  return "2026.10.14-2030";
 }
 
 function doGet() {
   // Fichier manquant ou resté à l'ancienne version : on n'ouvre pas une application à moitié
   const problemes = problemesInstallation_();
   if (problemes.length) return pageInstallationIncomplete_(problemes);
-  return HtmlService.createTemplateFromFile("Index")
+  const page = HtmlService.createTemplateFromFile("Index");
+  // Offres et réservations glissées dans la page : affichage immédiat, sans appel au serveur
+  page.copieJson = jsonPourPage_(copieSure_());
+  return page
     .evaluate()
     .setTitle("Application de Réservations")
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
@@ -88,4 +91,26 @@ function feuille_(nomFeuille) {
 // Lignes d'un onglet sans l'en-tête
 function lignes_(nomFeuille) {
   return feuille_(nomFeuille).getDataRange().getValues().slice(1);
+}
+
+// Réécrit un onglet en une fois en ne gardant que les lignes voulues (beaucoup plus rapide
+// que de supprimer les lignes une à une). Les textes sont réécrits en texte (apostrophe :
+// le 0 d'un téléphone ou un « = » restent tels quels). Renvoie le nombre de lignes retirées.
+function reecrire_(feuille, garder) {
+  const valeurs = feuille.getDataRange().getValues();
+  const corps = valeurs.slice(1);
+  const gardees = corps.filter(garder);
+  if (gardees.length === corps.length) return 0;
+  const nbColonnes = valeurs[0].length;
+  feuille.getRange(2, 1, corps.length, nbColonnes).clearContent();
+  if (gardees.length) {
+    feuille.getRange(2, 1, gardees.length, nbColonnes).setValues(
+      gardees.map(function (row) {
+        return row.map(function (v) {
+          return typeof v === "string" && v !== "" ? "'" + v : v;
+        });
+      })
+    );
+  }
+  return corps.length - gardees.length;
 }

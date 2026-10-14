@@ -62,10 +62,10 @@ try {
   assert.deepStrictEqual(
     publiques.sort(),
     [
+      "chargerCopie",
       "deleteOperation",
       "doGet",
       "getOperationDetails",
-      "getOperationsData",
       "saveOperation",
       "saveReservation",
       "updateOperation",

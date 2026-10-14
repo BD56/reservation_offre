@@ -1,7 +1,9 @@
 // Réservations côté serveur : contrôles, écriture en texte (0 du téléphone, formules),
-// articles, offre supprimée entre-temps, changement d'état.
+// articles écrits en une fois, identifiant donné par la page (réessai sans double), offre
+// supprimée entre-temps, changement d'état.
 const assert = require("assert");
 const { makeEnv, lignes } = require("./mocks");
+const J = (x) => JSON.parse(JSON.stringify(x));
 const repo = process.argv[2];
 try {
   const env = makeEnv({ repo });
@@ -37,7 +39,9 @@ try {
   assert.strictEqual(env.verrous, 0);
 
   // --- Enregistrement ---
-  assert.strictEqual(c.saveReservation(resa()), true);
+  const rep = J(c.saveReservation(resa()));
+  assert.match(rep.idRes, /^RES-\d+-[0-9a-f]{4}$/, "identifiant créé par le serveur si absent");
+  assert.match(rep.dateSaisie, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
   let r = lignes(env, "Reservations");
   assert.strictEqual(r.length, 1);
   assert.match(r[0][0], /^RES-\d+-[0-9a-f]{4}$/);
@@ -80,13 +84,56 @@ try {
   assert.strictEqual(d.reservations[0].contact, "0612345678");
   assert.strictEqual(d.reservations[1].nom, "=HYPERLINK(1)");
 
+  // --- Identifiant donné par la page : un réessai n'écrit pas deux fois ---
+  const idPage = "RES-1792000000000-ab12";
+  const r1 = J(c.saveReservation(resa({ idRes: idPage, nom: "Réessai" })));
+  assert.strictEqual(r1.idRes, idPage);
+  const nbArticles = lignes(env, "Articles").length;
+  const r2 = J(c.saveReservation(resa({ idRes: idPage, nom: "Réessai" })));
+  assert.deepStrictEqual(r2, { idRes: idPage, dejaEnregistree: true });
+  assert.strictEqual(lignes(env, "Reservations").filter((x) => x[0] === idPage).length, 1, "pas de double");
+  assert.strictEqual(lignes(env, "Articles").length, nbArticles, "articles pas en double");
+  // Identifiant mal formé (bricolé) : ignoré, le serveur en crée un
+  const r3 = J(c.saveReservation(resa({ idRes: "=1+1", nom: "Bricolé" })));
+  assert.match(r3.idRes, /^RES-\d+-[0-9a-f]{4}$/);
+  // Plusieurs articles écrits en une fois, à la suite
+  c.saveReservation(
+    resa({
+      nom: "Multi",
+      articles: [
+        { nom: "A", quantite: 1 },
+        { nom: "B", quantite: 2 },
+        { nom: "C", quantite: 3 },
+      ],
+    })
+  );
+  const idMulti = lignes(env, "Reservations").slice(-1)[0][0];
+  assert.deepStrictEqual(
+    lignes(env, "Articles")
+      .slice(-3)
+      .map((x) => [x[1], x[2], x[3]]),
+    [
+      [idMulti, "A", 1],
+      [idMulti, "B", 2],
+      [idMulti, "C", 3],
+    ]
+  );
+  assert.ok(
+    new Set(lignes(env, "Articles").map((x) => x[0])).size === lignes(env, "Articles").length,
+    "ID d'articles uniques"
+  );
+
   // --- Changement d'état ---
   const idRes = r[0][0];
   assert.throws(() => c.updateReservationStatus(idRes, "Perdu"), /État inconnu/);
   assert.throws(() => c.updateReservationStatus("RES-INCONNUE", "Retrait"), /introuvable/);
   c.updateReservationStatus(idRes, "Annulé");
   assert.strictEqual(lignes(env, "Reservations")[0][5], "Annulé");
-  assert.strictEqual(c.getOperationsData()[0].count, 1, "annulée retirée du compteur");
+  assert.strictEqual(
+    J(c.chargerCopie()).operations[0].count,
+    4,
+    "annulée retirée du compteur (5 réservations, 1 annulée)"
+  );
   assert.strictEqual(env.verrous, 0);
   console.log("test_reservations : OK");
 } catch (e) {

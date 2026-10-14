@@ -1,0 +1,234 @@
+<!-- Copie locale (offres + réservations des offres actives), envois en arrière-plan, doublons. -->
+<script data-version="2026.10.14-2030">
+  // Copie reçue du serveur : { operations: [...], reservations: { idOp: [...] } }. Seules les
+  // offres actives ont leurs réservations dans la copie ; celles d'une offre terminée sont
+  // chargées à la demande dans horsCopie.
+  let copie = { operations: [], reservations: {} };
+  let copieRecueA = 0;
+  let seqCopie = 0; // seule la réponse la plus récente est appliquée
+  const horsCopie = {};
+  // Réservations affichées mais pas encore confirmées par le serveur : idRes -> { data, res }
+  const enAttente = {};
+  // Envois refusés ou perdus, présentés un par un dans « Réservation NON enregistrée »
+  const echecsEnvoi = [];
+
+  const AGE_MAX_COPIE = 30 * 1000; // retour sur la fenêtre : recharger si plus ancienne
+  const RECHARGEMENT_AUTO = 2 * 60 * 1000; // 2 PC à l'accueil : voir les saisies de l'autre
+
+  function reservationsDe(idOp) {
+    return copie.reservations[idOp] || horsCopie[idOp] || null;
+  }
+
+  function trouverOffre(idOp) {
+    return copie.operations.find((op) => op.id === idOp) || null;
+  }
+
+  // Nombre de réservations non annulées (envois en cours compris)
+  function compteOffre(op) {
+    const liste = reservationsDe(op.id);
+    return liste ? liste.filter((r) => r.etat !== "Annulé").length : op.count;
+  }
+
+  function appliquerCopie(c) {
+    if (!c) return;
+    copie = { operations: c.operations || [], reservations: c.reservations || {} };
+    copieRecueA = Date.now();
+    // Une réservation envoyée mais pas encore lue par cette copie reste affichée
+    Object.keys(enAttente).forEach((idRes) => ajouterALaCopie(enAttente[idRes].res));
+    afficherDonnees();
+    rafraichirDetailOuvert();
+  }
+
+  // Copie renvoyée par une modification (offre créée, modifiée, supprimée) : plus récente
+  // que tout rechargement en cours.
+  function appliquerCopieServeur(c) {
+    seqCopie++;
+    appliquerCopie(c);
+  }
+
+  function rechargerCopie(siEchec) {
+    const seq = ++seqCopie;
+    google.script.run
+      .withSuccessHandler(function (c) {
+        if (seq === seqCopie) appliquerCopie(c);
+      })
+      .withFailureHandler(function (e) {
+        // Sans réseau, la copie actuelle reste utilisable
+        if (siEchec) siEchec(e);
+      })
+      .chargerCopie();
+  }
+
+  function surveillerCopie() {
+    const siAncienne = function () {
+      if (document.visibilityState === "visible" && Date.now() - copieRecueA > AGE_MAX_COPIE) {
+        rechargerCopie();
+      }
+    };
+    window.addEventListener("focus", siAncienne);
+    document.addEventListener("visibilitychange", siAncienne);
+    setInterval(function () {
+      if (document.visibilityState === "visible") rechargerCopie();
+    }, RECHARGEMENT_AUTO);
+    // Fermer la page pendant un envoi : le navigateur demande confirmation
+    window.addEventListener("beforeunload", function (e) {
+      if (Object.keys(enAttente).length) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+  }
+
+  // Réservations d'une offre terminée : chargées une fois, à la demande
+  function assurerReservations(idOp, ensuite) {
+    if (!idOp || reservationsDe(idOp)) {
+      if (ensuite) ensuite();
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (details) {
+        horsCopie[idOp] = details.reservations;
+        Object.keys(enAttente).forEach((idRes) => ajouterALaCopie(enAttente[idRes].res));
+        afficherDonnees();
+        if (ensuite) ensuite();
+      })
+      .withFailureHandler(function (e) {
+        if (ensuite) showErreur(e);
+      })
+      .getOperationDetails(idOp);
+  }
+
+  function ajouterALaCopie(res) {
+    const liste = reservationsDe(res.idOp);
+    if (liste && !liste.some((r) => r.idRes === res.idRes)) liste.push(res);
+  }
+
+  function retirerDeLaCopie(res) {
+    const liste = reservationsDe(res.idOp);
+    const i = liste ? liste.findIndex((r) => r.idRes === res.idRes) : -1;
+    if (i >= 0) liste.splice(i, 1);
+  }
+
+  // Même format que le serveur (FORMAT_ID_RES) : RES-<heure>-<4 caractères au hasard>
+  function nouvelIdReservation() {
+    const hasard = Array.from(crypto.getRandomValues(new Uint8Array(2)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return "RES-" + Date.now() + "-" + hasard;
+  }
+
+  function maintenantFr() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  // --- ENVOI EN ARRIÈRE-PLAN ---
+  // La réservation est déjà affichée (copie) ; le serveur l'écrit. Réessayer renvoie le même
+  // identifiant : le serveur ne l'écrit pas deux fois.
+  function envoyerReservation(data, res) {
+    enAttente[res.idRes] = { data: data, res: res };
+    res.enAttente = true;
+    ajouterALaCopie(res);
+    majApresEnvoi();
+    google.script.run
+      .withSuccessHandler(function (r) {
+        delete enAttente[res.idRes];
+        res.enAttente = false;
+        if (r && r.dateSaisie) res.dateSaisie = r.dateSaisie;
+        majApresEnvoi();
+      })
+      .withFailureHandler(function (err) {
+        delete enAttente[res.idRes];
+        retirerDeLaCopie(res);
+        echecsEnvoi.push({ data: data, res: res, message: messageErreur(err) });
+        majApresEnvoi();
+        afficherEchecEnvoi();
+        rechargerCopie(); // ex. offre supprimée depuis l'autre poste : la liste se met à jour
+      })
+      .saveReservation(data);
+  }
+
+  function majApresEnvoi() {
+    const n = Object.keys(enAttente).length;
+    const indicateur = document.getElementById("indicateurEnvoi");
+    indicateur.style.display = n ? "block" : "none";
+    indicateur.innerHTML = n
+      ? `<span class="spinner-border spinner-border-sm"></span> ${n} réservation${n > 1 ? "s" : ""} en cours d'envoi…`
+      : "";
+    afficherDonnees();
+    rafraichirDetailOuvert();
+  }
+
+  function afficherEchecEnvoi() {
+    const echec = echecsEnvoi[0];
+    if (!echec) return;
+    const op = trouverOffre(echec.res.idOp);
+    document.getElementById("texteEchecEnvoi").innerHTML = `
+      <p class="mb-2">Le serveur n'a pas enregistré cette réservation :</p>
+      <p class="fw-bold text-danger mb-3">${echapper(echec.message)}</p>
+      <ul class="mb-0">
+        <li>Client : <strong>${echapper(echec.res.nom)} ${echapper(echec.res.prenom)}</strong> (${echapper(echec.res.contact)})</li>
+        <li>Offre : ${echapper(op ? op.nom : echec.res.idOp)}</li>
+        ${echec.res.articles.length ? `<li>Articles : ${echapper(texteArticles(echec.res))}</li>` : ""}
+      </ul>`;
+    modal("modalEchecEnvoi").show();
+  }
+
+  document.getElementById("btnReessayerEnvoi").addEventListener("click", function () {
+    const echec = echecsEnvoi.shift();
+    modal("modalEchecEnvoi").hide();
+    if (echec) envoyerReservation(echec.data, echec.res);
+    setTimeout(afficherEchecEnvoi, 400);
+  });
+  document.getElementById("btnAbandonnerEnvoi").addEventListener("click", function () {
+    echecsEnvoi.shift();
+    modal("modalEchecEnvoi").hide();
+    setTimeout(afficherEchecEnvoi, 400);
+  });
+
+  // --- DOUBLONS ---
+  // Noms comparés sans accents, espaces, tirets ni apostrophes ; téléphones sur leurs chiffres
+  // (+33 / 0033 -> 0) ; emails en minuscules.
+  function normNom(t) {
+    return String(t || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/Œ/g, "OE")
+      .replace(/Æ/g, "AE")
+      .replace(/[^A-Z0-9]/g, "");
+  }
+
+  function normTel(t) {
+    let d = String(t).replace(/\D/g, "");
+    if (/^0033\d{9}$/.test(d)) d = "0" + d.slice(4);
+    else if (/^33\d{9}$/.test(d)) d = "0" + d.slice(2);
+    else if (/^\d{9}$/.test(d)) d = "0" + d; // ancien numéro enregistré sans son 0
+    return d;
+  }
+
+  function clesContact(texte) {
+    return String(texte || "")
+      .split("/")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => (p.includes("@") ? p.toLowerCase() : normTel(p)))
+      .filter(Boolean);
+  }
+
+  // Réservation non annulée de la même offre, même nom et prénom, et même téléphone ou email
+  function chercherDoublon(data) {
+    const liste = reservationsDe(data.operationId) || [];
+    const cles = clesContact(data.telephone + " / " + data.email);
+    return (
+      liste.find(
+        (r) =>
+          r.etat !== "Annulé" &&
+          normNom(r.nom) === normNom(data.nom) &&
+          normNom(r.prenom) === normNom(data.prenom) &&
+          clesContact(r.contact).some((k) => cles.includes(k))
+      ) || null
+    );
+  }
+</script>

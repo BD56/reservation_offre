@@ -1,8 +1,9 @@
-// Offres (onglet « Operations ») : liste, détail, création, modification, suppression.
+// Offres (onglet « Operations ») : détail, création, modification, suppression.
+// La liste des offres est dans la copie de la page (Copie.gs).
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Operations_() {
-  return "2026.10.14-1959";
+  return "2026.10.14-2030";
 }
 
 function verifierOffre_(data) {
@@ -28,100 +29,22 @@ function operationExiste_(idOp) {
   });
 }
 
-// --- LIRE LES OPÉRATIONS ---
-function getOperationsData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss.getSheetByName(FEUILLE_OPERATIONS) || !ss.getSheetByName(FEUILLE_RESERVATIONS)) return [];
-
-  // On ne compte que les réservations actives (les annulées sont exclues)
-  const compteReservations = {};
-  lignes_(FEUILLE_RESERVATIONS).forEach(function (row) {
-    const idOp = String(row[RES.OP]).trim();
-    if (idOp && row[RES.ETAT] !== ETAT_ANNULE) {
-      compteReservations[idOp] = (compteReservations[idOp] || 0) + 1;
-    }
-  });
-
-  return lignes_(FEUILLE_OPERATIONS)
-    .map(function (row) {
-      const id = String(row[OP.ID]).trim();
-      return {
-        id: id,
-        nom: String(row[OP.NOM] || ""),
-        type: String(row[OP.TYPE] || ""),
-        dateDebut: formaterDate_(row[OP.DEBUT], "dd/MM/yyyy"),
-        dateFin: formaterDate_(row[OP.FIN], "dd/MM/yyyy"),
-        modeSaisie: row[OP.MODE] || "Libre",
-        articlesPredefinis: String(row[OP.ARTICLES] || ""),
-        count: compteReservations[id] || 0,
-      };
-    })
-    .filter(function (op) {
-      return op.id !== "";
-    });
-}
-
-// --- RÉCUPÉRER LES DÉTAILS D'UNE OFFRE ET SES RÉSERVATIONS ---
-// Le résumé des quantités est calculé côté page (il suit les changements d'état).
+// --- DÉTAIL D'UNE OFFRE (offres terminées : les actives sont déjà dans la copie) ---
 function getOperationDetails(idOp) {
   const cible = String(idOp).trim();
-
-  // 1. Chercher l'opération
   const row = lignes_(FEUILLE_OPERATIONS).find(function (r) {
     return String(r[OP.ID]).trim() === cible;
   });
   if (!row) throw new Error("Opération introuvable.");
-  const opData = {
-    id: String(row[OP.ID] || ""),
-    nom: String(row[OP.NOM] || ""),
-    type: String(row[OP.TYPE] || ""),
-    dateDebut: formaterDate_(row[OP.DEBUT], "yyyy-MM-dd"),
-    dateFin: formaterDate_(row[OP.FIN], "yyyy-MM-dd"),
-    modeSaisie: String(row[OP.MODE] || ""),
-    articlesPredefinis: String(row[OP.ARTICLES] || ""),
-  };
-
-  // 2. Chercher les réservations
-  const reservations = lignes_(FEUILLE_RESERVATIONS)
-    .filter(function (r) {
-      return String(r[RES.OP]).trim() === cible;
-    })
-    .map(function (r) {
-      return {
-        idRes: String(r[RES.ID] || "").trim(),
-        nom: String(r[RES.NOM] || ""),
-        prenom: String(r[RES.PRENOM] || ""),
-        contact: formaterContact_(r[RES.CONTACT]),
-        etat: String(r[RES.ETAT] || ""),
-        dateSaisie: formaterDate_(r[RES.DATE], "dd/MM/yyyy HH:mm"),
-        articles: [],
-      };
-    });
-
-  // 3. Rattacher les articles à chaque réservation
-  if (reservations.length > 0) {
-    const parId = {};
-    reservations.forEach(function (res) {
-      parId[res.idRes] = res;
-    });
-    lignes_(FEUILLE_ARTICLES).forEach(function (r) {
-      const res = parId[String(r[ART.RES]).trim()];
-      const nomArt = String(r[ART.NOM] || "").trim();
-      if (res && nomArt) res.articles.push({ nom: nomArt, quantite: parseInt(r[ART.QTE], 10) || 0 });
-    });
-  }
-
-  return { operation: opData, reservations: reservations };
+  return { operation: versOperation_(row), reservations: reservationsDesOffres_([cible])[cible] };
 }
 
-// --- CRÉER UNE NOUVELLE OFFRE ---
+// --- CRÉER UNE NOUVELLE OFFRE --- (renvoie la copie à jour)
 function saveOperation(data) {
   verifierOffre_(data);
-
-  return avecVerrou_(function () {
-    const newId = nouvelId_("OP");
+  avecVerrou_(function () {
     feuille_(FEUILLE_OPERATIONS).appendRow([
-      newId,
+      nouvelId_("OP"),
       texte_(data.nom),
       data.type,
       data.dateDebut,
@@ -129,18 +52,16 @@ function saveOperation(data) {
       data.modeSaisie,
       texte_(data.articlesPredefinis),
     ]);
-    return true;
   });
+  return copie_();
 }
 
-// --- METTRE À JOUR UNE OPÉRATION ---
+// --- METTRE À JOUR UNE OPÉRATION --- (renvoie la copie à jour)
 function updateOperation(data) {
   verifierOffre_(data);
-
-  return avecVerrou_(function () {
+  avecVerrou_(function () {
     const feuille = feuille_(FEUILLE_OPERATIONS);
     const dataOps = feuille.getDataRange().getValues();
-
     for (let i = 1; i < dataOps.length; i++) {
       if (String(dataOps[i][OP.ID]).trim() === String(data.id).trim()) {
         // Colonnes B à G (Nom … Articles prédéfinis) de cette ligne
@@ -156,53 +77,36 @@ function updateOperation(data) {
               texte_(data.articlesPredefinis),
             ],
           ]);
-        return true;
+        return;
       }
     }
     throw new Error("Impossible de trouver l'opération pour la mettre à jour.");
   });
+  return copie_();
 }
 
-// --- SUPPRIMER UNE OPÉRATION ET TOUTES SES RÉSERVATIONS (suppression en cascade) ---
+// --- SUPPRIMER UNE OPÉRATION ET TOUTES SES RÉSERVATIONS --- (renvoie la copie à jour)
+// Chaque onglet est réécrit en une fois (supprimer les lignes une à une prenait
+// plusieurs secondes par centaine de lignes).
 function deleteOperation(idOp) {
-  return avecVerrou_(function () {
-    const cible = String(idOp).trim();
+  const cible = String(idOp).trim();
+  avecVerrou_(function () {
+    const retirees = reecrire_(feuille_(FEUILLE_OPERATIONS), function (row) {
+      return String(row[OP.ID]).trim() !== cible;
+    });
+    if (!retirees) throw new Error("L'ID '" + idOp + "' est introuvable dans l'onglet Operations.");
 
-    // 1. Supprimer l'opération
-    const sheetOps = feuille_(FEUILLE_OPERATIONS);
-    const dataOps = sheetOps.getDataRange().getValues();
-    let operationTrouvee = false;
-    for (let i = dataOps.length - 1; i > 0; i--) {
-      if (String(dataOps[i][OP.ID]).trim() === cible) {
-        sheetOps.deleteRow(i + 1);
-        operationTrouvee = true;
-        break;
-      }
-    }
-    if (!operationTrouvee) {
-      throw new Error("L'ID '" + idOp + "' est introuvable dans l'onglet Operations.");
-    }
-
-    // 2. Supprimer les réservations liées (en partant du bas pour ne pas décaler les index)
-    const sheetRes = feuille_(FEUILLE_RESERVATIONS);
-    const dataRes = sheetRes.getDataRange().getValues();
     const idsReservations = {};
-    for (let i = dataRes.length - 1; i > 0; i--) {
-      if (String(dataRes[i][RES.OP]).trim() === cible) {
-        idsReservations[String(dataRes[i][RES.ID]).trim()] = true;
-        sheetRes.deleteRow(i + 1);
-      }
+    reecrire_(feuille_(FEUILLE_RESERVATIONS), function (row) {
+      if (String(row[RES.OP]).trim() !== cible) return true;
+      idsReservations[String(row[RES.ID]).trim()] = true;
+      return false;
+    });
+    if (Object.keys(idsReservations).length) {
+      reecrire_(feuille_(FEUILLE_ARTICLES), function (row) {
+        return !idsReservations[String(row[ART.RES]).trim()];
+      });
     }
-
-    // 3. Supprimer les articles de ces réservations
-    if (Object.keys(idsReservations).length > 0) {
-      const sheetArt = feuille_(FEUILLE_ARTICLES);
-      const dataArt = sheetArt.getDataRange().getValues();
-      for (let i = dataArt.length - 1; i > 0; i--) {
-        if (idsReservations[String(dataArt[i][ART.RES]).trim()]) sheetArt.deleteRow(i + 1);
-      }
-    }
-
-    return true;
   });
+  return copie_();
 }

@@ -1,7 +1,69 @@
-<!-- Gestion des offres : création, détail, modification, état des réservations, suppression. -->
-<script data-version="2026.10.14-1959">
-  // Offre ouverte dans la fenêtre de détail (sert aussi à l'impression)
-  let currentOperationDetails = null;
+<!-- Gestion des offres : listes, détail, état des réservations, création, modification, suppression. -->
+<script data-version="2026.10.14-2030">
+  // Offre ouverte dans la fenêtre de détail (null si fermée)
+  let idOffreOuverte = null;
+  let signatureDetail = "";
+
+  // Liste déroulante du formulaire + liste « Gérer les Opérations », depuis la copie
+  function afficherDonnees() {
+    const operations = copie.operations;
+    const select = document.getElementById("operationSelect");
+    const tbody = document.getElementById("tableOperationsBody");
+    const selectionPrecedente = select.value;
+    select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
+    tbody.innerHTML = "";
+
+    if (operations.length === 0) {
+      select.innerHTML = '<option value="" disabled selected>Aucune offre disponible</option>';
+      tbody.innerHTML =
+        '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+      gererAffichageProduits();
+      return;
+    }
+
+    operations.forEach((op) => {
+      const option = document.createElement("option");
+      option.value = op.id;
+      option.setAttribute("data-type", op.type);
+      option.setAttribute("data-mode", op.modeSaisie);
+      option.setAttribute("data-articles", op.articlesPredefinis);
+      option.textContent = `[${op.type}] ${op.nom}`;
+      select.appendChild(option);
+
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.onclick = function () {
+        voirReservationsDetail(op.id);
+      };
+
+      const nombre = compteOffre(op);
+      const infoMode =
+        op.type === "Produit" ? `<small class="text-muted">Saisie : ${echapper(op.modeSaisie)}</small>` : "";
+
+      tr.innerHTML = `
+        <td class="ps-4"><span class="fw-bold text-dark">${echapper(op.nom)}</span><br>${infoMode}</td>
+        <td><small>Du ${echapper(dateFr(op.dateDebut))}<br>Au ${echapper(dateFr(op.dateFin))}</small></td>
+        <td class="text-center"><span class="badge bg-${nombre > 0 ? "success" : "secondary"} rounded-pill fs-6">${nombre}</span></td>
+        <td class="text-end pe-4">
+          <button class="btn btn-sm btn-outline-danger border-0" title="Supprimer l'offre">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      `;
+      tr.querySelector("button").addEventListener("click", function (event) {
+        event.stopPropagation();
+        demanderSuppression(op.id);
+      });
+      tbody.appendChild(tr);
+    });
+
+    // On conserve l'offre sélectionnée si elle existe toujours, sinon on masque les articles
+    if (selectionPrecedente && operations.some((op) => op.id === selectionPrecedente)) {
+      select.value = selectionPrecedente;
+    } else {
+      gererAffichageProduits();
+    }
+  }
 
   function gererChampsNouvelleOffre(prefix) {
     const type = document.getElementById(prefix + "OpType").value;
@@ -60,11 +122,12 @@
     const btn = document.getElementById("btnSauvegarderOffre");
     btn.disabled = true;
     google.script.run
-      .withSuccessHandler(function () {
+      .withSuccessHandler(function (c) {
+        appliquerCopieServeur(c);
         modal("modalCreerOffre").hide();
         showToast("Nouvelle offre créée !", "success");
         btn.disabled = false;
-        rechargerOperations(() => modal("modalOperations").show());
+        modal("modalOperations").show();
       })
       .withFailureHandler(function (err) {
         showErreur(err);
@@ -73,88 +136,103 @@
       .saveOperation(data);
   }
 
-  // --- DÉTAILS DE L'OFFRE ET STATUTS ---
+  // --- DÉTAIL DE L'OFFRE ---
+  // Offre active : affichée tout de suite depuis la copie. Offre terminée : chargée une fois.
   function voirReservationsDetail(idOperation) {
     modal("modalOperations").hide();
-    showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
+    const op = trouverOffre(idOperation);
+    if (!op) return;
+    if (!reservationsDe(idOperation)) {
+      showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
+    }
+    assurerReservations(idOperation, function () {
+      idOffreOuverte = idOperation;
+      signatureDetail = "";
+      document.getElementById("editOpId").value = op.id;
+      document.getElementById("editOpNom").value = op.nom;
+      document.getElementById("editOpType").value = op.type;
+      document.getElementById("editOpMode").value = op.modeSaisie || "Libre";
+      document.getElementById("editOpDateDebut").value = op.dateDebut;
+      document.getElementById("editOpDateFin").value = op.dateFin;
+      document.getElementById("editOpArticles").value = op.articlesPredefinis;
+      gererChampsNouvelleOffre("edit");
+      rafraichirDetailOuvert();
+      modal("modalDetailOffre").show();
+    });
+  }
 
-    google.script.run
-      .withSuccessHandler(function (details) {
-        currentOperationDetails = details;
-        const op = details.operation;
+  document.getElementById("modalDetailOffre").addEventListener("hidden.bs.modal", function () {
+    idOffreOuverte = null;
+  });
 
-        document.getElementById("detailModalTitle").innerHTML =
-          `<i class="bi bi-box-seam"></i> ${echapper(op.nom)}`;
-        document.getElementById("editOpId").value = op.id;
-        document.getElementById("editOpNom").value = op.nom;
-        document.getElementById("editOpType").value = op.type;
-        document.getElementById("editOpMode").value = op.modeSaisie || "Libre";
-        document.getElementById("editOpDateDebut").value = op.dateDebut;
-        document.getElementById("editOpDateFin").value = op.dateFin;
-        document.getElementById("editOpArticles").value = op.articlesPredefinis;
-        gererChampsNouvelleOffre("edit");
+  // Offre ouverte + ses réservations (sert aussi à l'impression)
+  function detailsOffreOuverte() {
+    const op = idOffreOuverte && trouverOffre(idOffreOuverte);
+    return op ? { operation: op, reservations: reservationsDe(op.id) || [] } : null;
+  }
 
-        const tbody = document.getElementById("tableInscritsBody");
-        tbody.innerHTML = "";
+  // Redessine la liste des inscrits (après un rechargement de la copie, un envoi…), seulement
+  // si elle a changé : un menu « État » en cours d'utilisation n'est pas recréé pour rien.
+  function rafraichirDetailOuvert() {
+    const details = detailsOffreOuverte();
+    if (!details) return;
+    const signature = JSON.stringify(details);
+    if (signature === signatureDetail) return;
+    signatureDetail = signature;
+    document.getElementById("detailModalTitle").innerHTML =
+      `<i class="bi bi-box-seam"></i> ${echapper(details.operation.nom)}`;
 
-        if (details.reservations.length === 0) {
-          tbody.innerHTML =
-            '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
-        } else {
-          details.reservations.forEach((res) => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-              <td><span class="fw-bold">${echapper(res.nom)} ${echapper(res.prenom)}</span><br><small>Saisi le ${echapper(res.dateSaisie)}</small></td>
-              <td>${echapper(res.contact)}</td>
-              <td><small>${echapper(texteArticles(res)) || "-"}</small></td>
-              <td>
-                <select class="form-select form-select-sm fw-bold border-secondary text-secondary">
-                  ${["Réservé", "Contacté", "Retrait", "Annulé"].map((etat) => `<option value="${etat}" ${res.etat === etat ? "selected" : ""}>${etat}</option>`).join("")}
-                </select>
-              </td>
-            `;
-            const select = tr.querySelector("select");
-            select.addEventListener("change", function () {
-              changerStatutReservation(res.idRes, select);
-            });
-            tbody.appendChild(tr);
-          });
-        }
-        modal("modalDetailOffre").show();
-      })
-      .withFailureHandler(showErreur)
-      .getOperationDetails(idOperation);
+    const tbody = document.getElementById("tableInscritsBody");
+    tbody.innerHTML = "";
+    if (details.reservations.length === 0) {
+      tbody.innerHTML =
+        '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
+      return;
+    }
+    details.reservations.forEach((res) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="fw-bold">${echapper(res.nom)} ${echapper(res.prenom)}</span><br><small>Saisi le ${echapper(res.dateSaisie)}</small></td>
+        <td>${echapper(res.contact)}</td>
+        <td><small>${echapper(texteArticles(res)) || "-"}</small></td>
+        <td>
+          <select class="form-select form-select-sm fw-bold border-secondary text-secondary" ${res.enAttente ? "disabled" : ""}>
+            ${["Réservé", "Contacté", "Retrait", "Annulé"].map((etat) => `<option value="${etat}" ${res.etat === etat ? "selected" : ""}>${etat}</option>`).join("")}
+          </select>
+          ${res.enAttente ? '<small class="text-muted">envoi en cours…</small>' : ""}
+        </td>
+      `;
+      const select = tr.querySelector("select");
+      select.addEventListener("change", function () {
+        changerStatutReservation(res, select);
+      });
+      tbody.appendChild(tr);
+    });
   }
 
   function texteArticles(res) {
     return res.articles.map((a) => `${a.quantite}x ${a.nom}`).join(", ");
   }
 
-  // Fonction d'enregistrement à la volée du statut
-  function changerStatutReservation(idRes, select) {
+  // État changé tout de suite à l'écran (et dans la copie) ; remis comme avant si le serveur refuse
+  function changerStatutReservation(res, select) {
+    const ancienStatut = res.etat;
     const nouveauStatut = select.value;
-    const resToUpdate = currentOperationDetails
-      ? currentOperationDetails.reservations.find((r) => r.idRes === idRes)
-      : null;
-    const ancienStatut = resToUpdate ? resToUpdate.etat : null;
-
-    select.disabled = true;
-    showToast("<span class='spinner-border spinner-border-sm'></span> Mise à jour du statut...", "info");
+    res.etat = nouveauStatut;
+    signatureDetail = JSON.stringify(detailsOffreOuverte());
+    afficherDonnees(); // compteurs (les annulées ne comptent pas)
     google.script.run
       .withSuccessHandler(function () {
-        select.disabled = false;
         showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
-
-        // Mise à jour de la donnée "en mémoire" pour que l'impression reflète le changement sans recharger
-        if (resToUpdate) resToUpdate.etat = nouveauStatut;
-        rechargerOperations(); // le compteur de réservations exclut les annulées
       })
       .withFailureHandler(function (err) {
-        select.disabled = false;
-        if (ancienStatut) select.value = ancienStatut; // on remet l'ancien statut affiché
+        res.etat = ancienStatut;
+        select.value = ancienStatut;
+        afficherDonnees();
+        rafraichirDetailOuvert();
         showErreur(err);
       })
-      .updateReservationStatus(idRes, nouveauStatut);
+      .updateReservationStatus(res.idRes, nouveauStatut);
   }
 
   function sauvegarderModificationOffre() {
@@ -165,13 +243,10 @@
     const btn = document.getElementById("btnUpdateOffre");
     btn.disabled = true;
     google.script.run
-      .withSuccessHandler(function () {
+      .withSuccessHandler(function (c) {
+        appliquerCopieServeur(c);
         showToast("Offre mise à jour !", "success");
         btn.disabled = false;
-        document.getElementById("detailModalTitle").innerHTML =
-          `<i class="bi bi-box-seam"></i> ${echapper(data.nom)}`;
-        if (currentOperationDetails) Object.assign(currentOperationDetails.operation, data);
-        rechargerOperations();
       })
       .withFailureHandler(function (err) {
         showErreur(err);
@@ -192,9 +267,10 @@
     modal("modalConfirmDelete").hide();
     showToast("<span class='spinner-border spinner-border-sm'></span> Suppression en cours...", "info");
     google.script.run
-      .withSuccessHandler(function () {
+      .withSuccessHandler(function (c) {
+        delete horsCopie[id];
+        appliquerCopieServeur(c);
         showToast("Opération supprimée !", "success");
-        rechargerOperations();
       })
       .withFailureHandler(showErreur)
       .deleteOperation(id);

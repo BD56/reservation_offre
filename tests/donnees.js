@@ -1,4 +1,5 @@
-// Jeu de données commun aux tests de la page : trois offres et quelques réservations.
+// Jeu de données commun aux tests de la page : trois offres actives, une terminée, et
+// quelques réservations.
 function preparer(env) {
   const c = env.ctx;
   c.saveOperation({
@@ -25,8 +26,17 @@ function preparer(env) {
     dateFin: "2026-12-10",
     articlesPredefinis: "",
   });
+  c.saveOperation({
+    nom: "Galettes 2025",
+    type: "Produit",
+    modeSaisie: "Libre",
+    dateDebut: "2025-01-02",
+    dateFin: "2025-01-31",
+    articlesPredefinis: "",
+  });
   const ops = env.sheets.Operations.getDataRange().getValues().slice(1);
-  env.ids = { foie: ops[0][0], choco: ops[1][0], atelier: ops[2][0] };
+  env.ids = { foie: ops[0][0], choco: ops[1][0], atelier: ops[2][0], galettes: ops[3][0] };
+
   c.saveReservation({
     operationId: env.ids.foie,
     nom: "O'Brien<img src=x onerror=window.__xss=1>",
@@ -49,5 +59,14 @@ function preparer(env) {
   const res = env.sheets.Reservations.getDataRange().getValues().slice(1);
   env.ids.resObrien = res[0][0];
   env.ids.resDupont = res[1][0];
+  // Offre terminée (Galettes 2025) avec une réservation
+  c.saveReservation({
+    operationId: env.ids.galettes,
+    nom: "Ancien",
+    prenom: "Client",
+    telephone: "0699999999",
+    email: "",
+    articles: [{ nom: "Frangipane", quantite: 1 }],
+  });
 }
 module.exports = { preparer };

@@ -20,6 +20,7 @@ const repo = process.argv[2];
       '[Produit] Foie <b>gras</b> "Noël"',
       "[Produit] Chocolats",
       "[Evenement] Atelier",
+      "[Produit] Galettes 2025",
     ]);
 
     // --- Offre prédéfinie ---
@@ -44,20 +45,20 @@ const repo = process.argv[2];
     await page.click("#btnValiderReservation");
     await attendre(page, 150);
     assert.match(await toast(), /au moins un article/);
-    assert.strictEqual(lignes(env, "Reservations").length, 2, "rien d'envoyé");
+    assert.strictEqual(lignes(env, "Reservations").length, 3, "rien d'envoyé");
     // Quantité saisie : enregistré
     await page.fill(".quantite-article >> nth=1", "3");
     await page.click("#btnValiderReservation");
     await attendre(page);
     assert.match(await toast(), /Réservation enregistrée/);
     let r = lignes(env, "Reservations");
-    assert.strictEqual(r.length, 3);
-    assert.deepStrictEqual(r[2].slice(2, 6), ["Martin", "Léa", "06 12 34 56 78", "Réservé"]);
+    assert.strictEqual(r.length, 4);
+    assert.deepStrictEqual(r[3].slice(2, 6), ["Martin", "Léa", "06 12 34 56 78", "Réservé"]);
     assert.deepStrictEqual(
       lignes(env, "Articles")
         .slice(-1)
         .map((a) => [a[1], a[2], a[3]]),
-      [[r[2][0], "L'entier", 3]],
+      [[r[3][0], "L'entier", 3]],
       "seule la ligne avec une quantité est enregistrée"
     );
     // Formulaire vidé, offre à resélectionner, compteur à jour
@@ -87,18 +88,20 @@ const repo = process.argv[2];
     await page.click(".ligne-produit >> nth=2 >> button");
     await page.fill(".nom-article >> nth=1", "Truffes");
     await page.fill(".quantite-article >> nth=1", "1");
-    // Échec du serveur : message, bouton rendu, saisie conservée
+    // Échec du serveur : fenêtre « NON enregistrée » avec le détail, puis RÉESSAYER
     env.pannes.saveReservation = "Service <indisponible>";
     await page.click("#btnValiderReservation");
-    await attendre(page);
-    assert.match(await toast(), /Erreur : Service <indisponible>/, "message du serveur affiché en texte");
-    assert.strictEqual(await page.isEnabled("#btnValiderReservation"), true);
-    assert.strictEqual(await page.inputValue("#nomClient"), "Petit", "saisie conservée après un échec");
+    await attendre(page, 700);
+    assert.ok(await page.isVisible("#modalEchecEnvoi"), "fenêtre d'échec");
+    const texteEchec = await page.textContent("#texteEchecEnvoi");
+    assert.match(texteEchec, /Service <indisponible>/, "message du serveur affiché en texte");
+    assert.match(texteEchec, /Petit Paul[\s\S]*Chocolats[\s\S]*2x Ballotin 500g, 1x Truffes/);
     delete env.pannes.saveReservation;
-    await page.click("#btnValiderReservation");
-    await attendre(page);
+    await page.click("#btnReessayerEnvoi");
+    await attendre(page, 700);
+    assert.ok(!(await page.isVisible("#modalEchecEnvoi")));
     r = lignes(env, "Reservations");
-    assert.strictEqual(r[3][4], "paul@exemple.fr");
+    assert.strictEqual(r[4][4], "paul@exemple.fr");
     assert.deepStrictEqual(
       lignes(env, "Articles")
         .slice(-2)
@@ -118,10 +121,11 @@ const repo = process.argv[2];
     await page.click("#btnValiderReservation");
     await attendre(page);
     assert.match(await toast(), /Réservation enregistrée/);
-    assert.strictEqual(lignes(env, "Reservations").length, 5);
+    assert.strictEqual(lignes(env, "Reservations").length, 6);
 
     // --- Offre supprimée par un autre poste entre-temps ---
     env.ctx.deleteOperation(env.ids.choco);
+    const nbAvant = lignes(env, "Reservations").length;
     await page.selectOption("#operationSelect", env.ids.choco);
     await page.fill("#nomClient", "Tard");
     await page.fill("#prenomClient", "Ive");
@@ -129,8 +133,12 @@ const repo = process.argv[2];
     await page.fill(".nom-article", "Ballotin");
     await page.fill(".quantite-article", "1");
     await page.click("#btnValiderReservation");
-    await attendre(page);
-    assert.match(await toast(), /n'existe plus/);
+    await attendre(page, 700);
+    assert.match(await page.textContent("#texteEchecEnvoi"), /n'existe plus/);
+    await page.click("#btnAbandonnerEnvoi");
+    await attendre(page, 700);
+    assert.ok(!(await page.isVisible("#modalEchecEnvoi")));
+    assert.strictEqual(lignes(env, "Reservations").length, nbAvant, "rien d'écrit");
 
     assert.strictEqual(await page.evaluate(() => window.__xss || 0), 0, "aucun code injecté");
     assert.deepStrictEqual(o.erreursPage, [], "aucune erreur dans la page");

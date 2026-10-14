@@ -17,6 +17,19 @@
      identifiants uniques (`nouvelId_` : heure + 4 caractères au hasard — deux offres
      créées dans la même milliseconde avaient le même ID, trouvé par les tests),
      contrôle de version (« Installation incomplète »). Aucun changement visible.
+  3. **Étape 2 — rapidité** (« go » de Bryan, 14/10 : 2 PC, surtout 1 à la fois ; alerte
+     doublon voulue) : copie injectée par `doGet` (`Copie.gs`, `COPIE_INITIALE`, 0 appel
+     au démarrage), offres actives = fin non passée / sans date / date illisible ;
+     réservation confirmée tout de suite + envoi en arrière-plan (`ScriptCopie` :
+     `enAttente`, indicateur, `beforeunload`, fenêtre « NON enregistrée » + RÉESSAYER,
+     copie rechargée après un échec) ; ID créé par la page (`FORMAT_ID_RES`) → réessai
+     sans double ; changement d'état immédiat ; création / modification / suppression
+     renvoient la copie (`appliquerCopieServeur`, `seqCopie`) ; rechargement au focus
+     (> 30 s) et toutes les 2 min ; offres terminées chargées à la demande
+     (`horsCopie`) ; suppression = réécriture des onglets en une fois (`reecrire_`,
+     textes en texte) ; articles écrits en une fois ; alerte doublon (même offre, nom +
+     prénom normalisés, même téléphone OU email ; annulées ignorées) — non bloquante.
+     `getOperationsData` supprimée (remplacée par `chargerCopie`). 8 séries de tests.
 - **Rien n'est testé sur un vrai Google Sheet** (simulation seulement).
 
 ## Contexte (réponses de Bryan, 14/10)
@@ -28,9 +41,7 @@
 
 ## Plan validé (une étape = un commit, tests verts, point à Bryan)
 1. ✅ Socle.
-2. Rapidité : offres injectées par `doGet`, copie locale des offres actives,
-   enregistrement instantané + écriture en arrière-plan (« en cours d'envoi »,
-   RÉESSAYER), détails préchargés, écritures groupées (suppression en une réécriture).
+2. ✅ Rapidité (voir ci-dessus).
 3. Design « Comptoir » (maquette cliquable d'abord) : sans Bootstrap/CDN, logo à
    l'impression, recherche/filtre des inscrits, modifier/supprimer une réservation.
 4. Sécurité : code responsable (+ appareils autorisés ?) pour créer/modifier/supprimer
@@ -39,6 +50,10 @@
 6. Documentation (AGENTS.md…).
 
 ## À vérifier sur un vrai Google Sheet
+- Copie injectée par `doGet` : page affichée tout de suite (temps d'ouverture réel).
+- `beforeunload` (avertissement à la fermeture pendant un envoi) dans l'iframe Apps Script.
+- Réécriture d'un onglet à la suppression : mise en forme manuelle des lignes (couleurs)
+  non déplacée avec les données ; formules éventuelles remplacées par leurs valeurs.
 - Paramètres régionaux du classeur = France (dates « jj/mm/aaaa » reconnues).
 - Le manifeste `appsscript.json` réel (accès du déploiement) : le récupérer par
   `clasp pull` avant tout `npm run push`.

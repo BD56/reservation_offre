@@ -3,7 +3,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_00_Constantes_() {
-  return "2026.10.14-1959";
+  return "2026.10.14-2030";
 }
 
 // Onglets du classeur
@@ -22,6 +22,25 @@ const ART = { ID: 0, RES: 1, NOM: 2, QTE: 3 };
 const ETATS_VALIDES = ["Réservé", "Contacté", "Retrait", "Annulé"];
 const ETAT_ANNULE = "Annulé";
 
+// Identifiant de réservation créé par la page (nouvelId_ côté page) : un réessai après une
+// réponse perdue renvoie le même identifiant et ne crée pas de double.
+const FORMAT_ID_RES = /^RES-\d{10,}-[0-9a-f]{4}$/;
+
 // Fichiers de l'application (contrôle de l'installation : tous présents, même version)
-const FICHIERS_SERVEUR = ["00_Constantes", "Application", "Installation", "Operations", "Reservations"];
-const FICHIERS_PAGE = ["Index", "Style", "ScriptCommun", "ScriptImpression", "ScriptOffres", "ScriptSaisie"];
+const FICHIERS_SERVEUR = [
+  "00_Constantes",
+  "Application",
+  "Copie",
+  "Installation",
+  "Operations",
+  "Reservations",
+];
+const FICHIERS_PAGE = [
+  "Index",
+  "Style",
+  "ScriptCommun",
+  "ScriptCopie",
+  "ScriptImpression",
+  "ScriptOffres",
+  "ScriptSaisie",
+];

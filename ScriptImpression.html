@@ -1,5 +1,5 @@
 <!-- Impression du résumé d'une offre (totaux à préparer + liste des commandes). -->
-<script data-version="2026.10.14-1959">
+<script data-version="2026.10.14-2030">
   // Totaux par article, hors réservations annulées
   function calculerResume(reservations) {
     const totaux = {};
@@ -16,10 +16,11 @@
   }
 
   function imprimerReservations() {
-    if (!currentOperationDetails) return;
+    const details = detailsOffreOuverte();
+    if (!details) return;
 
-    const op = currentOperationDetails.operation;
-    const res = currentOperationDetails.reservations;
+    const op = details.operation;
+    const res = details.reservations;
     const resume = calculerResume(res);
 
     let html = `

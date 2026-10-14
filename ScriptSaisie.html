@@ -1,5 +1,5 @@
 <!-- Formulaire de saisie d'une réservation (articles, contacts, validation). -->
-<script data-version="2026.10.14-1959">
+<script data-version="2026.10.14-2030">
   function gererAffichageProduits() {
     const select = document.getElementById("operationSelect");
     const optionSelectionnee = select.options[select.selectedIndex];
@@ -13,6 +13,7 @@
     const btnAjouter = document.getElementById("btnAjouterLigne");
 
     conteneurListe.innerHTML = "";
+    assurerReservations(select.value); // offre terminée : ses réservations, pour les doublons
 
     if (typeOperation === "Produit") {
       sectionProduits.style.display = "block";
@@ -120,26 +121,56 @@
       articles: articlesSaisis,
     };
 
-    const btn = document.getElementById("btnValiderReservation");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+    const doublon = chercherDoublon(data);
+    if (doublon) {
+      saisieEnSuspens = data;
+      afficherDoublon(doublon);
+      return;
+    }
+    enregistrerReservation(data);
+  }
 
-    google.script.run
-      .withSuccessHandler(function () {
-        showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
-        document.getElementById("formReservation").reset();
-        document.getElementById("telClient").classList.remove("is-valid", "is-invalid");
-        document.getElementById("emailClient").classList.remove("is-valid", "is-invalid");
-        gererAffichageProduits();
-        btn.disabled = false;
-        btn.innerHTML = "VÉRIFIER ET VALIDER";
-        rechargerOperations();
-      })
-      .withFailureHandler(function (err) {
-        showErreur(err);
-        btn.disabled = false;
-        btn.innerHTML = "VÉRIFIER ET VALIDER";
-      })
-      .saveReservation(data);
+  // Réservation en attente de la réponse à l'alerte doublon
+  let saisieEnSuspens = null;
+
+  function afficherDoublon(r) {
+    document.getElementById("texteDoublon").innerHTML = `
+      <p>Une réservation existe déjà pour ce client sur cette offre :</p>
+      <ul class="mb-0">
+        <li><strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong> — ${echapper(r.contact)}</li>
+        <li>Saisie le ${echapper(r.dateSaisie)} · état : ${echapper(r.etat)}</li>
+        ${r.articles.length ? `<li>Articles : ${echapper(texteArticles(r))}</li>` : ""}
+      </ul>`;
+    modal("modalDoublon").show();
+  }
+
+  document.getElementById("btnForcerDoublon").addEventListener("click", function () {
+    const data = saisieEnSuspens;
+    saisieEnSuspens = null;
+    modal("modalDoublon").hide();
+    if (data) enregistrerReservation(data);
+  });
+
+  // Affichée et confirmée tout de suite ; le serveur l'écrit en arrière-plan (ScriptCopie).
+  function enregistrerReservation(data) {
+    data.idRes = nouvelIdReservation();
+    let contact = data.telephone;
+    if (data.email) contact += (contact ? " / " : "") + data.email;
+    const res = {
+      idRes: data.idRes,
+      idOp: data.operationId,
+      nom: data.nom,
+      prenom: data.prenom,
+      contact: contact,
+      etat: "Réservé",
+      dateSaisie: maintenantFr(),
+      articles: data.articles.map((a) => ({ nom: a.nom, quantite: a.quantite })),
+    };
+    envoyerReservation(data, res);
+    showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
+    document.getElementById("formReservation").reset();
+    document.getElementById("telClient").classList.remove("is-valid", "is-invalid");
+    document.getElementById("emailClient").classList.remove("is-valid", "is-invalid");
+    gererAffichageProduits();
   }
 </script>
