@@ -51,9 +51,13 @@
   .rond { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: tourne .8s linear infinite; display: inline-block; flex: 0 0 auto; }
   @keyframes tourne { to { transform: rotate(360deg); } }
 
-  /* Écran Réservations : saisie | liste */
-  .milieu { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
-  .zone-form { overflow: auto; padding-block: 24px 30px; padding-left: var(--gouttiere); padding-right: 22px; display: flex; justify-content: center; }
+  /* Écran de saisie : formulaire seul, centré */
+  .milieu { flex: 1; min-height: 0; overflow: auto; }
+  .zone-form { padding-block: 28px 40px; padding-left: var(--gouttiere); padding-right: var(--gouttiere-d); display: flex; justify-content: center; }
+  .champ select { appearance: auto; font-weight: 650; height: 52px; cursor: pointer; }
+  .infos-offre { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 8px; color: var(--doux); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .retour { align-self: flex-start; border: 0; background: none; color: var(--accent); font-weight: 700; display: inline-flex; gap: 6px; align-items: center; padding: 4px 0; }
+  .retour:hover { text-decoration: underline; text-underline-offset: 3px; }
   form.saisie { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 20px; }
   .etape { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; }
   .num { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: var(--encre); color: var(--blanc); transition: background .2s; }
@@ -63,13 +67,6 @@
   .lien-doux { border: 0; background: none; color: var(--accent); font-weight: 700; padding: 2px 0; }
   .lien-doux:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-  .tuiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-  .tuile { text-align: left; border: 1.5px solid var(--trait); background: var(--surface); border-radius: 14px; padding: 12px 13px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .tuile:hover { border-color: var(--doux); }
-  .tuile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-doux); box-shadow: 0 0 0 3px var(--accent-doux); }
-  .tuile b { font-size: 15px; line-height: 1.25; }
-  .tuile .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--doux); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .tuile.terminee { opacity: .75; }
   .chip { font-size: 11px; font-weight: 750; padding: 2px 7px; border-radius: 6px; white-space: nowrap; letter-spacing: .2px; }
   .chip.produit { background: var(--accent-doux); color: var(--accent); }
   .chip.evenement { background: var(--orange-doux); color: var(--orange); }
@@ -111,8 +108,8 @@
   .message { margin-left: 44px; min-height: 22px; font-size: 14px; font-weight: 650; color: var(--danger); margin-top: -8px; }
 
   /* Liste des réservations de l'offre choisie */
-  .liste-res { background: var(--surface); border-left: 1px solid var(--trait); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .liste-tete { padding-block: 18px 10px; padding-left: 22px; padding-right: var(--gouttiere-d); display: flex; flex-direction: column; gap: 12px; }
+  .liste-res { background: var(--surface); border: 1px solid var(--trait); border-radius: 16px; display: flex; flex-direction: column; min-width: 0; }
+  .liste-tete { padding: 16px 18px 10px; display: flex; flex-direction: column; gap: 12px; }
   .liste-tete h2 { margin: 0; font-size: 18px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   .liste-tete h2 small { color: var(--doux); font-size: 13px; font-weight: 600; }
   .recherche { position: relative; }
@@ -124,10 +121,10 @@
   .filtre b { color: var(--encre); font-variant-numeric: tabular-nums; }
   .filtre[aria-pressed="true"] { border-color: var(--encre); background: var(--encre); color: var(--blanc); }
   .filtre[aria-pressed="true"] b { color: var(--blanc); }
-  .preparer { margin-left: 22px; margin-right: var(--gouttiere-d); background: var(--fond); border-radius: 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; align-items: center; }
+  .preparer { margin: 0 18px; background: var(--fond); border-radius: 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; align-items: center; }
   .preparer > span:first-child { color: var(--doux); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; }
   .preparer b { font-variant-numeric: tabular-nums; }
-  .lignes { overflow: auto; flex: 1; min-height: 0; padding-block: 6px; padding-left: 22px; padding-right: var(--gouttiere-d); }
+  .lignes { padding: 6px 10px; }
   .ligne { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 8px; border-bottom: 1px solid var(--trait); border-radius: 10px; cursor: pointer; }
   .ligne:hover { background: var(--champ); }
   .ligne.neuve { animation: neuve 1.8s ease-out; }
@@ -147,13 +144,13 @@
   .retire-btn { height: 32px; padding: 0 10px; border-radius: 9px; border: 1.5px solid var(--ok); color: var(--ok); background: var(--surface); font-weight: 700; font-size: 12.5px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .retire-btn:hover { background: var(--ok-doux); }
   .vide { color: var(--doux); font-size: 14px; padding: 22px 8px; text-align: center; }
-  .liste-pied { padding-block: 12px 16px; padding-left: 22px; padding-right: var(--gouttiere-d); border-top: 1px solid var(--trait); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--doux); }
+  .liste-pied { padding: 12px 18px 14px; border-top: 1px solid var(--trait); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--doux); }
   .lien-fort { border: 0; background: none; padding: 4px 0; color: var(--accent); font-weight: 750; font-size: 15px; }
   .lien-fort:hover { text-decoration: underline; text-underline-offset: 3px; }
 
   /* Écran Offres */
   .ecran-offres { flex: 1; min-height: 0; overflow: auto; padding-block: 24px 40px; padding-left: var(--gouttiere); padding-right: var(--gouttiere-d); }
-  .ecran-offres .cadre { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  .ecran-offres .cadre { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
   .titre-ecran { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .titre-ecran h1 { margin: 0; font-size: 22px; flex: 1; }
   .groupe-titre { margin: 8px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--doux); }
@@ -259,12 +256,9 @@
 
   /* Écran étroit : une colonne */
   @media (max-width: 900px) {
-    .milieu { grid-template-columns: 1fr; overflow: auto; }
-    .zone-form { overflow: visible; padding-right: var(--gouttiere-d); }
-    .liste-res { border-left: 0; border-top: 1px solid var(--trait); }
-    .liste-tete, .lignes, .liste-pied { padding-left: var(--gouttiere); }
-    .preparer { margin-left: var(--gouttiere); }
-    .lignes { overflow: visible; }
+    .liste-tete, .liste-pied { padding-left: 14px; padding-right: 14px; }
+    .preparer { margin: 0 14px; }
+    .lignes { padding-left: 4px; padding-right: 4px; }
     .etape { grid-template-columns: minmax(0, 1fr); }
     .num { display: none; }
     .valider, .message { margin-left: 0; }
@@ -299,6 +293,7 @@
   <symbol id="i-imprimer" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
   <symbol id="i-crayon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
   <symbol id="i-poubelle" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+  <symbol id="i-retour" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
   <symbol id="i-hors-ligne" viewBox="0 0 24 24"><path d="M1 1l22 22M16.7 11.1A10.9 10.9 0 0 1 19 12.6M5 12.6a10.9 10.9 0 0 1 5.2-2.5M10.7 5.1A16 16 0 0 1 22.6 9M1.4 9a16 16 0 0 1 4.4-2.8M8.5 16.1a5 5 0 0 1 7 0M12 20h.01"/></symbol>
 </defs></svg>
 
@@ -319,21 +314,22 @@
     <div class="marque"><div class="logo"><svg class="ico"><use href="#i-sac"/></svg></div>
       <div><b>Réservations</b><small>Accueil du magasin</small></div></div>
     <nav class="onglets" aria-label="Écrans">
-      <button id="ongletSaisie" aria-current="true"><svg class="ico p"><use href="#i-liste"/></svg>Réservations</button>
-      <button id="ongletOffres" aria-current="false"><svg class="ico p"><use href="#i-calendrier"/></svg>Offres</button>
+      <button id="ongletSaisie" aria-current="true"><svg class="ico p"><use href="#i-plus"/></svg>Nouvelle réservation</button>
+      <button id="ongletOffres" aria-current="false"><svg class="ico p"><use href="#i-liste"/></svg>Offres et réservations</button>
     </nav>
     <div class="espace"></div>
     <span class="puce envoi" id="puceEnvoi" role="status" hidden><span class="rond"></span><span id="txtEnvoi"></span></span>
     <button class="icone-btn" id="btnAide" title="Aide" aria-label="Aide"><svg class="ico"><use href="#i-aide"/></svg></button>
   </header>
 
-  <!-- Écran 1 : saisie + réservations de l'offre -->
+  <!-- Écran 1 : saisie d'une réservation (seule, centrée) -->
   <main class="milieu" id="ecranSaisie">
     <div class="zone-form">
       <form class="saisie" id="formSaisie" novalidate autocomplete="off">
         <div class="etape"><div class="num" id="n1">1</div><div>
-          <h2>Offre <button type="button" class="lien-doux" id="voirTerminees">Offres terminées</button></h2>
-          <div class="tuiles" id="tuiles"></div></div></div>
+          <h2>Offre</h2>
+          <div class="champ"><select id="offre" aria-label="Offre"></select></div>
+          <div class="infos-offre" id="infosOffre"></div></div></div>
         <div class="etape"><div class="num" id="n2">2</div><div>
           <h2>Client</h2>
           <div class="deux">
@@ -350,18 +346,26 @@
         <div class="message" id="message" role="status"></div>
       </form>
     </div>
+  </main>
 
-    <section class="liste-res" aria-labelledby="titreListe">
-      <div class="liste-tete">
-        <h2 id="titreListe"></h2>
-        <div class="recherche"><svg class="ico p"><use href="#i-recherche"/></svg>
-          <input id="recherche" type="search" placeholder="Rechercher un nom, un téléphone, un email…" aria-label="Rechercher une réservation"></div>
-        <div class="filtres" id="filtres"></div>
-      </div>
-      <div class="preparer" id="preparer"></div>
-      <div class="lignes" id="lignes"></div>
-      <div class="liste-pied"><button class="lien-fort" id="ouvrirFeuille">Feuille de préparation →</button><span>Clic sur une ligne : modifier la réservation</span></div>
-    </section>
+  <!-- Écran 3 : réservations d'une offre (ouvert depuis Offres) -->
+  <main class="ecran-offres" id="ecranDetail" hidden>
+    <div class="cadre">
+      <button class="retour" id="retourOffres"><svg class="ico p"><use href="#i-retour"/></svg>Toutes les offres</button>
+      <div class="titre-ecran"><div style="flex:1;min-width:0"><h1 id="titreDetail"></h1><div class="infos-offre" id="infosDetail"></div></div>
+        <button class="sec" id="detailFeuille"><svg class="ico p"><use href="#i-imprimer"/></svg>Feuille de préparation</button>
+        <button class="sec" id="detailModifier"><svg class="ico p"><use href="#i-crayon"/></svg>Modifier l'offre</button></div>
+      <section class="liste-res" aria-label="Réservations de l'offre">
+        <div class="liste-tete">
+          <div class="recherche"><svg class="ico p"><use href="#i-recherche"/></svg>
+            <input id="recherche" type="search" placeholder="Rechercher un nom, un téléphone, un email…" aria-label="Rechercher une réservation"></div>
+          <div class="filtres" id="filtres"></div>
+        </div>
+        <div class="preparer" id="preparer"></div>
+        <div class="lignes" id="lignes"></div>
+        <div class="liste-pied"><span>Clic sur une ligne : modifier ou supprimer la réservation</span></div>
+      </section>
+    </div>
   </main>
 
   <!-- Écran 2 : offres -->
@@ -448,8 +452,8 @@
 
   <aside class="aide" id="aide" hidden aria-label="Aide">
     <div class="tete-aide"><h2>Aide</h2><button class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
-    <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités, puis Entrée. La réservation apparaît tout de suite à droite ; « en cours d'envoi » le temps que le Google Sheets l'enregistre.</p>
-    <p><b>Un client vient chercher sa commande :</b> tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
+    <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités, puis Entrée. La réservation est confirmée tout de suite ; « en cours d'envoi » en haut le temps que le Google Sheets l'enregistre.</p>
+    <p><b>Un client vient chercher sa commande :</b> Offres et réservations → l'offre → tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
     <p><b>Modifier ou supprimer :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
     <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
     <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer (les annulées ne comptent pas).</p>
@@ -493,7 +497,7 @@
   }
 
   let D = donneesDepart();
-  let etat = { offre: "o1", filtre: "Toutes", recherche: "", terminees: false, fiche: null, ficheBrouillon: null, editeur: null, echecProchain: false, enSuspens: null, doublonDe: null, echec: null, compteur: 100 };
+  let etat = { offre: "o1", vue: null, filtre: "Toutes", recherche: "", fiche: null, ficheBrouillon: null, editeur: null, echecProchain: false, enSuspens: null, doublonDe: null, echec: null, compteur: 100 };
   let saisie = {};
 
   const $ = (id) => document.getElementById(id);
@@ -527,10 +531,20 @@
   function allerEcran(nom) {
     $("ecranSaisie").hidden = nom !== "saisie";
     $("ecranOffres").hidden = nom !== "offres";
+    $("ecranDetail").hidden = nom !== "detail";
     $("ongletSaisie").setAttribute("aria-current", String(nom === "saisie"));
-    $("ongletOffres").setAttribute("aria-current", String(nom === "offres"));
+    $("ongletOffres").setAttribute("aria-current", String(nom !== "saisie"));
     if (nom === "offres") dessinerOffres();
+    if (nom === "detail") dessinerListe();
+    document.querySelector(nom === "saisie" ? "#ecranSaisie" : nom === "offres" ? "#ecranOffres" : "#ecranDetail").scrollTop = 0;
   }
+  function ouvrirDetail(id) {
+    etat.vue = id; etat.filtre = "Toutes"; etat.recherche = ""; $("recherche").value = "";
+    allerEcran("detail");
+  }
+  $("retourOffres").addEventListener("click", () => allerEcran("offres"));
+  $("detailFeuille").addEventListener("click", () => ouvrirFeuille(etat.vue));
+  $("detailModifier").addEventListener("click", () => ouvrirEditeur(etat.vue));
   $("ongletSaisie").addEventListener("click", () => allerEcran("saisie"));
   $("ongletOffres").addEventListener("click", () => allerEcran("offres"));
   document.querySelectorAll("[data-fermer]").forEach((b) => b.addEventListener("click", () => { $(b.dataset.fermer).hidden = true; }));
@@ -540,34 +554,36 @@
     ["voileFeuille", "voileFiche", "voileOffre", "aide"].forEach((id) => { $(id).hidden = true; });
   });
 
-  // ---------- Étape 1 : offres ----------
-  function dessinerTuiles() {
-    const liste = D.offres.filter((o) => etat.terminees || statut(o) !== "terminee");
-    $("tuiles").innerHTML = liste.map((o) => {
-      const s = statut(o);
-      return `<button type="button" class="tuile ${s === "terminee" ? "terminee" : ""}" data-offre="${o.id}" aria-pressed="${o.id === etat.offre}">
-        <b>${esc(o.nom)}</b>
-        <span class="meta"><span class="chip ${o.type === "Produit" ? "produit" : "evenement"}">${o.type === "Produit" ? "Produits" : "Évènement"}</span>${s !== "encours" ? `<span class="chip ${s}">${LIB_STATUT[s]}</span>` : ""}</span>
-        <span class="meta">${o.debut === o.fin ? "Le " + dateCourte(o.debut) : dateCourte(o.debut) + " → " + dateCourte(o.fin)} · ${actives(resaDe(o.id)).length} résa.</span>
-      </button>`;
-    }).join("");
-    $("tuiles").querySelectorAll(".tuile").forEach((b) => b.addEventListener("click", () => choisirOffre(b.dataset.offre)));
-    const n = D.offres.filter((o) => statut(o) === "terminee").length;
-    $("voirTerminees").textContent = etat.terminees ? "Masquer les terminées" : `Offres terminées (${n})`;
+  // ---------- Étape 1 : offre (menu déroulant) ----------
+  const periode = (o) => o.debut === o.fin ? "le " + dateCourte(o.debut) : dateCourte(o.debut) + " → " + dateCourte(o.fin);
+  function dessinerSelecteur() {
+    const sel = $("offre");
+    const enCours = D.offres.filter((o) => statut(o) !== "terminee"), finies = D.offres.filter((o) => statut(o) === "terminee");
+    const opt = (o) => `<option value="${o.id}">${esc(o.nom)} · ${periode(o)}</option>`;
+    sel.innerHTML = `<option value="" disabled>Choisir l'offre…</option>`
+      + (enCours.length ? `<optgroup label="En cours et à venir">${enCours.map(opt).join("")}</optgroup>` : "")
+      + (finies.length ? `<optgroup label="Terminées">${finies.map(opt).join("")}</optgroup>` : "");
+    sel.value = etat.offre || "";
+    const o = offre(etat.offre);
+    if (!o) { $("infosOffre").innerHTML = ""; return; }
+    const n = actives(resaDe(o.id)).length, s = statut(o);
+    $("infosOffre").innerHTML = `<span class="chip ${o.type === "Produit" ? "produit" : "evenement"}">${o.type === "Produit" ? "Produits" : "Évènement"}</span>`
+      + (s !== "encours" ? `<span class="chip ${s}">${LIB_STATUT[s]}</span>` : "")
+      + `<span>${n} réservation${n > 1 ? "s" : ""}</span><button type="button" class="lien-doux" id="voirListe">Voir la liste →</button>`;
+    $("voirListe").addEventListener("click", () => ouvrirDetail(o.id));
   }
-  $("voirTerminees").addEventListener("click", () => { etat.terminees = !etat.terminees; dessinerTuiles(); });
+  $("offre").addEventListener("change", () => choisirOffre($("offre").value));
 
   function choisirOffre(id) {
-    etat.offre = id; etat.filtre = "Toutes"; etat.recherche = ""; $("recherche").value = "";
-    saisie = {};
-    dessinerTuiles(); dessinerArticles(); dessinerListe(); majEtapes();
+    etat.offre = id; saisie = {};
+    dessinerSelecteur(); dessinerArticles(); majEtapes();
   }
 
   // ---------- Étape 3 : articles ----------
   function dessinerArticles() {
     const o = offre(etat.offre);
     const zone = $("articles");
-    if (!o) { zone.innerHTML = ""; return; }
+    if (!o) { $("titreEtape3").textContent = "Articles"; zone.innerHTML = `<div class="sans-article">Choisissez d'abord l'offre.</div>`; return; }
     if (o.type === "Evenement") {
       $("titreEtape3").textContent = "Inscription";
       zone.innerHTML = `<div class="sans-article">Évènement : pas d'article à choisir. Le client est inscrit dès l'enregistrement.</div>`;
@@ -697,9 +713,12 @@
 
   // ---------- Liste des réservations ----------
   function dessinerListe(nouvelle) {
-    const o = offre(etat.offre);
-    const toutes = resaDe(etat.offre);
-    $("titreListe").innerHTML = `${esc(o.nom)} <small>${actives(toutes).length} réservation${actives(toutes).length > 1 ? "s" : ""} · ${statut(o) === "terminee" ? "terminée le " + dateLongue(o.fin) : o.debut === o.fin ? "le " + dateLongue(o.debut) : "du " + dateCourte(o.debut) + " au " + dateLongue(o.fin)}</small>`;
+    const o = offre(etat.vue);
+    if (!o) return;
+    const toutes = resaDe(o.id), s = statut(o), nAct = actives(toutes).length;
+    $("titreDetail").textContent = o.nom;
+    $("infosDetail").innerHTML = `<span class="chip ${o.type === "Produit" ? "produit" : "evenement"}">${o.type === "Produit" ? "Produits" : "Évènement"}</span><span class="chip ${s}">${LIB_STATUT[s]}</span>`
+      + `<span>${o.debut === o.fin ? "Le " + dateLongue(o.debut) : "Du " + dateLongue(o.debut) + " au " + dateLongue(o.fin)}</span><span>${nAct} réservation${nAct > 1 ? "s" : ""}</span>`;
     const compte = (e) => e === "Toutes" ? toutes.length : toutes.filter((r) => r.etat === e).length;
     $("filtres").innerHTML = ["Toutes", "Réservé", "Contacté", "Retrait", "Annulé"].map((f) =>
       `<button type="button" class="filtre" data-filtre="${f}" aria-pressed="${etat.filtre === f}">${f === "Retrait" ? "Retirées" : f === "Toutes" ? "Toutes" : f === "Réservé" ? "À retirer" : f === "Contacté" ? "Contactés" : "Annulées"} <b>${compte(f)}</b></button>`).join("");
@@ -796,7 +815,7 @@
     }).join("")).join("");
     $("listeOffres").querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
       const art = b.closest(".offre"); const id = art.dataset.offre; const o = offre(id);
-      if (b.dataset.act === "voir") { if (statut(o) === "terminee") etat.terminees = true; choisirOffre(id); allerEcran("saisie"); }
+      if (b.dataset.act === "voir") ouvrirDetail(id);
       if (b.dataset.act === "feuille") ouvrirFeuille(id);
       if (b.dataset.act === "modifier") ouvrirEditeur(id);
       if (b.dataset.act === "supprimer") {
@@ -806,7 +825,8 @@
         art.querySelector("[data-non]").addEventListener("click", () => art.querySelector(".confirme").remove());
         art.querySelector("[data-oui]").addEventListener("click", () => {
           D.offres = D.offres.filter((x) => x.id !== id); D.reservations = D.reservations.filter((r) => r.op !== id);
-          if (etat.offre === id) etat.offre = (D.offres.find((x) => statut(x) !== "terminee") || D.offres[0] || {}).id;
+          if (etat.offre === id) { etat.offre = ""; saisie = {}; dessinerArticles(); }
+          if (etat.vue === id) etat.vue = null;
           dessinerTout(); dessinerOffres(); toast(`Offre « ${o.nom} » supprimée`);
         });
       }
@@ -869,7 +889,6 @@
   }
   $("feuilleAnnulees").addEventListener("change", dessinerFeuille);
   $("feuilleImprimer").addEventListener("click", () => toast("Dans l'application : ouvre la fenêtre d'impression du navigateur"));
-  $("ouvrirFeuille").addEventListener("click", () => ouvrirFeuille(etat.offre));
 
   // ---------- Aide ----------
   $("btnAide").addEventListener("click", () => { $("aide").hidden = false; });
@@ -886,17 +905,21 @@
     const e = b.dataset.essai;
     if (e === "doublon") { remplir({ op: "o1", nom: "Le Gall", prenom: "yannick", tel: "+33 6 12 34 56 78" }, { "Plateau Prestige 4 pers.": 1 }); $("formSaisie").requestSubmit(); }
     if (e === "echec") { etat.echecProchain = true; remplir({ op: "o1", nom: "Nédélec", prenom: "Julie", tel: "06 40 50 60 70" }, { "Plateau Océan 2 pers.": 1 }); $("formSaisie").requestSubmit(); }
-    if (e === "retrait") { allerEcran("saisie"); choisirOffre("o1"); $("recherche").value = "morv"; etat.recherche = "morv"; dessinerListe(); $("recherche").focus(); toast("Recherche « morv » : cliquez sur « Retiré »"); }
-    if (e === "feuille") { allerEcran("saisie"); ouvrirFeuille("o1"); }
+    if (e === "retrait") { ouvrirDetail("o1"); $("recherche").value = "morv"; etat.recherche = "morv"; dessinerListe(); $("recherche").focus(); toast("Recherche « morv » : cliquez sur « Retiré »"); }
+    if (e === "feuille") { ouvrirDetail("o1"); ouvrirFeuille("o1"); }
     if (e === "offre") { allerEcran("offres"); ouvrirEditeur(null); }
   }));
   $("reinit").addEventListener("click", () => {
-    D = donneesDepart(); etat = Object.assign(etat, { offre: "o1", filtre: "Toutes", recherche: "", terminees: false, echecProchain: false });
+    D = donneesDepart(); etat = Object.assign(etat, { offre: "o1", vue: null, filtre: "Toutes", recherche: "", echecProchain: false });
     ["voileFiche", "voileOffre", "voileDoublon", "voileEchec", "voileFeuille", "aide", "toast"].forEach((id) => { $(id).hidden = true; });
     $("recherche").value = ""; allerEcran("saisie"); viderFormulaire(); dessinerTout(); majEnvoi();
   });
 
-  function dessinerTout(nouvelle) { dessinerTuiles(); dessinerListe(nouvelle); majEtapes(); if (!$("ecranOffres").hidden) dessinerOffres(); }
+  function dessinerTout(nouvelle) {
+    dessinerSelecteur(); majEtapes();
+    if (!$("ecranDetail").hidden) dessinerListe(nouvelle);
+    if (!$("ecranOffres").hidden) dessinerOffres();
+  }
   dessinerTout(); dessinerArticles();
 })();
 </script>

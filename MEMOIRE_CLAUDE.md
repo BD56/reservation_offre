@@ -45,10 +45,14 @@
 3. Design « Comptoir » : sans Bootstrap/CDN, recherche/filtre des inscrits,
    modifier/supprimer une réservation. **Pas de logo** (décision de Bryan, 14/10).
    Maquette cliquable (14/10, EN ATTENTE de validation) : `docs/maquettes/comptoir-reservations.html`,
-   artefact privé https://claude.ai/artifact/7rAHc1LAay3N4j62ZBzX4r. Propositions :
-   2 écrans (Réservations / Offres) ; saisie en 3 étapes (tuiles d'offres, client,
-   articles en + / −) à gauche, réservations de l'offre à droite (recherche, filtres par
-   état, « reste à préparer », bouton « Retiré » + Annuler dans le message) ; fiche
+   artefact privé https://claude.ai/artifact/7rAHc1LAay3N4j62ZBzX4r. **v2 après retour
+   de Bryan** (v1 refusée : tuiles d'offres → MENU DÉROULANT ; écran coupé saisie | liste
+   « mal fait, c'était mieux avant » → saisie SEULE et centrée). Propositions v2 :
+   onglets « Nouvelle réservation » / « Offres et réservations » ; saisie en 3 étapes
+   (offre en menu déroulant avec groupes en cours / terminées + « Voir la liste → »,
+   client, articles en + / −) ; page détail d'une offre (← Toutes les offres, recherche,
+   filtres par état, « reste à préparer », bouton « Retiré » + Annuler dans le message,
+   Feuille de préparation, Modifier l'offre) ; fiche
    réservation (état, coordonnées, quantités, suppression confirmée dans la page) ;
    doublon = comparaison côte à côte (orange) + « Modifier l'existante » ; échec d'envoi
    (rouge, Réessayer) ; écran Offres (en cours / à venir / terminées, suppression
