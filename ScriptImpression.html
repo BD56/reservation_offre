@@ -1,0 +1,77 @@
+<!-- Impression du résumé d'une offre (totaux à préparer + liste des commandes). -->
+<script data-version="2026.10.14-1959">
+  // Totaux par article, hors réservations annulées
+  function calculerResume(reservations) {
+    const totaux = {};
+    reservations
+      .filter((r) => r.etat !== "Annulé")
+      .forEach((r) => {
+        r.articles.forEach((a) => {
+          totaux[a.nom] = (totaux[a.nom] || 0) + a.quantite;
+        });
+      });
+    return Object.keys(totaux)
+      .sort((a, b) => a.localeCompare(b))
+      .map((nom) => ({ nom: nom, total: totaux[nom] }));
+  }
+
+  function imprimerReservations() {
+    if (!currentOperationDetails) return;
+
+    const op = currentOperationDetails.operation;
+    const res = currentOperationDetails.reservations;
+    const resume = calculerResume(res);
+
+    let html = `
+      <div class="mb-4 text-center">
+        <h2 class="mb-1">${echapper(op.nom)}</h2>
+        <p class="text-muted">Dates : Du ${echapper(dateFr(op.dateDebut))} au ${echapper(dateFr(op.dateFin))}</p>
+      </div>
+    `;
+
+    if (resume.length > 0) {
+      html += `
+        <h4 class="mb-2">Résumé des Produits à préparer</h4>
+        <table class="table table-bordered border-dark mb-5">
+          <thead class="table-light"><tr><th>Désignation du produit</th><th style="width: 150px" class="text-center">Quantité Totale</th></tr></thead>
+          <tbody>
+      `;
+      resume.forEach((r) => {
+        html += `<tr><td>${echapper(r.nom)}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    html += `
+      <h4 class="mb-2">Liste des Commandes (${res.length})</h4>
+      <table class="table table-bordered border-dark">
+        <thead class="table-light">
+          <tr><th>Nom & Prénom</th><th>Contact</th><th>Détail de la commande</th><th>État</th></tr>
+        </thead>
+        <tbody>
+    `;
+    if (res.length === 0) {
+      html += `<tr><td colspan="4" class="text-center">Aucune réservation pour le moment.</td></tr>`;
+    } else {
+      res.forEach((r) => {
+        html += `<tr><td><strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong><br><small class="text-muted">${echapper(r.dateSaisie)}</small></td><td>${echapper(r.contact)}</td><td>${echapper(texteArticles(r)) || "-"}</td><td class="text-center"><strong>${echapper(r.etat)}</strong></td></tr>`;
+      });
+    }
+    html += `</tbody></table>`;
+
+    const zoneImpression = document.getElementById("zoneImpression");
+    zoneImpression.innerHTML = html;
+    zoneImpression.classList.remove("d-none");
+
+    // On vide la zone après l'impression (afterprint est plus fiable qu'un délai fixe, notamment sur Safari)
+    window.addEventListener(
+      "afterprint",
+      function () {
+        zoneImpression.classList.add("d-none");
+        zoneImpression.innerHTML = "";
+      },
+      { once: true }
+    );
+    window.print();
+  }
+</script>

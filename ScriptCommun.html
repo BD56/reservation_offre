@@ -1,0 +1,129 @@
+<!-- Outils communs (échappement, fenêtres, messages), chargement des offres, aide et mentions. -->
+<script data-version="2026.10.14-1959">
+  // Échappe le texte saisi avant de l'insérer dans du HTML (noms avec < ' " & etc.)
+  function echapper(valeur) {
+    return String(valeur == null ? "" : valeur).replace(
+      /[&<>"']/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+    );
+  }
+
+  // Réutilise l'instance existante pour éviter les fonds gris empilés
+  function modal(id) {
+    return bootstrap.Modal.getOrCreateInstance(document.getElementById(id));
+  }
+
+  // yyyy-MM-dd -> dd/MM/yyyy
+  function dateFr(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || "-";
+  }
+
+  function showToast(message, type = "success") {
+    const toastEl = document.getElementById("appToast");
+    toastEl.className = `toast align-items-center border-0 text-white ${type === "success" ? "bg-success" : type === "info" ? "bg-info" : "bg-danger"}`;
+    document.getElementById("toastMessage").innerHTML = message;
+    bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
+  }
+
+  function showErreur(err) {
+    showToast(
+      "<i class='bi bi-exclamation-triangle'></i> Erreur : " +
+        echapper(err && err.message ? err.message : err),
+      "error"
+    );
+  }
+
+  function rechargerOperations(callback) {
+    google.script.run
+      .withSuccessHandler(function (ops) {
+        afficherDonnees(ops);
+        if (callback) callback();
+      })
+      .withFailureHandler(showErreur)
+      .getOperationsData();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    google.script.run
+      .withSuccessHandler(afficherDonnees)
+      .withFailureHandler(function (e) {
+        document.getElementById("operationSelect").innerHTML =
+          '<option value="" disabled selected>Impossible de charger les offres</option>';
+        showToast("Erreur de connexion : " + echapper(e.message), "error");
+      })
+      .getOperationsData();
+  });
+
+  function afficherDonnees(operations) {
+    const select = document.getElementById("operationSelect");
+    const tbody = document.getElementById("tableOperationsBody");
+    const selectionPrecedente = select.value;
+    select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
+    tbody.innerHTML = "";
+
+    if (operations.length === 0) {
+      select.innerHTML = '<option value="" disabled selected>Aucune offre disponible</option>';
+      tbody.innerHTML =
+        '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
+      gererAffichageProduits();
+      return;
+    }
+
+    operations.forEach((op) => {
+      const option = document.createElement("option");
+      option.value = op.id;
+      option.setAttribute("data-type", op.type);
+      option.setAttribute("data-mode", op.modeSaisie);
+      option.setAttribute("data-articles", op.articlesPredefinis);
+      option.textContent = `[${op.type}] ${op.nom}`;
+      select.appendChild(option);
+
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.onclick = function () {
+        voirReservationsDetail(op.id);
+      };
+
+      const pastilleCouleur = op.count > 0 ? "success" : "secondary";
+      const infoMode =
+        op.type === "Produit" ? `<small class="text-muted">Saisie : ${echapper(op.modeSaisie)}</small>` : "";
+
+      tr.innerHTML = `
+        <td class="ps-4"><span class="fw-bold text-dark">${echapper(op.nom)}</span><br>${infoMode}</td>
+        <td><small>Du ${echapper(op.dateDebut || "-")}<br>Au ${echapper(op.dateFin || "-")}</small></td>
+        <td class="text-center"><span class="badge bg-${pastilleCouleur} rounded-pill fs-6">${op.count}</span></td>
+        <td class="text-end pe-4">
+          <button class="btn btn-sm btn-outline-danger border-0" title="Supprimer l'offre">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      `;
+      tr.querySelector("button").addEventListener("click", function (event) {
+        event.stopPropagation();
+        demanderSuppression(op.id);
+      });
+      tbody.appendChild(tr);
+    });
+
+    // On conserve l'offre sélectionnée si elle existe toujours, sinon on masque les articles
+    if (selectionPrecedente && operations.some((op) => op.id === selectionPrecedente)) {
+      select.value = selectionPrecedente;
+    } else {
+      gererAffichageProduits();
+    }
+  }
+
+  // --- OUVRIR MENTIONS LEGALES ET AIDE ---
+  function ouvrirMentions() {
+    modal("modalMentions").show();
+  }
+
+  function ouvrirAide() {
+    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById("offcanvasHelp")).show();
+  }
+
+  function ouvrirOperations() {
+    modal("modalOperations").show();
+  }
+</script>

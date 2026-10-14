@@ -1,0 +1,202 @@
+<!-- Gestion des offres : création, détail, modification, état des réservations, suppression. -->
+<script data-version="2026.10.14-1959">
+  // Offre ouverte dans la fenêtre de détail (sert aussi à l'impression)
+  let currentOperationDetails = null;
+
+  function gererChampsNouvelleOffre(prefix) {
+    const type = document.getElementById(prefix + "OpType").value;
+    const mode = document.getElementById(prefix + "OpMode").value;
+    document.getElementById("blocModeSaisie_" + prefix).style.display =
+      type === "Evenement" ? "none" : "block";
+    document.getElementById("blocArticlesPredefinis_" + prefix).style.display =
+      type === "Produit" && mode === "Predefini" ? "block" : "none";
+  }
+
+  // Lit et vérifie le formulaire d'offre (prefix 'new' ou 'edit'). Renvoie null si invalide.
+  function lireFormulaireOffre(prefix) {
+    const form = document.getElementById(prefix === "new" ? "formNouvelleOffre" : "formEditOffre");
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return null;
+    }
+
+    const type = document.getElementById(prefix + "OpType").value;
+    const mode = type === "Produit" ? document.getElementById(prefix + "OpMode").value : "";
+    const data = {
+      nom: document.getElementById(prefix + "OpNom").value.trim(),
+      type: type,
+      modeSaisie: mode,
+      dateDebut: document.getElementById(prefix + "OpDateDebut").value,
+      dateFin: document.getElementById(prefix + "OpDateFin").value,
+      articlesPredefinis:
+        mode === "Predefini" ? document.getElementById(prefix + "OpArticles").value.trim() : "",
+    };
+
+    if (!data.nom) {
+      showToast("Le nom de l'offre est obligatoire.", "error");
+      return null;
+    }
+    if (data.dateDebut && data.dateFin && data.dateFin < data.dateDebut) {
+      showToast("La date de fin doit être postérieure à la date de début.", "error");
+      return null;
+    }
+    if (mode === "Predefini" && !data.articlesPredefinis.replace(/,/g, "").trim()) {
+      showToast("Le mode prédéfini nécessite au moins un article.", "error");
+      return null;
+    }
+    return data;
+  }
+
+  function creerNouvelleOffre() {
+    modal("modalOperations").hide();
+    document.getElementById("formNouvelleOffre").reset();
+    gererChampsNouvelleOffre("new");
+    modal("modalCreerOffre").show();
+  }
+
+  function sauvegarderNouvelleOffre() {
+    const data = lireFormulaireOffre("new");
+    if (!data) return;
+    const btn = document.getElementById("btnSauvegarderOffre");
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function () {
+        modal("modalCreerOffre").hide();
+        showToast("Nouvelle offre créée !", "success");
+        btn.disabled = false;
+        rechargerOperations(() => modal("modalOperations").show());
+      })
+      .withFailureHandler(function (err) {
+        showErreur(err);
+        btn.disabled = false;
+      })
+      .saveOperation(data);
+  }
+
+  // --- DÉTAILS DE L'OFFRE ET STATUTS ---
+  function voirReservationsDetail(idOperation) {
+    modal("modalOperations").hide();
+    showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
+
+    google.script.run
+      .withSuccessHandler(function (details) {
+        currentOperationDetails = details;
+        const op = details.operation;
+
+        document.getElementById("detailModalTitle").innerHTML =
+          `<i class="bi bi-box-seam"></i> ${echapper(op.nom)}`;
+        document.getElementById("editOpId").value = op.id;
+        document.getElementById("editOpNom").value = op.nom;
+        document.getElementById("editOpType").value = op.type;
+        document.getElementById("editOpMode").value = op.modeSaisie || "Libre";
+        document.getElementById("editOpDateDebut").value = op.dateDebut;
+        document.getElementById("editOpDateFin").value = op.dateFin;
+        document.getElementById("editOpArticles").value = op.articlesPredefinis;
+        gererChampsNouvelleOffre("edit");
+
+        const tbody = document.getElementById("tableInscritsBody");
+        tbody.innerHTML = "";
+
+        if (details.reservations.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
+        } else {
+          details.reservations.forEach((res) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td><span class="fw-bold">${echapper(res.nom)} ${echapper(res.prenom)}</span><br><small>Saisi le ${echapper(res.dateSaisie)}</small></td>
+              <td>${echapper(res.contact)}</td>
+              <td><small>${echapper(texteArticles(res)) || "-"}</small></td>
+              <td>
+                <select class="form-select form-select-sm fw-bold border-secondary text-secondary">
+                  ${["Réservé", "Contacté", "Retrait", "Annulé"].map((etat) => `<option value="${etat}" ${res.etat === etat ? "selected" : ""}>${etat}</option>`).join("")}
+                </select>
+              </td>
+            `;
+            const select = tr.querySelector("select");
+            select.addEventListener("change", function () {
+              changerStatutReservation(res.idRes, select);
+            });
+            tbody.appendChild(tr);
+          });
+        }
+        modal("modalDetailOffre").show();
+      })
+      .withFailureHandler(showErreur)
+      .getOperationDetails(idOperation);
+  }
+
+  function texteArticles(res) {
+    return res.articles.map((a) => `${a.quantite}x ${a.nom}`).join(", ");
+  }
+
+  // Fonction d'enregistrement à la volée du statut
+  function changerStatutReservation(idRes, select) {
+    const nouveauStatut = select.value;
+    const resToUpdate = currentOperationDetails
+      ? currentOperationDetails.reservations.find((r) => r.idRes === idRes)
+      : null;
+    const ancienStatut = resToUpdate ? resToUpdate.etat : null;
+
+    select.disabled = true;
+    showToast("<span class='spinner-border spinner-border-sm'></span> Mise à jour du statut...", "info");
+    google.script.run
+      .withSuccessHandler(function () {
+        select.disabled = false;
+        showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
+
+        // Mise à jour de la donnée "en mémoire" pour que l'impression reflète le changement sans recharger
+        if (resToUpdate) resToUpdate.etat = nouveauStatut;
+        rechargerOperations(); // le compteur de réservations exclut les annulées
+      })
+      .withFailureHandler(function (err) {
+        select.disabled = false;
+        if (ancienStatut) select.value = ancienStatut; // on remet l'ancien statut affiché
+        showErreur(err);
+      })
+      .updateReservationStatus(idRes, nouveauStatut);
+  }
+
+  function sauvegarderModificationOffre() {
+    const data = lireFormulaireOffre("edit");
+    if (!data) return;
+    data.id = document.getElementById("editOpId").value;
+
+    const btn = document.getElementById("btnUpdateOffre");
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function () {
+        showToast("Offre mise à jour !", "success");
+        btn.disabled = false;
+        document.getElementById("detailModalTitle").innerHTML =
+          `<i class="bi bi-box-seam"></i> ${echapper(data.nom)}`;
+        if (currentOperationDetails) Object.assign(currentOperationDetails.operation, data);
+        rechargerOperations();
+      })
+      .withFailureHandler(function (err) {
+        showErreur(err);
+        btn.disabled = false;
+      })
+      .updateOperation(data);
+  }
+
+  let idOffreASupprimer = null;
+  function demanderSuppression(idOperation) {
+    idOffreASupprimer = idOperation;
+    modal("modalConfirmDelete").show();
+  }
+  document.getElementById("btnConfirmerSuppression").addEventListener("click", function () {
+    if (!idOffreASupprimer) return;
+    const id = idOffreASupprimer;
+    idOffreASupprimer = null;
+    modal("modalConfirmDelete").hide();
+    showToast("<span class='spinner-border spinner-border-sm'></span> Suppression en cours...", "info");
+    google.script.run
+      .withSuccessHandler(function () {
+        showToast("Opération supprimée !", "success");
+        rechargerOperations();
+      })
+      .withFailureHandler(showErreur)
+      .deleteOperation(id);
+  });
+</script>

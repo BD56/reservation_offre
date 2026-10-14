@@ -1,0 +1,6 @@
+{
+  "printWidth": 110,
+  "singleQuote": false,
+  "trailingComma": "es5",
+  "overrides": [{ "files": "*.gs", "options": { "parser": "babel" } }]
+}

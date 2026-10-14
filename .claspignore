@@ -1,0 +1,8 @@
+# Fichiers envoyés vers Apps Script par `clasp push` : UNIQUEMENT ceux du code de
+# l'application, à la racine du dépôt (liste blanche). Tout le reste (tests, docs,
+# outils, node_modules, logo, configuration ESLint/Prettier…) reste sur GitHub.
+# Vérifier la liste avant un envoi : `npx clasp status`.
+**/**
+!appsscript.json
+!*.gs
+!*.html

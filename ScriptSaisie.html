@@ -1,0 +1,145 @@
+<!-- Formulaire de saisie d'une réservation (articles, contacts, validation). -->
+<script data-version="2026.10.14-1959">
+  function gererAffichageProduits() {
+    const select = document.getElementById("operationSelect");
+    const optionSelectionnee = select.options[select.selectedIndex];
+
+    const typeOperation = optionSelectionnee ? optionSelectionnee.getAttribute("data-type") : null;
+    const modeSaisie = optionSelectionnee ? optionSelectionnee.getAttribute("data-mode") : null;
+    const articlesPredefinis = optionSelectionnee ? optionSelectionnee.getAttribute("data-articles") : null;
+
+    const sectionProduits = document.getElementById("sectionProduits");
+    const conteneurListe = document.getElementById("listeProduits");
+    const btnAjouter = document.getElementById("btnAjouterLigne");
+
+    conteneurListe.innerHTML = "";
+
+    if (typeOperation === "Produit") {
+      sectionProduits.style.display = "block";
+      if (modeSaisie === "Predefini" && articlesPredefinis) {
+        btnAjouter.style.display = "none";
+        articlesPredefinis.split(",").forEach((article) => {
+          if (!article.trim()) return;
+          const div = document.createElement("div");
+          div.className = "row g-2 mb-2 ligne-produit";
+          div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${echapper(article.trim())}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
+          conteneurListe.appendChild(div);
+        });
+      } else {
+        btnAjouter.style.display = "inline-block";
+        ajouterLigneProduit();
+      }
+    } else {
+      sectionProduits.style.display = "none";
+    }
+  }
+
+  function ajouterLigneProduit() {
+    const div = document.createElement("div");
+    div.className = "row g-2 mb-2 ligne-produit";
+    div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article" placeholder="Nom de l'article"></div><div class="col-3"><input type="number" class="form-control quantite-article" placeholder="Qté" min="1"></div><div class="col-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)"><i class="bi bi-x-lg"></i></button></div>`;
+    document.getElementById("listeProduits").appendChild(div);
+  }
+
+  function supprimerLigne(bouton) {
+    bouton.closest(".ligne-produit").remove();
+  }
+
+  function verifierContacts() {
+    const telInput = document.getElementById("telClient");
+    const emailInput = document.getElementById("emailClient");
+    const alerteContact = document.getElementById("alerteContact");
+
+    const regexTel = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const telSaisi = telInput.value.trim();
+    const emailSaisi = emailInput.value.trim();
+
+    const telValide = telSaisi === "" || regexTel.test(telSaisi);
+    const emailValide = emailSaisi === "" || regexEmail.test(emailSaisi);
+
+    telInput.classList.toggle("is-invalid", telSaisi !== "" && !telValide);
+    telInput.classList.toggle("is-valid", telSaisi !== "" && telValide);
+    emailInput.classList.toggle("is-invalid", emailSaisi !== "" && !emailValide);
+    emailInput.classList.toggle("is-valid", emailSaisi !== "" && emailValide);
+
+    const valide = (telSaisi !== "" && telValide) || (emailSaisi !== "" && emailValide);
+    alerteContact.style.display = !valide && telSaisi === "" && emailSaisi === "" ? "block" : "none";
+    return valide && telValide && emailValide;
+  }
+
+  function validerFormulaire() {
+    const select = document.getElementById("operationSelect");
+    const operationId = select.value;
+    if (
+      !operationId ||
+      !document.getElementById("nomClient").value.trim() ||
+      !document.getElementById("prenomClient").value.trim()
+    ) {
+      showToast("Veuillez sélectionner une offre et remplir Nom/Prénom.", "error");
+      return;
+    }
+    if (!verifierContacts()) {
+      document.getElementById("alerteContact").style.display = "block";
+      return;
+    }
+
+    const optionSelectionnee = select.options[select.selectedIndex];
+    const estProduit = optionSelectionnee.getAttribute("data-type") === "Produit";
+    const modeLibre = !(
+      optionSelectionnee.getAttribute("data-mode") === "Predefini" &&
+      optionSelectionnee.getAttribute("data-articles")
+    );
+
+    const articlesSaisis = [];
+    let ligneIncomplete = null;
+    document.querySelectorAll(".ligne-produit").forEach((ligne) => {
+      const n = ligne.querySelector(".nom-article").value.trim();
+      const q = parseInt(ligne.querySelector(".quantite-article").value, 10);
+      if (n && q > 0) articlesSaisis.push({ nom: n, quantite: q });
+      // En saisie libre, une ligne à moitié remplie est probablement un oubli
+      else if (modeLibre && (n || q > 0) && !ligneIncomplete) ligneIncomplete = n || "sans nom";
+    });
+
+    if (ligneIncomplete) {
+      showToast("Article incomplet (nom ou quantité manquant) : " + echapper(ligneIncomplete), "error");
+      return;
+    }
+    if (estProduit && articlesSaisis.length === 0) {
+      showToast("Veuillez saisir au moins un article avec une quantité.", "error");
+      return;
+    }
+
+    const data = {
+      operationId: operationId,
+      nom: document.getElementById("nomClient").value.trim(),
+      prenom: document.getElementById("prenomClient").value.trim(),
+      telephone: document.getElementById("telClient").value.trim(),
+      email: document.getElementById("emailClient").value.trim(),
+      articles: articlesSaisis,
+    };
+
+    const btn = document.getElementById("btnValiderReservation");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+
+    google.script.run
+      .withSuccessHandler(function () {
+        showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
+        document.getElementById("formReservation").reset();
+        document.getElementById("telClient").classList.remove("is-valid", "is-invalid");
+        document.getElementById("emailClient").classList.remove("is-valid", "is-invalid");
+        gererAffichageProduits();
+        btn.disabled = false;
+        btn.innerHTML = "VÉRIFIER ET VALIDER";
+        rechargerOperations();
+      })
+      .withFailureHandler(function (err) {
+        showErreur(err);
+        btn.disabled = false;
+        btn.innerHTML = "VÉRIFIER ET VALIDER";
+      })
+      .saveReservation(data);
+  }
+</script>
