@@ -1,4 +1,4 @@
-<style data-version="2026.10.15-1253">
+<style data-version="2026.10.15-1339">
   /* Style « Comptoir » (repris de l'app chèques) : clair uniquement, police du système,
      icônes SVG intégrées (Icones.html), aucune ressource externe. PC de l'accueil. */
   :root {
@@ -1420,6 +1420,37 @@
   }
   .aide-corps b {
     color: var(--encre);
+  }
+
+  /* --- Noms très longs (mots sans espace) : coupés où il faut, jamais hors de leur case
+     ni sous les boutons --- */
+  .infos-offre > *,
+  .offre .infos > *,
+  .preparer > *,
+  .rang > *,
+  .resume > *,
+  .fenetre .tete > div,
+  .feuille header > div,
+  .feuille h1,
+  .feuille td,
+  .puce-article,
+  #toastTxt {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .feuille header > div:first-child {
+    flex: 1 1 300px;
+  }
+  /* Reste à préparer : la quantité reste collée au nom */
+  .preparer .prep {
+    display: inline-flex;
+    gap: 5px;
+    align-items: baseline;
+  }
+  .preparer .prep span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   /* --- Écran étroit --- */

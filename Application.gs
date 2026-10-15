@@ -2,7 +2,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Application_() {
-  return "2026.10.15-1253";
+  return "2026.10.15-1339";
 }
 
 function doGet() {

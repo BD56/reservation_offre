@@ -74,7 +74,14 @@
   de `body` (body flex + height 100 %) ; l'app chèques fixe `.app { height: 100vh;
   height: 100dvh }` et body n'est pas flex → structure reprise (15/10, version
   2026.10.15-11xx). Test : `.app` garde la hauteur de l'écran même si body passe en
-  hauteur automatique. EN ATTENTE du test de Bryan sous Safari.
+  hauteur automatique. ✅ CONFIRMÉ par Bryan sous Safari (15/10) : c'était bien ça.
+- **Noms très longs** (15/10, captures de Bryan : mots sans espace qui sortaient du cadre
+  « Reste à préparer » et passaient sous les boutons des cartes d'offre) : règle commune
+  `min-width: 0; max-width: 100%; overflow-wrap: anywhere` (infos, reste à préparer,
+  comparaison doublon, en-têtes de fenêtre et de feuille, cellules de la feuille,
+  étiquettes, message bref) ; quantité collée au nom dans « Reste à préparer » (`.prep`).
+  Test `test_ui_textes_longs` (10 séries) : aucun texte hors de sa case ni sous un bouton,
+  1366 et 400 px, tous les écrans.
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.
