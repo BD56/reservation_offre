@@ -48,7 +48,13 @@ const repo = process.argv[2];
       "O'Brien<img src=x onerror=window.__xss=1> Jo",
     ]);
     assert.match(await page.textContent("#preparer"), /Reste à préparer\s*7 Bloc 200g\s*1 L'entier/);
-    assert.match(await page.textContent("#lignes"), /5 × Bloc 200g, 1 × L'entier/);
+    assert.deepStrictEqual(
+      await page.$$eval(`.ligne[data-res="${env.ids.resDupont}"] .liste-articles li`, (x) =>
+        x.map((e) => e.textContent)
+      ),
+      ["5 × Bloc 200g", "1 × L'entier"],
+      "un article par ligne"
+    );
     // Recherche : nom, téléphone, email
     await page.fill("#recherche", "brien");
     assert.deepStrictEqual(await lignesEcran(), ["O'Brien<img src=x onerror=window.__xss=1> Jo"]);
@@ -124,9 +130,15 @@ const repo = process.argv[2];
         .map((a) => [a[2], a[3]]),
       [["Bloc 200g", 2]]
     );
+    assert.deepStrictEqual(
+      await page.$$eval(`.ligne[data-res="${env.ids.resDupont}"] .liste-articles li`, (x) =>
+        x.map((e) => e.textContent)
+      ),
+      ["2 × Bloc 200g"]
+    );
     assert.match(
-      await page.textContent(`.ligne[data-res="${env.ids.resDupont}"]`),
-      /2 × Bloc 200g[\s\S]*Contacté/
+      await page.textContent(`.ligne[data-res="${env.ids.resDupont}"] .actions-ligne`),
+      /Contacté/
     );
 
     // --- Feuille de préparation ---
@@ -150,6 +162,7 @@ const repo = process.argv[2];
     await page.click("#feuilleImprimer");
     const imprime = await page.evaluate(() => window.__imprime);
     assert.match(imprime, /Commandes à pointer \(2\)/);
+    assert.match(imprime, /<li><b>2 ×<\/b> <span>Bloc 200g<\/span><\/li>/, "feuille : un article par ligne");
     assert.strictEqual(await page.innerHTML("#zoneImpression"), "", "zone d'impression vidée après");
     await page.click('#voileFeuille [data-fermer="voileFeuille"]');
 

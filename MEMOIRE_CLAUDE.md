@@ -58,6 +58,9 @@
   `installerDepuisMenu` → compte rendu + contrôle des fichiers + version). Test
   `test_installation` (9 séries). Pas de déclencheurs ni de propriétés à installer pour
   l'instant (viendront avec la sécurité / le RGPD).
+- **Un article par ligne** (demande de Bryan, 15/10, après essai sur son vrai Sheet) :
+  `listeArticlesHtml` (quantité en gras collée au nom, nom long replié dans sa colonne)
+  dans la liste des réservations ET la colonne « Commande » de la feuille.
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.

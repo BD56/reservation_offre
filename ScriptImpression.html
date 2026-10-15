@@ -1,5 +1,5 @@
 <!-- Feuille de préparation : aperçu (total à préparer + liste à pointer), puis impression. -->
-<script data-version="2026.10.15-1042">
+<script data-version="2026.10.15-1052">
   let offreFeuille = null;
 
   function ouvrirFeuille(idOp) {
@@ -38,7 +38,7 @@
         listees
           .map(
             (r) =>
-              `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${r.etat === "Retrait" ? "☑" : "☐"}</td><td><b>${echapper(r.nom)}</b> ${echapper(r.prenom)}</td><td>${echapper(contactLisible(r))}</td>${produits ? `<td>${echapper(texteArticles(r))}</td>` : ""}<td>${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</td></tr>`
+              `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${r.etat === "Retrait" ? "☑" : "☐"}</td><td><b>${echapper(r.nom)}</b> ${echapper(r.prenom)}</td><td>${echapper(contactLisible(r))}</td>${produits ? `<td>${listeArticlesHtml(r)}</td>` : ""}<td>${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</td></tr>`
           )
           .join("") || `<tr><td colspan="${produits ? 5 : 4}">Aucune réservation</td></tr>`
       }</tbody></table></div>
