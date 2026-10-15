@@ -1,5 +1,5 @@
-<!-- Feuille de préparation : aperçu (total à préparer + liste à pointer), puis impression. -->
-<script data-version="2026.10.15-1052">
+<!-- Feuille de préparation : aperçu (total à préparer + liste à pointer), puis impression dans un onglet à part. -->
+<script data-version="2026.10.15-1102">
   let offreFeuille = null;
 
   function ouvrirFeuille(idOp) {
@@ -46,17 +46,40 @@
     $("feuille").innerHTML = html;
   }
 
-  // Seule la copie de la feuille est imprimée (CSS @media print) ; vidée après l'impression
+  // Impression dans un onglet à part, qui ne contient que la feuille (fond blanc) : l'application
+  // ne bouge jamais (sous Safari, masquer l'application le temps de l'impression laissait une
+  // page blanche). Le style de l'onglet est celui de la page, sans aucune ressource externe.
   $("feuilleImprimer").addEventListener("click", function () {
-    const zone = $("zoneImpression");
-    zone.innerHTML = `<div class="feuille">${$("feuille").innerHTML}</div>`;
-    window.addEventListener(
-      "afterprint",
-      function () {
-        zone.innerHTML = "";
-      },
-      { once: true }
+    const op = trouverOffre(offreFeuille);
+    const onglet = window.open("", "_blank");
+    if (!onglet) {
+      showToast(
+        "Le navigateur a bloqué l'onglet d'impression : autorisez les fenêtres pour ce site, puis réessayez.",
+        "error"
+      );
+      return;
+    }
+    const style = document.querySelector("style").textContent;
+    const fin = "</" + "script>";
+    onglet.document.open();
+    onglet.document.write(
+      `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">` +
+        `<title>${echapper("Feuille de préparation · " + (op ? op.nom : ""))}</title>` +
+        `<style>${style}
+          html, body { height: auto; }
+          body { display: block; background: #fff; padding: 20px; }
+          .feuille { max-width: 860px; margin: 0 auto; box-shadow: none; }
+          .barre-impression { max-width: 860px; margin: 0 auto 4px; padding: 0 40px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--doux); font-size: 14px; }
+          @page { margin: 12mm; }
+          @media print { body { padding: 0; } .barre-impression { display: none; } .feuille { padding: 0; max-width: none; } }
+        </style></head><body>` +
+        `<div class="barre-impression"><button type="button" class="sec accent" onclick="window.print()">Imprimer</button>` +
+        `<span>Fermez cet onglet après l'impression pour revenir à l'application.</span></div>` +
+        `<div class="feuille">${$("feuille").innerHTML}</div>` +
+        `<script>window.addEventListener("load", function () { window.print(); });${fin}` +
+        `</body></html>`
     );
-    window.print();
+    onglet.document.close();
+    onglet.focus();
   });
 </script>

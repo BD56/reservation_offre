@@ -1,4 +1,4 @@
-<style data-version="2026.10.15-1052">
+<style data-version="2026.10.15-1102">
   /* Style « Comptoir » (repris de l'app chèques) : clair uniquement, police du système,
      icônes SVG intégrées (Icones.html), aucune ressource externe. PC de l'accueil. */
   :root {
@@ -1342,23 +1342,6 @@
     color: var(--doux);
     font-size: 11.5px;
   }
-  #zoneImpression {
-    display: none;
-  }
-  @media print {
-    body > *:not(#zoneImpression) {
-      display: none !important;
-    }
-    #zoneImpression {
-      display: block !important;
-    }
-    #zoneImpression .feuille {
-      box-shadow: none;
-      padding: 0;
-      overflow: visible;
-    }
-  }
-
   /* --- Message bref, aide --- */
   .toast {
     position: absolute;

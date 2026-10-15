@@ -159,11 +159,38 @@ const repo = process.argv[2];
     await page.check("#feuilleAnnulees");
     feuille = await page.innerHTML("#feuille");
     assert.match(feuille, /<tr class="barre">[\s\S]*DUPONT/, "annulée listée, barrée, sur demande");
-    await page.click("#feuilleImprimer");
-    const imprime = await page.evaluate(() => window.__imprime);
+    // Impression dans un onglet à part : la feuille seule ; l'application ne bouge pas
+    const [onglet] = await Promise.all([page.waitForEvent("popup"), page.click("#feuilleImprimer")]);
+    await onglet.waitForLoadState();
+    const imprime = await onglet.content();
+    assert.match(await onglet.title(), /^Feuille de préparation · Foie <b>gras<\/b> "Noël"$/);
     assert.match(imprime, /Commandes à pointer \(2\)/);
     assert.match(imprime, /<li><b>2 ×<\/b> <span>Bloc 200g<\/span><\/li>/, "feuille : un article par ligne");
-    assert.strictEqual(await page.innerHTML("#zoneImpression"), "", "zone d'impression vidée après");
+    assert.ok(!imprime.includes("<img"), "noms échappés dans l'onglet");
+    assert.doesNotMatch(imprime, /<(script|link|img)[^>]+(src|href)="https?:/, "aucune ressource externe");
+    assert.match(
+      imprime,
+      /@media print[\s\S]*\.barre-impression \{ display: none; \}/,
+      "bandeau non imprimé"
+    );
+    assert.deepStrictEqual(
+      await onglet.$$eval("body > *", (x) => x.map((e) => e.className)),
+      ["barre-impression", "feuille", ""],
+      "onglet : rien d'autre que la feuille"
+    );
+    await onglet.close();
+    assert.ok(
+      (await page.isVisible("#ecranDetail")) && (await page.isVisible("#voileFeuille")),
+      "application intacte"
+    );
+    assert.ok(
+      !(await page.evaluate(() => window.__imprimeDansLaPage)),
+      "pas d'impression de la page elle-même"
+    );
+    // Onglet bloqué par le navigateur : message clair
+    await page.evaluate(() => (window.open = () => null));
+    await page.click("#feuilleImprimer");
+    assert.match(await toast(), /bloqué l'onglet d'impression/);
     await page.click('#voileFeuille [data-fermer="voileFeuille"]');
 
     // --- Fiche : supprimer une réservation ---

@@ -61,6 +61,13 @@
 - **Un article par ligne** (demande de Bryan, 15/10, après essai sur son vrai Sheet) :
   `listeArticlesHtml` (quantité en gras collée au nom, nom long replié dans sa colonne)
   dans la liste des réservations ET la colonne « Commande » de la feuille.
+- **Impression dans un onglet à part** (15/10, bug signalé par Bryan sous Safari : la
+  page devenait blanche pendant l'impression ; option A choisie) : « Imprimer » de
+  l'aperçu ouvre un onglet (`window.open` + `document.write`) avec la feuille seule, le
+  style de la page (`document.querySelector("style")`), fond blanc, bandeau « Imprimer »
+  non imprimé, impression lancée au chargement. Onglet bloqué → message. Plus de
+  `#zoneImpression` ni de `@media print` dans l'application. À vérifier sous Safari dans
+  la vraie page Apps Script (ouverture de l'onglet depuis le cadre).
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.
