@@ -3,13 +3,29 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_00_Constantes_() {
-  return "2026.10.15-1036";
+  return "2026.10.15-1042";
 }
 
 // Onglets du classeur
 const FEUILLE_OPERATIONS = "Operations";
 const FEUILLE_RESERVATIONS = "Reservations";
 const FEUILLE_ARTICLES = "Articles";
+
+// En-têtes écrits par l'installation (onglet créé, ou ligne 1 vide / incomplète)
+const ENTETES = {
+  Operations: ["ID_Operation", "Nom", "Type", "Date_Debut", "Date_Fin", "Mode_Saisie", "Articles_Predefinis"],
+  Reservations: ["ID_Reservation", "ID_Operation", "Nom", "Prenom", "Contact", "Etat", "Date_Saisie"],
+  Articles: ["ID_Article", "ID_Reservation", "Article", "Quantite"],
+};
+// Format des colonnes de dates (colonne A = 1)
+const FORMATS_DATES = {
+  Operations: [
+    [4, "dd/MM/yyyy"],
+    [5, "dd/MM/yyyy"],
+  ],
+  Reservations: [[7, "dd/MM/yyyy HH:mm"]],
+  Articles: [],
+};
 
 // Colonnes (index des tableaux de getValues : A = 0)
 // Operations : ID, Nom, Type, Date début, Date fin, Mode de saisie, Articles prédéfinis

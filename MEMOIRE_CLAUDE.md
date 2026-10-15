@@ -50,6 +50,14 @@
   latérales (trop de vide, 2e style de fenêtre). Page écartée (perd la recherche en
   cours, « ← Retour » de plus). Appli : `#voileFiche`, `#voileOffre`, `#aide` =
   `.voile.centre > .fenetre-form` (plus de `.tiroir` ni de panneau `.aide`).
+- **Installation automatique** (demande de Bryan, 15/10, « comme l'app chèques ») :
+  `installerFeuilles_` crée les onglets manquants (en-têtes `ENTETES`, gras, ligne figée,
+  formats de dates) et complète les cases d'en-tête VIDES seulement (jamais d'écrasement) ;
+  `doGet` l'appelle sous verrou si un onglet manque (échec = page ouverte quand même) ;
+  menu du Sheet « 🚀 APPLICATION → 🧰 Installer / vérifier l'installation » (`onOpen`,
+  `installerDepuisMenu` → compte rendu + contrôle des fichiers + version). Test
+  `test_installation` (9 séries). Pas de déclencheurs ni de propriétés à installer pour
+  l'instant (viendront avec la sécurité / le RGPD).
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.

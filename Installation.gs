@@ -1,9 +1,10 @@
-// Contrôle de l'installation : tous les fichiers présents et au même numéro de version,
-// sinon page « Installation incomplète » au lieu d'une application à moitié à jour.
+// Installation : onglets et colonnes du Google Sheets créés par le code (rien n'est jamais
+// écrasé), menu du Sheet, et contrôle « tous les fichiers présents et au même numéro de
+// version » (sinon page « Installation incomplète » au lieu d'une application à moitié à jour).
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Installation_() {
-  return "2026.10.15-1036";
+  return "2026.10.15-1042";
 }
 
 // Liste des problèmes (vide si tout va bien). La version de référence est celle de ce fichier.
@@ -62,4 +63,86 @@ function pageInstallationIncomplete_(problemes) {
     "<p>Prévenez le responsable : il doit recopier les fichiers indiqués puis redéployer.</p>" +
     "</div>";
   return HtmlService.createHtmlOutput(html).setTitle("Installation incomplète");
+}
+
+// --- Onglets et colonnes du Google Sheets ---
+function feuillesManquantes_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return Object.keys(ENTETES).filter(function (nom) {
+    return !ss.getSheetByName(nom);
+  });
+}
+
+// Crée les onglets manquants et complète une ligne d'en-tête vide ou incomplète. Une cellule
+// d'en-tête déjà remplie n'est jamais modifiée, et aucune donnée n'est touchée.
+// Renvoie la liste de ce qui a été fait.
+function installerFeuilles_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const faits = [];
+  Object.keys(ENTETES).forEach(function (nom, position) {
+    const entetes = ENTETES[nom];
+    let feuille = ss.getSheetByName(nom);
+    if (!feuille) {
+      feuille = ss.insertSheet(nom, position);
+      feuille.getRange(1, 1, 1, entetes.length).setValues([entetes]).setFontWeight("bold");
+      feuille.setFrozenRows(1);
+      FORMATS_DATES[nom].forEach(function (f) {
+        const lettre = String.fromCharCode(64 + f[0]); // colonne entière, lignes futures comprises
+        feuille.getRange(lettre + "2:" + lettre).setNumberFormat(f[1]);
+      });
+      faits.push("Onglet « " + nom + " » créé.");
+      return;
+    }
+    const ligne1 = feuille.getRange(1, 1, 1, entetes.length).getValues()[0];
+    const manquantes = [];
+    entetes.forEach(function (titre, i) {
+      if (String(ligne1[i] == null ? "" : ligne1[i]).trim() === "") {
+        feuille
+          .getRange(1, i + 1)
+          .setValue(titre)
+          .setFontWeight("bold");
+        manquantes.push(titre);
+      }
+    });
+    if (manquantes.length)
+      faits.push("Onglet « " + nom + " » : colonnes ajoutées (" + manquantes.join(", ") + ").");
+  });
+  return faits;
+}
+
+// Installation complète (idempotente) : onglets, colonnes, contrôle des fichiers.
+function installer_() {
+  const rapport = installerFeuilles_();
+  let problemes = [];
+  try {
+    problemes = verifierInstallation_();
+  } catch (e) {
+    rapport.push("Contrôle des fichiers impossible : " + e.message);
+  }
+  if (problemes.length) {
+    rapport.unshift("⚠️ INSTALLATION INCOMPLÈTE (l'application est bloquée) :\n- " + problemes.join("\n- "));
+  }
+  if (!rapport.length) rapport.push("Rien à faire : tout est déjà en place.");
+  rapport.push("Version " + version_Installation_() + ".");
+  Logger.log(rapport.join("\n"));
+  return rapport.join("\n");
+}
+
+// Menu du Google Sheets → « 🧰 Installer / vérifier l'installation »
+function installerDepuisMenu() {
+  const ui = SpreadsheetApp.getUi(); // échoue hors du Google Sheets : rien n'est fait
+  ui.alert(
+    "🧰 Installation",
+    installer_() +
+      "\n\nSi l'application n'est pas encore en ligne : Extensions → Apps Script → " +
+      "Déployer → Nouveau déploiement → Application Web.",
+    ui.ButtonSet.OK
+  );
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("🚀 APPLICATION")
+    .addItem("🧰 Installer / vérifier l'installation", "installerDepuisMenu")
+    .addToUi();
 }

@@ -14,7 +14,8 @@ Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**
 - **Application.gs** — `doGet`, `include_`, outils communs (`avecVerrou_`, `texte_`, `nouvelId_`…).
 - **Copie.gs** — copie de la page : toutes les offres + réservations des offres actives
   (glissée dans la page par `doGet`, rechargée par `chargerCopie`).
-- **Installation.gs** — contrôle « tous les fichiers à la même version ».
+- **Installation.gs** — onglets et en-têtes créés par le code (`installerFeuilles_`, menu
+  du Sheet `onOpen` → `installerDepuisMenu`), contrôle « tous les fichiers à la même version ».
 - **Operations.gs** — offres : détail (offres terminées), création, modification, suppression
   en cascade (onglets réécrits en une fois). Chaque modification renvoie la copie à jour.
 - **Reservations.gs** — enregistrement d'une réservation (identifiant donné par la page :
@@ -55,6 +56,17 @@ Page :
   téléphone ou email → « Ce client a déjà réservé » (enregistrer quand même possible).
 
 Les fonctions serveur dont le nom finit par `_` ne sont pas appelables depuis la page.
+
+## Installer sur un nouveau Google Sheets
+Les onglets `Operations`, `Reservations` et `Articles` (et leurs en-têtes) sont **créés par
+le code** : à la première ouverture de l'application, ou par le menu du Sheet
+**🚀 APPLICATION → 🧰 Installer / vérifier l'installation** (compte rendu : ce qui a été
+créé, fichiers manquants, version). Rien n'est jamais écrasé : sur un classeur déjà en
+service, seules les cases d'en-tête vides sont complétées.
+1. Créer un Google Sheets vide, puis Extensions → Apps Script.
+2. Créer les fichiers du dépôt (`.gs` et `.html`, mêmes noms) et y coller leur contenu.
+3. Recharger le Sheet → menu 🚀 APPLICATION → 🧰 Installer (accepter les autorisations).
+4. Déployer → Nouveau déploiement → Application Web.
 
 ## Mettre à jour l'application en service
 Chaque fichier porte le même numéro de version. S'il manque un fichier ou qu'un fichier

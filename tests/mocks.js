@@ -21,6 +21,8 @@ function makeEnv(opts = {}) {
     sheets: opts.sheets || classeurVide(),
     verrous: 0, // verrous pris et pas encore rendus
     flushs: 0,
+    menus: [], // éléments du menu du Google Sheets
+    alertes: [], // fenêtres affichées dans le Google Sheets
   };
   const ss = makeSpreadsheet(env);
   env.ctx = loadCode(opts.repo, {
@@ -46,6 +48,20 @@ function makeEnv(opts = {}) {
       flush() {
         env.flushs++;
       },
+      getUi: () => ({
+        createMenu: (titre) => {
+          const menu = {
+            addItem: (libelle, fonction) => {
+              env.menus.push([titre, libelle, fonction]);
+              return menu;
+            },
+            addToUi: () => menu,
+          };
+          return menu;
+        },
+        alert: (titre, texte) => env.alertes.push(titre + " | " + texte),
+        ButtonSet: { OK: "OK" },
+      }),
     },
     // Fichiers .html du dépôt, comme dans le projet Apps Script (fichier absent -> erreur)
     HtmlService: {

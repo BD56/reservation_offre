@@ -67,6 +67,8 @@ try {
       "deleteReservation",
       "doGet",
       "getOperationDetails",
+      "installerDepuisMenu",
+      "onOpen",
       "saveOperation",
       "saveReservation",
       "updateOperation",
