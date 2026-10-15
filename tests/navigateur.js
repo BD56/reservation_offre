@@ -21,7 +21,7 @@ const PROXY = `
     }});
   }
   window.google = { script: { run: runner(null, null) } };
-  window.print = function () { window.__imprimeDansLaPage = true; };
+  window.print = function () { window.__imprime = document.getElementById('zoneImpression').innerHTML; };
   window.__alertes = []; window.alert = function (m) { window.__alertes.push(String(m)); };
   window.confirm = function () { return window.__confirmer !== false; };
 })();`;

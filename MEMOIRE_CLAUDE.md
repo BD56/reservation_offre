@@ -61,13 +61,15 @@
 - **Un article par ligne** (demande de Bryan, 15/10, après essai sur son vrai Sheet) :
   `listeArticlesHtml` (quantité en gras collée au nom, nom long replié dans sa colonne)
   dans la liste des réservations ET la colonne « Commande » de la feuille.
-- **Impression dans un onglet à part** (15/10, bug signalé par Bryan sous Safari : la
-  page devenait blanche pendant l'impression ; option A choisie) : « Imprimer » de
-  l'aperçu ouvre un onglet (`window.open` + `document.write`) avec la feuille seule, le
-  style de la page (`document.querySelector("style")`), fond blanc, bandeau « Imprimer »
-  non imprimé, impression lancée au chargement. Onglet bloqué → message. Plus de
-  `#zoneImpression` ni de `@media print` dans l'application. À vérifier sous Safari dans
-  la vraie page Apps Script (ouverture de l'onglet depuis le cadre).
+- **Impression (15/10)** : bug Bryan sous Safari = page blanche à l'impression. L'option A
+  (onglet à part) n'a PAS résolu le problème → RETIRÉE (demande de Bryan). Méthode de
+  l'app chèques reprise À L'IDENTIQUE : feuille copiée dans `#zoneImpression` (hors
+  `.app`), aperçu fermé AVANT `window.print()`, zone JAMAIS vidée après (plus
+  d'`afterprint` : sous Safari l'impression ne bloque pas), `@media print` = html/body
+  hauteur auto, overflow visible, `display: block`, fond blanc, `.app` masquée. Différences
+  avec ma 1re version : vidage à afterprint, body resté flex/100 %, aperçu laissé ouvert.
+  EN ATTENTE du test de Bryan sous Safari. Leçon : partir du code qui marche déjà
+  (app chèques) au lieu d'inventer.
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.

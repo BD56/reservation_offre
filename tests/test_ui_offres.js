@@ -159,39 +159,28 @@ const repo = process.argv[2];
     await page.check("#feuilleAnnulees");
     feuille = await page.innerHTML("#feuille");
     assert.match(feuille, /<tr class="barre">[\s\S]*DUPONT/, "annulée listée, barrée, sur demande");
-    // Impression dans un onglet à part : la feuille seule ; l'application ne bouge pas
-    const [onglet] = await Promise.all([page.waitForEvent("popup"), page.click("#feuilleImprimer")]);
-    await onglet.waitForLoadState();
-    const imprime = await onglet.content();
-    assert.match(await onglet.title(), /^Feuille de préparation · Foie <b>gras<\/b> "Noël"$/);
+    // Impression comme dans l'app chèques : feuille copiée dans #zoneImpression, aperçu fermé
+    await page.click("#feuilleImprimer");
+    const imprime = await page.evaluate(() => window.__imprime);
     assert.match(imprime, /Commandes à pointer \(2\)/);
     assert.match(imprime, /<li><b>2 ×<\/b> <span>Bloc 200g<\/span><\/li>/, "feuille : un article par ligne");
-    assert.ok(!imprime.includes("<img"), "noms échappés dans l'onglet");
-    assert.doesNotMatch(imprime, /<(script|link|img)[^>]+(src|href)="https?:/, "aucune ressource externe");
-    assert.match(
+    assert.ok(!(await page.isVisible("#voileFeuille")), "aperçu fermé avant l'impression");
+    assert.strictEqual(
+      await page.innerHTML("#zoneImpression"),
       imprime,
-      /@media print[\s\S]*\.barre-impression \{ display: none; \}/,
-      "bandeau non imprimé"
+      "zone gardée après l'impression (pas vidée à afterprint)"
     );
-    assert.deepStrictEqual(
-      await onglet.$$eval("body > *", (x) => x.map((e) => e.className)),
-      ["barre-impression", "feuille", ""],
-      "onglet : rien d'autre que la feuille"
-    );
-    await onglet.close();
-    assert.ok(
-      (await page.isVisible("#ecranDetail")) && (await page.isVisible("#voileFeuille")),
-      "application intacte"
-    );
-    assert.ok(
-      !(await page.evaluate(() => window.__imprimeDansLaPage)),
-      "pas d'impression de la page elle-même"
-    );
-    // Onglet bloqué par le navigateur : message clair
-    await page.evaluate(() => (window.open = () => null));
-    await page.click("#feuilleImprimer");
-    assert.match(await toast(), /bloqué l'onglet d'impression/);
-    await page.click('#voileFeuille [data-fermer="voileFeuille"]');
+    // À l'impression : seule la zone est visible, page en mode normal (pas de flex / 100 %)
+    await page.emulateMedia({ media: "print" });
+    const etat = await page.evaluate(() => ({
+      app: getComputedStyle(document.getElementById("app")).display,
+      zone: getComputedStyle(document.getElementById("zoneImpression")).display,
+      body: getComputedStyle(document.body).display,
+      fond: getComputedStyle(document.body).backgroundColor,
+    }));
+    assert.deepStrictEqual(etat, { app: "none", zone: "block", body: "block", fond: "rgb(255, 255, 255)" });
+    await page.emulateMedia({ media: "screen" });
+    assert.ok(await page.isVisible("#ecranDetail"), "application intacte après l'impression");
 
     // --- Fiche : supprimer une réservation ---
     await page.click(`.ligne[data-res="${env.ids.resDupont}"] .qui`);

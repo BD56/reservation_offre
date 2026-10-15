@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-version="2026.10.15-1102">
+<html lang="fr" data-version="2026.10.15-1112">
   <head>
     <base target="_top">
     <?!= include_('Style') ?>
@@ -190,6 +190,9 @@
 
       <div class="toast" id="toast" role="status" hidden><svg class="ico"><use href="#i-check"/></svg><span id="toastTxt"></span><button type="button" id="toastAnnuler" hidden>Annuler</button></div>
     </div>
+
+    <!-- Copie de la feuille, seule imprimée (@media print dans Style.html) -->
+    <div id="zoneImpression"></div>
 
     <script>
       // Offres et réservations des offres actives, glissées dans la page par doGet (null si
