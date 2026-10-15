@@ -2,7 +2,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Reservations_() {
-  return "2026.10.15-1026";
+  return "2026.10.15-1036";
 }
 
 function verifierClient_(data) {

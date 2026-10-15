@@ -253,6 +253,14 @@ const repo = process.argv[2];
     assert.match(await page.textContent("#voileMentions"), /Hypermarché Carrefour Vannes/);
     await page.keyboard.press("Escape");
     assert.ok(!(await page.isVisible("#voileMentions")));
+    // Aide en fenêtre centrée : fermée par la croix ou par un clic à côté
+    await page.click("#btnAide");
+    assert.ok(await page.isVisible("#aide .fenetre-form"));
+    await page.mouse.click(5, 300);
+    assert.ok(!(await page.isVisible("#aide")), "clic à côté : fermée");
+    await page.click("#btnAide");
+    await page.click("#fermerAide");
+    assert.ok(!(await page.isVisible("#aide")));
 
     assert.strictEqual(await page.evaluate(() => window.__xss || 0), 0, "aucun code injecté");
     assert.deepStrictEqual(o.erreursPage, [], "aucune erreur dans la page");

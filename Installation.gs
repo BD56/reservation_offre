@@ -3,7 +3,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Installation_() {
-  return "2026.10.15-1026";
+  return "2026.10.15-1036";
 }
 
 // Liste des problèmes (vide si tout va bien). La version de référence est celle de ce fichier.

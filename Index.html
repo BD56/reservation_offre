@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-version="2026.10.15-1026">
+<html lang="fr" data-version="2026.10.15-1036">
   <head>
     <base target="_top">
     <?!= include_('Style') ?>
@@ -83,8 +83,8 @@
       </main>
 
       <!-- Fiche d'une réservation -->
-      <div class="voile" id="voileFiche" hidden>
-        <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
+      <div class="voile centre" id="voileFiche" hidden>
+        <div class="fenetre-form" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
           <div class="tiroir-tete"><h2 id="ficheTitre"></h2><button type="button" class="icone-btn" data-fermer="voileFiche" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
           <div class="tiroir-corps">
             <div class="bloc"><h3>État</h3><div class="segment" id="ficheEtat"></div></div>
@@ -101,12 +101,12 @@
               <button type="button" class="sec plein-danger" id="ficheSupprimerOui">Supprimer</button><button type="button" class="sec" id="ficheSupprimerNon">Garder</button></div>
           </div>
           <div class="tiroir-pied"><button type="button" class="plein" id="ficheEnregistrer" disabled>Enregistrer les modifications</button><button type="button" class="lien-danger" id="ficheSupprimer">Supprimer…</button></div>
-        </aside>
+        </div>
       </div>
 
       <!-- Création / modification d'une offre -->
-      <div class="voile" id="voileOffre" hidden>
-        <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="offreTitre">
+      <div class="voile centre" id="voileOffre" hidden>
+        <div class="fenetre-form large" role="dialog" aria-modal="true" aria-labelledby="offreTitre">
           <div class="tiroir-tete"><h2 id="offreTitre">Nouvelle offre</h2><button type="button" class="icone-btn" data-fermer="voileOffre" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
           <div class="tiroir-corps">
             <div class="champ"><label for="oNom">Nom de l'offre</label><input id="oNom" placeholder="Ex. : Foie gras de Noël"></div>
@@ -124,7 +124,7 @@
             <p class="erreur-texte" id="oErreur" role="status"></p>
           </div>
           <div class="tiroir-pied"><button type="button" class="plein" id="oEnregistrer">Enregistrer l'offre</button></div>
-        </aside>
+        </div>
       </div>
 
       <!-- Alerte : client déjà inscrit -->
@@ -173,15 +173,20 @@
         </div>
       </div>
 
-      <aside class="aide" id="aide" hidden aria-label="Aide">
-        <div class="tete-aide"><h2>Aide</h2><button type="button" class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
-        <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités avec + / −, puis Entrée. La réservation est confirmée tout de suite ; « en cours d'envoi » s'affiche en haut le temps que le Google Sheets l'enregistre.</p>
-        <p><b>Un client vient chercher sa commande :</b> Offres et réservations → l'offre → tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
-        <p><b>Modifier ou supprimer une réservation :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
-        <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
-        <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer, triée par nom (les annulées ne comptent pas).</p>
-        <p><b>Réservation NON enregistrée :</b> la connexion a été perdue ou le serveur a refusé. « Réessayer » ne crée jamais de double.</p>
-      </aside>
+      <!-- Aide -->
+      <div class="voile centre" id="aide" hidden>
+        <div class="fenetre-form etroite" role="dialog" aria-modal="true" aria-labelledby="aideTitre">
+          <div class="tiroir-tete"><h2 id="aideTitre">Aide</h2><button type="button" class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+          <div class="tiroir-corps aide-corps">
+            <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités avec + / −, puis Entrée. La réservation est confirmée tout de suite ; « en cours d'envoi » s'affiche en haut le temps que le Google Sheets l'enregistre.</p>
+            <p><b>Un client vient chercher sa commande :</b> Offres et réservations → l'offre → tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
+            <p><b>Modifier ou supprimer une réservation :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
+            <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
+            <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer, triée par nom (les annulées ne comptent pas).</p>
+            <p><b>Réservation NON enregistrée :</b> la connexion a été perdue ou le serveur a refusé. « Réessayer » ne crée jamais de double.</p>
+          </div>
+        </div>
+      </div>
 
       <div class="toast" id="toast" role="status" hidden><svg class="ico"><use href="#i-check"/></svg><span id="toastTxt"></span><button type="button" id="toastAnnuler" hidden>Annuler</button></div>
     </div>

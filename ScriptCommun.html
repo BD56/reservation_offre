@@ -1,5 +1,5 @@
 <!-- Outils communs : échappement, message bref, fenêtres, écrans, démarrage, aide et mentions. -->
-<script data-version="2026.10.15-1026">
+<script data-version="2026.10.15-1036">
   function $(id) {
     return document.getElementById(id);
   }
@@ -70,8 +70,8 @@
   document
     .querySelectorAll("[data-fermer]")
     .forEach((b) => b.addEventListener("click", () => fermerVoile(b.dataset.fermer)));
-  // Clic à côté d'un tiroir : fermé (pas pour les alertes, qui demandent une réponse)
-  ["voileFiche", "voileOffre", "voileMentions", "voileFeuille"].forEach((id) =>
+  // Clic à côté d'une fenêtre : fermée (pas pour les alertes, qui demandent une réponse)
+  ["voileFiche", "voileOffre", "voileMentions", "voileFeuille", "aide"].forEach((id) =>
     $(id).addEventListener("click", (e) => {
       if (e.target === $(id)) fermerVoile(id);
     })

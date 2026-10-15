@@ -1,4 +1,4 @@
-<style data-version="2026.10.15-1026">
+<style data-version="2026.10.15-1036">
   /* Style « Comptoir » (repris de l'app chèques) : clair uniquement, police du système,
      icônes SVG intégrées (Icones.html), aucune ressource externe. PC de l'accueil. */
   :root {
@@ -860,18 +860,27 @@
     padding: 16px;
     overflow: auto;
   }
-  .tiroir {
-    margin-left: auto;
-    width: min(520px, 100%);
-    height: 100%;
+  /* Fenêtres de formulaire centrées (fiche, offre, aide) : hauteur selon le contenu */
+  .fenetre-form {
+    width: 100%;
+    max-width: 600px;
+    max-height: 100%;
     background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    box-shadow: -20px 0 40px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+  }
+  .fenetre-form.large {
+    max-width: 660px;
+  }
+  .fenetre-form.etroite {
+    max-width: 520px;
   }
   .tiroir-tete {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     padding: 18px 22px 12px;
     border-bottom: 1px solid var(--trait);
@@ -890,7 +899,7 @@
     margin-top: 3px;
   }
   .tiroir-corps {
-    flex: 1;
+    flex: 1 1 auto;
     overflow: auto;
     padding: 18px 22px;
     display: flex;
@@ -1360,39 +1369,13 @@
     padding: 6px 10px;
     font-weight: 700;
   }
-  .aide {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(400px, 100%);
-    background: var(--surface);
-    border-left: 1px solid var(--trait);
-    z-index: 7;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    box-shadow: -20px 0 40px rgba(0, 0, 0, 0.1);
-    overflow: auto;
-  }
-  .aide .tete-aide {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .aide h2 {
-    margin: 0;
-    font-size: 18px;
-    flex: 1;
-  }
-  .aide p {
+  .aide-corps p {
     margin: 0;
     font-size: 14px;
     line-height: 1.5;
     color: var(--doux);
   }
-  .aide b {
+  .aide-corps b {
     color: var(--encre);
   }
 

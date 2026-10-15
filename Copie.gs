@@ -5,7 +5,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Copie_() {
-  return "2026.10.15-1026";
+  return "2026.10.15-1036";
 }
 
 // Lignes d'un onglet sans l'en-tête ; onglet absent -> aucune ligne
