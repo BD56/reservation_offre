@@ -1,4 +1,4 @@
-<style data-version="2026.10.15-1112">
+<style data-version="2026.10.15-1253">
   /* Style « Comptoir » (repris de l'app chèques) : clair uniquement, police du système,
      icônes SVG intégrées (Icones.html), aucune ressource externe. PC de l'accueil. */
   :root {
@@ -41,8 +41,6 @@
     color: var(--encre);
     font-family: var(--texte);
     font-size: 15px;
-    display: flex;
-    flex-direction: column;
   }
   button,
   input,
@@ -71,9 +69,12 @@
   }
 
   /* --- En-tête --- */
+  /* Hauteur de l'écran fixée sur l'application elle-même (comme l'app chèques), et non
+     héritée de body : après l'impression, Safari peut garder body en hauteur automatique,
+     et une application qui en dépendait restait à hauteur nulle (page blanche). */
   .app {
-    flex: 1;
-    min-height: 0;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     position: relative;

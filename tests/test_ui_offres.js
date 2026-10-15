@@ -181,6 +181,21 @@ const repo = process.argv[2];
     assert.deepStrictEqual(etat, { app: "none", zone: "block", body: "block", fond: "rgb(255, 255, 255)" });
     await page.emulateMedia({ media: "screen" });
     assert.ok(await page.isVisible("#ecranDetail"), "application intacte après l'impression");
+    // Hauteur de l'application fixée sur l'écran, pas héritée de body (page blanche sous
+    // Safari après l'impression quand body restait en hauteur automatique)
+    const hauteurs = await page.evaluate(() => {
+      document.documentElement.style.height = "auto";
+      document.body.style.height = "auto";
+      const r = { app: document.getElementById("app").offsetHeight, ecran: window.innerHeight };
+      document.documentElement.style.height = "";
+      document.body.style.height = "";
+      return r;
+    });
+    assert.strictEqual(
+      hauteurs.app,
+      hauteurs.ecran,
+      "application à la hauteur de l'écran, même si body ne l'est plus"
+    );
 
     // --- Fiche : supprimer une réservation ---
     await page.click(`.ligne[data-res="${env.ids.resDupont}"] .qui`);

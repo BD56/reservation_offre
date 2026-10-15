@@ -68,8 +68,13 @@
   d'`afterprint` : sous Safari l'impression ne bloque pas), `@media print` = html/body
   hauteur auto, overflow visible, `display: block`, fond blanc, `.app` masquée. Différences
   avec ma 1re version : vidage à afterprint, body resté flex/100 %, aperçu laissé ouvert.
-  EN ATTENTE du test de Bryan sous Safari. Leçon : partir du code qui marche déjà
-  (app chèques) au lieu d'inventer.
+  Leçon : partir du code qui marche déjà (app chèques) au lieu d'inventer.
+  Retour de Bryan : TOUJOURS blanc, et la page RESTE blanche après fermeture de la
+  fenêtre d'impression (Imprimer ou Annuler). Cause probable : hauteur de `.app` héritée
+  de `body` (body flex + height 100 %) ; l'app chèques fixe `.app { height: 100vh;
+  height: 100dvh }` et body n'est pas flex → structure reprise (15/10, version
+  2026.10.15-11xx). Test : `.app` garde la hauteur de l'écran même si body passe en
+  hauteur automatique. EN ATTENTE du test de Bryan sous Safari.
 - **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.
