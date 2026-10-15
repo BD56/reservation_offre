@@ -169,7 +169,15 @@
   .confirme p { margin: 0; color: var(--danger); font-weight: 650; font-size: 14px; flex: 1 1 260px; }
   .confirme .sec.plein-danger { background: var(--danger); color: var(--blanc); border-color: var(--danger); }
 
-  /* Tiroirs (fiche réservation, éditeur d'offre) */
+  /* Fenêtres de formulaire centrées (fiche réservation, offre, aide) : hauteur selon le contenu */
+  .fenetre-form { width: 100%; max-width: 600px; max-height: 100%; background: var(--surface); border-radius: 20px; box-shadow: 0 30px 80px rgba(0,0,0,.3); display: flex; flex-direction: column; overflow: hidden; }
+  .fenetre-form.large { max-width: 660px; }
+  .fenetre-form.etroite { max-width: 520px; }
+  .fenetre-form .tiroir-tete { padding: 18px 22px 12px; align-items: center; }
+  .fenetre-form .tiroir-corps { flex: 1 1 auto; padding: 18px 22px; }
+  .fenetre-form .tiroir-pied { padding: 14px 22px 18px; }
+  .aide-corps p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--doux); }
+  .aide-corps b { color: var(--encre); }
   .voile { position: absolute; inset: 0; background: var(--voile); z-index: 5; display: flex; }
   .tiroir { margin-left: auto; width: min(520px, 100%); height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -20px 0 40px rgba(0,0,0,.15); }
   .tiroir-tete { display: flex; align-items: flex-start; gap: 12px; padding-block: 18px 12px; padding-left: 22px; padding-right: max(22px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--trait); }
@@ -377,8 +385,8 @@
   </main>
 
   <!-- Fiche d'une réservation -->
-  <div class="voile" id="voileFiche" hidden>
-    <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
+  <div class="voile centre" id="voileFiche" hidden>
+    <div class="fenetre-form" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
       <div class="tiroir-tete"><h2 id="ficheTitre"></h2><button class="icone-btn" data-fermer="voileFiche" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
       <div class="tiroir-corps">
         <div class="bloc"><h3>État</h3><div class="segment" id="ficheEtat"></div></div>
@@ -392,12 +400,12 @@
           <button class="sec plein-danger" id="ficheSupprimerOui">Supprimer</button><button class="sec" id="ficheSupprimerNon">Garder</button></div>
       </div>
       <div class="tiroir-pied"><button class="plein" id="ficheEnregistrer" disabled>Enregistrer les modifications</button><button class="lien-danger" id="ficheSupprimer">Supprimer…</button></div>
-    </aside>
+    </div>
   </div>
 
   <!-- Éditeur d'offre -->
-  <div class="voile" id="voileOffre" hidden>
-    <aside class="tiroir" role="dialog" aria-modal="true" aria-labelledby="offreTitre">
+  <div class="voile centre" id="voileOffre" hidden>
+    <div class="fenetre-form large" role="dialog" aria-modal="true" aria-labelledby="offreTitre">
       <div class="tiroir-tete"><h2 id="offreTitre">Nouvelle offre</h2><button class="icone-btn" data-fermer="voileOffre" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
       <div class="tiroir-corps">
         <div class="champ"><label for="oNom">Nom de l'offre</label><input id="oNom" placeholder="Ex. : Foie gras de Noël"></div>
@@ -414,7 +422,7 @@
         <p class="erreur-texte" id="oErreur" role="status"></p>
       </div>
       <div class="tiroir-pied"><button class="plein" id="oEnregistrer">Enregistrer l'offre</button></div>
-    </aside>
+    </div>
   </div>
 
   <!-- Alerte doublon -->
@@ -450,14 +458,18 @@
     </div>
   </div>
 
-  <aside class="aide" id="aide" hidden aria-label="Aide">
-    <div class="tete-aide"><h2>Aide</h2><button class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+  <div class="voile centre" id="aide" hidden>
+    <div class="fenetre-form etroite" role="dialog" aria-modal="true" aria-labelledby="aideTitre">
+      <div class="tiroir-tete"><h2 id="aideTitre">Aide</h2><button class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+      <div class="tiroir-corps aide-corps">
     <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités, puis Entrée. La réservation est confirmée tout de suite ; « en cours d'envoi » en haut le temps que le Google Sheets l'enregistre.</p>
     <p><b>Un client vient chercher sa commande :</b> Offres et réservations → l'offre → tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
     <p><b>Modifier ou supprimer :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
     <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
     <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer (les annulées ne comptent pas).</p>
-  </aside>
+      </div>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" hidden><svg class="ico"><use href="#i-check"/></svg><span id="toastTxt"></span><button id="toastAnnuler" hidden>Annuler</button></div>
 </div>
@@ -548,7 +560,7 @@
   $("ongletSaisie").addEventListener("click", () => allerEcran("saisie"));
   $("ongletOffres").addEventListener("click", () => allerEcran("offres"));
   document.querySelectorAll("[data-fermer]").forEach((b) => b.addEventListener("click", () => { $(b.dataset.fermer).hidden = true; }));
-  document.querySelectorAll(".voile").forEach((v) => v.addEventListener("click", (e) => { if (e.target === v && !v.classList.contains("centre")) v.hidden = true; }));
+  ["voileFiche", "voileOffre", "voileFeuille", "aide"].forEach((id) => $(id).addEventListener("click", (e) => { if (e.target === $(id)) $(id).hidden = true; }));
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     ["voileFeuille", "voileFiche", "voileOffre", "aide"].forEach((id) => { $(id).hidden = true; });

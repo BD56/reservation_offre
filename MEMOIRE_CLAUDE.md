@@ -44,6 +44,12 @@
      fenêtres natives. Tests réécrits (8 séries), « ses 1 réservation » corrigé.
 - **Rien n'est testé sur un vrai Google Sheet** (simulation seulement).
 
+- **Maquette v3 (15/10, demande de Bryan, EN ATTENTE de son avis)** : fiche réservation,
+  éditeur d'offre et aide en FENÊTRES CENTRÉES (`.fenetre-form`, hauteur selon le contenu,
+  même style que les alertes ; clic à côté ou Échap = fermer) au lieu des barres
+  latérales (trop de vide, 2e style de fenêtre). Page écartée (perd la recherche en
+  cours, « ← Retour » de plus). À reporter dans l'application après validation.
+
 ## Contexte (réponses de Bryan, 14/10)
 - Utilisé **à l'accueil, sur PC** (pas de tablette).
 - **Copie locale des offres actives** voulue : ne plus attendre les chargements.
