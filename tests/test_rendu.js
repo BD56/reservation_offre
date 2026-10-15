@@ -1,5 +1,6 @@
 // La page telle que doGet la produit : morceaux insérés, plus de balise de modèle, scripts
-// sans erreur de syntaxe, copie glissée dans la page sans pouvoir fermer la balise <script>.
+// sans erreur de syntaxe, aucune ressource externe, copie glissée dans la page sans pouvoir
+// fermer la balise <script>.
 const assert = require("assert");
 const vm = require("vm");
 const { rendrePage } = require("./harness");
@@ -26,7 +27,13 @@ try {
       new vm.Script(m[1], { filename: "script " + n });
     }
     assert.strictEqual(n, 6, "scripts de la page (copie + 5 morceaux), aucun ajouté par les données");
-    assert.match(rendu, /<style[^>]*>[\s\S]*\.card-custom/, "style inséré");
+    assert.match(rendu, /<style[^>]*>[\s\S]*--accent:/, "style inséré");
+    assert.match(rendu, /<symbol id="i-check"/, "icônes insérées");
+    assert.doesNotMatch(
+      rendu,
+      /<(script|link|img)[^>]+(src|href)="https?:/,
+      "aucune ressource externe (CDN)"
+    );
     const copie = new Function("return " + rendu.match(/const COPIE_INITIALE = (.*);/)[1])();
     if (copieJson !== "null") {
       const noms = copie.reservations[env.ids.foie].map((r) => r.nom);

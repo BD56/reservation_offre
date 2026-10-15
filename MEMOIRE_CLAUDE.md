@@ -1,6 +1,6 @@
 # Mémoire de travail — Claude
 
-> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-14.
+> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-15.
 
 ## ▶️ État actuel
 - Branche de travail : `claude/happy-franklin-af909r` (pas de pull request).
@@ -30,6 +30,18 @@
      textes en texte) ; articles écrits en une fois ; alerte doublon (même offre, nom +
      prénom normalisés, même téléphone OU email ; annulées ignorées) — non bloquante.
      `getOperationsData` supprimée (remplacée par `chargerCopie`). 8 séries de tests.
+  4. **Étape 3 — design « Comptoir »** (« go » de Bryan le 15/10 sur la maquette v2 ;
+     « Retiré » sans confirmation validé) : Bootstrap et CDN retirés ; `Style.html`
+     (palette Comptoir), `Icones.html` (sprite SVG) ; onglets « Nouvelle réservation » /
+     « Offres et réservations » ; saisie seule (offre en menu déroulant avec groupes, reste
+     choisie après un enregistrement ; articles + / − ; saisie libre : lignes + / −) ; page
+     réservations d'une offre (recherche, filtres, reste à préparer, « Retiré » +
+     Annuler) ; fiche (état, coordonnées, quantités, suppression) → nouvelles fonctions
+     serveur `updateReservation` / `deleteReservation` (renvoient la copie) ; éditeur
+     d'offre (articles en étiquettes, une virgule sépare) ; doublon en comparaison +
+     « Modifier l'existante » ; échec d'envoi en fenêtre ; feuille de préparation (aperçu,
+     tri par nom, annulées en option, impression via `#zoneImpression`). Plus de
+     fenêtres natives. Tests réécrits (8 séries), « ses 1 réservation » corrigé.
 - **Rien n'est testé sur un vrai Google Sheet** (simulation seulement).
 
 ## Contexte (réponses de Bryan, 14/10)
@@ -42,9 +54,8 @@
 ## Plan validé (une étape = un commit, tests verts, point à Bryan)
 1. ✅ Socle.
 2. ✅ Rapidité (voir ci-dessus).
-3. Design « Comptoir » : sans Bootstrap/CDN, recherche/filtre des inscrits,
-   modifier/supprimer une réservation. **Pas de logo** (décision de Bryan, 14/10).
-   Maquette cliquable (14/10, EN ATTENTE de validation) : `docs/maquettes/comptoir-reservations.html`,
+3. ✅ Design « Comptoir » (voir ci-dessus). **Pas de logo** (décision de Bryan, 14/10).
+   Maquette cliquable (validée en v2 le 15/10) : `docs/maquettes/comptoir-reservations.html`,
    artefact privé https://claude.ai/artifact/7rAHc1LAay3N4j62ZBzX4r. **v2 après retour
    de Bryan** (v1 refusée : tuiles d'offres → MENU DÉROULANT ; écran coupé saisie | liste
    « mal fait, c'était mieux avant » → saisie SEULE et centrée). Propositions v2 :
@@ -64,6 +75,9 @@
 6. Documentation (AGENTS.md…).
 
 ## À vérifier sur un vrai Google Sheet
+- Impression de la feuille dans l'iframe Apps Script (`window.print`, seule
+  `#zoneImpression` imprimée) et rendu des icônes SVG (`<use href>`).
+- Mise à jour : nouveau fichier `Icones.html` à créer dans l'éditeur.
 - Copie injectée par `doGet` : page affichée tout de suite (temps d'ouverture réel).
 - `beforeunload` (avertissement à la fermeture pendant un envoi) dans l'iframe Apps Script.
 - Réécriture d'un onglet à la suppression : mise en forme manuelle des lignes (couleurs)

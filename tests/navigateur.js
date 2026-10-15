@@ -1,8 +1,5 @@
 // Outils communs : charge Index.html rendu dans Chromium, google.script.run -> faux serveur Node.
-// Bootstrap (chargé depuis un CDN par la vraie page) est servi depuis node_modules.
 const { chromium } = require("playwright");
-const fs = require("fs");
-const path = require("path");
 const { rendrePage } = require("./harness");
 const { makeEnv } = require("./mocks");
 const J = (x) => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
@@ -47,13 +44,6 @@ async function ouvrir(repo, opts = {}) {
   const page = await browser.newPage(opts.page || {});
   const erreursPage = [];
   page.on("pageerror", (e) => erreursPage.push(e.message));
-  // https://cdn.jsdelivr.net/npm/<paquet>@<version>/<chemin> -> node_modules/<paquet>/<chemin>
-  await page.route(/cdn\.jsdelivr\.net\/npm\//, (route) => {
-    const m = /\/npm\/([^@/]+)@[^/]+\/([^?#]+)/.exec(route.request().url());
-    const fichier = m && path.join(repo, "node_modules", m[1], m[2]);
-    if (fichier && fs.existsSync(fichier)) return route.fulfill({ path: fichier });
-    return route.fulfill({ status: 404, body: "" });
-  });
   await page.exposeFunction("__serveur", async (nom, argsJson) => {
     if (env.retards[nom]) await new Promise((ok) => setTimeout(ok, env.retards[nom]));
     try {

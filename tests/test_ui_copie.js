@@ -1,20 +1,22 @@
-// Rapidité (étape 2) : copie glissée dans la page (aucun appel au démarrage), détail
-// immédiat, enregistrement instantané + écriture en arrière-plan (indicateur, échec,
-// RÉESSAYER sans double), saisies de l'autre poste, offre terminée chargée à la demande,
-// alerte doublon.
+// Rapidité : copie glissée dans la page (aucun appel au démarrage), réservations d'une offre
+// active sans attente, enregistrement instantané + écriture en arrière-plan (indicateur,
+// échec, Réessayer sans double), saisies de l'autre poste, offre terminée chargée à la
+// demande, alerte doublon (comparaison, « Modifier l'existante »).
 const assert = require("assert");
 const { ouvrir, attendre } = require("./navigateur");
 const { lignes } = require("./mocks");
 const { preparer } = require("./donnees");
 const repo = process.argv[2];
 
-async function remplir(page, idOp, nom, prenom, tel, email, qte) {
-  await page.selectOption("#operationSelect", idOp);
+async function remplir(page, idOp, nom, prenom, tel, email, article) {
+  if ((await page.inputValue("#operationSelect")) !== idOp) await page.selectOption("#operationSelect", idOp);
   await page.fill("#nomClient", nom);
   await page.fill("#prenomClient", prenom);
-  if (tel) await page.fill("#telClient", tel);
-  if (email) await page.fill("#emailClient", email);
-  if (qte) await page.fill(".quantite-article >> nth=0", String(qte));
+  await page.fill("#telClient", tel || "");
+  await page.fill("#emailClient", email || "");
+  if (article) await page.click(`.ligne-produit[data-article="${article}"] .plus`);
+  else if (await page.$(".ligne-produit.libre input"))
+    await page.fill(".ligne-produit.libre input", "Frangipane");
 }
 
 (async () => {
@@ -27,78 +29,81 @@ async function remplir(page, idOp, nom, prenom, tel, email, qte) {
     assert.deepStrictEqual(await o.page.evaluate(() => window.__appels), ["chargerCopie"]);
     assert.strictEqual(await o.page.$$eval("#operationSelect option", (x) => x.length), 5);
 
-    // --- Avec la copie : aucun appel au serveur pour afficher listes et détail ---
+    // --- Avec la copie : aucun appel pour afficher le menu, les offres et les réservations ---
     o = await ouvrir(repo, { preparer });
     navigateurs.push(o.browser);
     const { page, env } = o;
     const appels = () => page.evaluate(() => window.__appels || []);
-    const nb = (nom) => lignes(env, nom).length;
+    const nb = () => lignes(env, "Reservations").length;
+    const dialogues = () => page.$$eval(".voile:not([hidden])", (x) => x.map((v) => v.id));
     assert.strictEqual(await page.$$eval("#operationSelect option", (x) => x.length), 5);
-    await page.click("text=Gérer les Opérations");
-    await attendre(page);
-    await page.click("#tableOperationsBody tr:first-child td:first-child");
-    await attendre(page);
-    assert.ok(await page.isVisible("#modalDetailOffre"));
-    assert.strictEqual(await page.$$eval("#tableInscritsBody tr", (x) => x.length), 2);
-    assert.deepStrictEqual(await appels(), [], "démarrage + détail d'une offre active : 0 appel");
-    await page.click("#modalDetailOffre .btn-close");
-    await attendre(page);
+    await page.click("#ongletOffres");
+    await page.click(`.offre[data-offre="${env.ids.foie}"] [data-act="voir"]`);
+    assert.strictEqual(await page.$$eval("#lignes .ligne", (x) => x.length), 2);
+    assert.deepStrictEqual(await appels(), [], "démarrage + réservations d'une offre active : 0 appel");
 
     // --- Enregistrement instantané, écriture en arrière-plan ---
     env.retards.saveReservation = 1500;
-    await remplir(page, env.ids.foie, "Lent", "Léo", "0611111111", "", 1);
+    await page.click("#ongletSaisie");
+    await remplir(page, env.ids.foie, "Lent", "Léo", "0611111111", "", "Bloc 200g");
     await page.click("#btnValiderReservation");
     await attendre(page, 150);
     assert.match(
-      await page.textContent("#toastMessage"),
-      /Réservation enregistrée/,
+      await page.textContent("#toastTxt"),
+      /LENT Léo : réservation enregistrée/,
       "confirmé tout de suite"
     );
     assert.strictEqual(await page.inputValue("#nomClient"), "", "formulaire vidé tout de suite");
-    assert.match(await page.textContent("#indicateurEnvoi"), /1 réservation en cours d'envoi/);
-    assert.strictEqual(nb("Reservations"), 3, "pas encore écrite par le serveur");
-    // Déjà dans les compteurs et dans le détail (menu « État » bloqué pendant l'envoi)
-    await page.click("text=Gérer les Opérations");
-    await attendre(page);
-    assert.strictEqual(await page.textContent("#tableOperationsBody tr:first-child .badge"), "3");
+    assert.strictEqual(await page.textContent("#txtEnvoi"), "1 en cours d'envoi");
+    assert.strictEqual(nb(), 3, "pas encore écrite par le serveur");
+    assert.match(await page.textContent("#infosOffre"), /3 réservations/, "déjà comptée");
     // Un rechargement de la copie pendant l'envoi ne la fait pas disparaître
     await page.evaluate(() => rechargerCopie());
     await attendre(page, 200);
-    assert.strictEqual(await page.textContent("#tableOperationsBody tr:first-child .badge"), "3");
-    await page.click("#tableOperationsBody tr:first-child td:first-child");
-    await attendre(page);
-    const derniere = "#tableInscritsBody tr:last-child";
-    assert.match(await page.textContent(derniere), /Lent Léo[\s\S]*envoi en cours/);
-    assert.ok(await page.isDisabled(derniere + " select"));
-    // Le serveur répond : plus d'indicateur, état modifiable
+    assert.match(await page.textContent("#infosOffre"), /3 réservations/);
+    await page.click("#voirListe");
+    const premiere = "#lignes .ligne:first-child";
+    assert.match(await page.textContent(premiere), /LENT Léo[\s\S]*envoi…/);
+    await page.click(premiere + " .qui");
+    assert.deepStrictEqual(await dialogues(), [], "pas de fiche pendant l'envoi");
+    // Le serveur répond : plus d'indicateur, ligne modifiable
     await attendre(page, 1600);
-    assert.strictEqual(nb("Reservations"), 4);
+    assert.strictEqual(nb(), 4);
     assert.ok(!(await page.isVisible("#indicateurEnvoi")));
-    assert.ok(await page.isEnabled(derniere + " select"));
-    assert.doesNotMatch(await page.textContent(derniere), /envoi en cours/);
+    assert.match(await page.textContent(premiere), /Réservé[\s\S]*Retiré/);
     delete env.retards.saveReservation;
-    await page.click("#modalDetailOffre .btn-close");
-    await attendre(page);
 
-    // --- Réponse perdue (le serveur a écrit) puis RÉESSAYER : pas de double ---
+    // --- Réponse perdue (le serveur a écrit) puis Réessayer : pas de double ---
     env.pannesApres.saveReservation = "Connexion perdue";
-    await remplir(page, env.ids.foie, "Perdu", "Paul", "0622222222", "", 2);
+    await page.click("#ongletSaisie");
+    await remplir(page, env.ids.foie, "Perdu", "Paul", "0622222222", "", "L'entier");
     await page.click("#btnValiderReservation");
-    await attendre(page, 700);
-    assert.ok(await page.isVisible("#modalEchecEnvoi"));
-    assert.match(await page.textContent("#texteEchecEnvoi"), /Connexion perdue[\s\S]*Perdu Paul/);
-    assert.strictEqual(nb("Reservations"), 5, "écrite malgré la réponse perdue");
+    await attendre(page, 500);
+    assert.deepStrictEqual(await dialogues(), ["voileEchec"]);
+    assert.strictEqual(await page.textContent("#echecMessage"), "Connexion perdue");
+    assert.match(await page.textContent("#echecResume"), /PERDU Paul[\s\S]*1 × L'entier/);
+    assert.strictEqual(nb(), 5, "écrite malgré la réponse perdue");
     delete env.pannesApres.saveReservation;
-    await page.click("#btnReessayerEnvoi");
-    await attendre(page, 700);
-    assert.strictEqual(nb("Reservations"), 5, "RÉESSAYER n'écrit pas une 2e fois");
-    const idPerdu = lignes(env, "Reservations").find((r) => r[2] === "Perdu")[0];
+    await page.click("#echecReessayer");
+    await attendre(page);
+    assert.strictEqual(nb(), 5, "Réessayer n'écrit pas une 2e fois");
+    const idPerdu = lignes(env, "Reservations").find((r) => r[2] === "PERDU")[0];
     assert.strictEqual(
       lignes(env, "Articles").filter((a) => a[1] === idPerdu).length,
       1,
       "articles pas en double"
     );
-    assert.ok(!(await page.isVisible("#modalEchecEnvoi")));
+    assert.deepStrictEqual(await dialogues(), []);
+    // Refus définitif : Abandonner
+    env.pannes.saveReservation = "Cette offre n'existe plus. Rechargez la page.";
+    await remplir(page, env.ids.foie, "Refus", "R", "0633333333", "", "L'entier");
+    await page.click("#btnValiderReservation");
+    await attendre(page, 500);
+    assert.match(await page.textContent("#echecMessage"), /n'existe plus/);
+    await page.click("#echecAbandon");
+    assert.match(await page.textContent("#toastTxt"), /Réservation abandonnée/);
+    assert.match(await page.textContent("#infosOffre"), /4 réservations/, "retirée de l'écran");
+    delete env.pannes.saveReservation;
 
     // --- Saisie faite sur l'autre poste : visible au retour sur la fenêtre ---
     env.ctx.saveReservation({
@@ -109,78 +114,82 @@ async function remplir(page, idOp, nom, prenom, tel, email, qte) {
       email: "",
       articles: [],
     });
-    await page.click("text=Gérer les Opérations");
-    await attendre(page);
-    assert.strictEqual(await page.textContent("#tableOperationsBody tr:nth-child(3) .badge"), "0");
+    await page.selectOption("#operationSelect", env.ids.atelier);
+    assert.match(await page.textContent("#infosOffre"), /0 réservation/);
     await page.evaluate(() => {
       copieRecueA = 0; // copie ancienne
       window.dispatchEvent(new Event("focus"));
     });
     await attendre(page);
-    assert.strictEqual(await page.textContent("#tableOperationsBody tr:nth-child(3) .badge"), "1");
-    await page.click("#modalOperations .btn-close");
-    await attendre(page);
+    assert.match(await page.textContent("#infosOffre"), /1 réservation/);
 
-    // --- Alerte doublon : même nom/prénom (accents, casse) + même téléphone (autre format) ---
-    await remplir(page, env.ids.foie, "DUPONT", "Al", "", "AL@exemple.fr", 1);
+    // --- Alerte doublon : même nom/prénom (accents, casse) + même email ---
+    await remplir(page, env.ids.foie, "dupont", "AL", "", "AL@exemple.fr", "Bloc 200g");
+    await page.click("#btnValiderReservation");
+    assert.deepStrictEqual(await dialogues(), ["voileDoublon"]);
+    const tableau = await page.textContent("#tableauDoublon");
+    assert.match(tableau, /NomDUPONTDupontIDENTIQUE/);
+    assert.match(tableau, /EmailAL@exemple\.fral@exemple\.frIDENTIQUE/);
+    assert.match(tableau, /Articles1 × Bloc 200g5 × Bloc 200g, 1 × L'entier/);
+    const avant = nb();
+    await page.click("#doublonStop");
+    assert.strictEqual(nb(), avant, "« Ne pas enregistrer » : rien d'écrit");
+    assert.strictEqual(await page.inputValue("#nomClient"), "dupont", "saisie gardée");
+    // Enregistrer quand même (confirmation dans la fenêtre)
+    await page.click("#btnValiderReservation");
+    await page.click("#doublonQuandMeme");
+    assert.ok(await page.isVisible("#doublonConfirmer"));
+    await page.click("#doublonForcer");
+    await attendre(page);
+    assert.strictEqual(nb(), avant + 1, "2e réservation confirmée");
+    // Modifier l'existante : la fiche s'ouvre sur la réservation déjà faite
+    await remplir(page, env.ids.foie, "Lént", "LEO", "+33 6 11 11 11 11", "", "Bloc 200g");
+    await page.click("#btnValiderReservation");
+    assert.deepStrictEqual(await dialogues(), ["voileDoublon"], "+33 6 11… = 0611…, Lént = Lent");
+    await page.click("#doublonOuvrir");
+    assert.deepStrictEqual(await dialogues(), ["voileFiche"]);
+    assert.match(await page.textContent("#ficheTitre"), /LENT Léo/);
+    assert.strictEqual(await page.inputValue("#nomClient"), "", "saisie abandonnée");
+    await page.keyboard.press("Escape");
+    // Même nom, autre téléphone : homonyme, pas d'alerte
+    await remplir(page, env.ids.foie, "Lent", "Léo", "0699999998", "", "Bloc 200g");
     await page.click("#btnValiderReservation");
     await attendre(page);
-    assert.ok(await page.isVisible("#modalDoublon"), "même nom + même email");
-    assert.match(await page.textContent("#texteDoublon"), /Dupont Al[\s\S]*5x Bloc 200g, 1x L'entier/);
-    const avant = nb("Reservations");
-    await page.click("#modalDoublon >> text=Ne pas enregistrer");
-    await attendre(page);
-    assert.strictEqual(nb("Reservations"), avant, "« Ne pas enregistrer » : rien d'écrit");
-    assert.strictEqual(await page.inputValue("#nomClient"), "DUPONT", "saisie gardée pour corriger");
-    await page.click("#btnValiderReservation");
-    await attendre(page);
-    await page.click("#btnForcerDoublon");
-    await attendre(page);
-    assert.strictEqual(nb("Reservations"), avant + 1, "« Enregistrer quand même »");
-    // Téléphone écrit autrement (+33, espaces) et nom avec accent : doublon aussi
-    await remplir(page, env.ids.foie, "Lént", "LEO", "+33 6 11 11 11 11", "", 1);
-    await page.click("#btnValiderReservation");
-    await attendre(page);
-    assert.ok(await page.isVisible("#modalDoublon"), "+33 6 11… = 0611…, Lént = Lent");
-    await page.click("#modalDoublon >> text=Ne pas enregistrer");
-    await attendre(page);
-    // Même nom, autre téléphone : pas d'alerte (homonyme)
-    await page.fill("#telClient", "0699999998");
-    await page.click("#btnValiderReservation");
-    await attendre(page);
-    assert.ok(!(await page.isVisible("#modalDoublon")), "homonyme : pas d'alerte");
-    assert.strictEqual(nb("Reservations"), avant + 2);
+    assert.deepStrictEqual(await dialogues(), [], "homonyme : pas d'alerte");
     // Réservation annulée : pas d'alerte
     env.ctx.updateReservationStatus(env.ids.resObrien, "Annulé");
     await page.evaluate(() => rechargerCopie());
     await attendre(page);
-    await remplir(page, env.ids.foie, "O'Brien<img src=x onerror=window.__xss=1>", "Jo", "0612345678", "", 1);
+    await remplir(
+      page,
+      env.ids.foie,
+      "O'Brien<img src=x onerror=window.__xss=1>",
+      "Jo",
+      "0612345678",
+      "",
+      "Bloc 200g"
+    );
     await page.click("#btnValiderReservation");
     await attendre(page);
-    assert.ok(!(await page.isVisible("#modalDoublon")), "réservation annulée : pas d'alerte");
+    assert.deepStrictEqual(await dialogues(), [], "réservation annulée : pas d'alerte");
 
     // --- Offre terminée : réservations chargées une fois, à la sélection ---
-    const n0 = (await appels()).filter((a) => a === "getOperationDetails").length;
-    await remplir(page, env.ids.galettes, "Ancien", "Client", "06 99 99 99 99", "", 0);
+    const nDetails = async () => (await appels()).filter((a) => a === "getOperationDetails").length;
+    const n0 = await nDetails();
+    await page.selectOption("#operationSelect", env.ids.galettes);
     await attendre(page);
-    assert.strictEqual((await appels()).filter((a) => a === "getOperationDetails").length, n0 + 1);
-    await page.fill(".nom-article", "Frangipane");
-    await page.fill(".quantite-article", "1");
+    assert.strictEqual(await nDetails(), n0 + 1);
+    await remplir(page, env.ids.galettes, "Ancien", "Client", "06 99 99 99 99", "");
     await page.click("#btnValiderReservation");
-    await attendre(page);
-    assert.ok(await page.isVisible("#modalDoublon"), "doublon détecté aussi sur une offre terminée");
-    await page.click("#modalDoublon >> text=Ne pas enregistrer");
-    await attendre(page);
-    await page.click("text=Gérer les Opérations");
-    await attendre(page);
-    await page.click("#tableOperationsBody tr:nth-child(4) td:first-child");
-    await attendre(page);
-    assert.match(await page.textContent("#tableInscritsBody"), /Ancien Client/);
-    assert.strictEqual(
-      (await appels()).filter((a) => a === "getOperationDetails").length,
-      n0 + 1,
-      "pas rechargée à l'ouverture du détail"
+    assert.deepStrictEqual(
+      await dialogues(),
+      ["voileDoublon"],
+      "doublon détecté aussi sur une offre terminée"
     );
+    await page.click("#doublonStop");
+    await page.click("#voirListe");
+    assert.match(await page.textContent("#lignes"), /Ancien Client/);
+    assert.strictEqual(await nDetails(), n0 + 1, "pas rechargée à l'ouverture des réservations");
 
     assert.strictEqual(await page.evaluate(() => window.__xss || 0), 0, "aucun code injecté");
     assert.deepStrictEqual(o.erreursPage, [], "aucune erreur dans la page");

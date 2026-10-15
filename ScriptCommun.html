@@ -1,5 +1,9 @@
-<!-- Outils communs (échappement, fenêtres, messages), démarrage, aide et mentions. -->
-<script data-version="2026.10.14-2030">
+<!-- Outils communs : échappement, message bref, fenêtres, écrans, démarrage, aide et mentions. -->
+<script data-version="2026.10.15-1026">
+  function $(id) {
+    return document.getElementById(id);
+  }
+
   // Échappe le texte saisi avant de l'insérer dans du HTML (noms avec < ' " & etc.)
   function echapper(valeur) {
     return String(valeur == null ? "" : valeur).replace(
@@ -8,56 +12,117 @@
     );
   }
 
-  // Réutilise l'instance existante pour éviter les fonds gris empilés
-  function modal(id) {
-    return bootstrap.Modal.getOrCreateInstance(document.getElementById(id));
-  }
-
-  // yyyy-MM-dd -> dd/MM/yyyy
+  // yyyy-MM-dd -> dd/MM/yyyy (ou dd/MM)
   function dateFr(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || "-";
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || "";
   }
-
-  function showToast(message, type = "success") {
-    const toastEl = document.getElementById("appToast");
-    toastEl.className = `toast align-items-center border-0 text-white ${type === "success" ? "bg-success" : type === "info" ? "bg-info" : "bg-danger"}`;
-    document.getElementById("toastMessage").innerHTML = message;
-    bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
+  function dateCourte(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? `${m[3]}/${m[2]}` : iso || "";
+  }
+  function aujourdhuiIso() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
   function messageErreur(err) {
     return err && err.message ? err.message : String(err);
   }
 
-  function showErreur(err) {
-    showToast("<i class='bi bi-exclamation-triangle'></i> Erreur : " + echapper(messageErreur(err)), "error");
+  // --- Message bref en bas (option : bouton « Annuler ») ---
+  let minuteurToast = null;
+  let annulerToast = null;
+  function showToast(texte, type, annuler) {
+    $("toastTxt").textContent = texte;
+    $("toast").classList.toggle("erreur", type === "error");
+    annulerToast = annuler || null;
+    $("toastAnnuler").hidden = !annuler;
+    $("toast").hidden = false;
+    clearTimeout(minuteurToast);
+    minuteurToast = setTimeout(
+      () => {
+        $("toast").hidden = true;
+        annulerToast = null;
+      },
+      annuler ? 6000 : type === "error" ? 6000 : 3200
+    );
   }
+  $("toastAnnuler").addEventListener("click", function () {
+    const annuler = annulerToast;
+    annulerToast = null;
+    $("toast").hidden = true;
+    if (annuler) annuler();
+  });
+
+  function showErreur(err) {
+    showToast("Erreur : " + messageErreur(err), "error");
+  }
+
+  // --- Fenêtres (voiles) ---
+  function ouvrirVoile(id) {
+    $(id).hidden = false;
+  }
+  function fermerVoile(id) {
+    $(id).hidden = true;
+  }
+  document
+    .querySelectorAll("[data-fermer]")
+    .forEach((b) => b.addEventListener("click", () => fermerVoile(b.dataset.fermer)));
+  // Clic à côté d'un tiroir : fermé (pas pour les alertes, qui demandent une réponse)
+  ["voileFiche", "voileOffre", "voileMentions", "voileFeuille"].forEach((id) =>
+    $(id).addEventListener("click", (e) => {
+      if (e.target === $(id)) fermerVoile(id);
+    })
+  );
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    ["voileFiche", "voileOffre", "voileMentions", "voileFeuille", "aide"].forEach(fermerVoile);
+  });
+
+  // --- Écrans : saisie, offres, réservations d'une offre ---
+  function ecranVisible(nom) {
+    return !$({ saisie: "ecranSaisie", offres: "ecranOffres", detail: "ecranDetail" }[nom]).hidden;
+  }
+  function allerEcran(nom) {
+    $("ecranSaisie").hidden = nom !== "saisie";
+    $("ecranOffres").hidden = nom !== "offres";
+    $("ecranDetail").hidden = nom !== "detail";
+    $("ongletSaisie").setAttribute("aria-current", String(nom === "saisie"));
+    $("ongletOffres").setAttribute("aria-current", String(nom !== "saisie"));
+    if (nom === "offres") dessinerOffres();
+    if (nom === "detail") dessinerDetail();
+    $({ saisie: "ecranSaisie", offres: "ecranOffres", detail: "ecranDetail" }[nom]).scrollTop = 0;
+  }
+  $("ongletSaisie").addEventListener("click", () => allerEcran("saisie"));
+  $("ongletOffres").addEventListener("click", () => allerEcran("offres"));
+
+  // Tout ce qui dépend de la copie (après un rechargement, un envoi, une modification)
+  function dessinerTout() {
+    dessinerSelecteur();
+    majEtapes();
+    if (ecranVisible("offres")) dessinerOffres();
+    if (ecranVisible("detail")) dessinerDetail();
+  }
+
+  // --- Aide et mentions légales ---
+  $("btnAide").addEventListener("click", () => ($("aide").hidden = false));
+  $("fermerAide").addEventListener("click", () => ($("aide").hidden = true));
+  $("lienMentions").addEventListener("click", () => ouvrirVoile("voileMentions"));
 
   // Démarrage : la copie glissée dans la page suffit (aucun appel au serveur) ; sinon on la demande.
   document.addEventListener("DOMContentLoaded", function () {
     if (COPIE_INITIALE) {
       appliquerCopie(COPIE_INITIALE);
     } else {
+      $("operationSelect").innerHTML = '<option value="">Chargement des offres…</option>';
       rechargerCopie(function (e) {
-        document.getElementById("operationSelect").innerHTML =
-          '<option value="" disabled selected>Impossible de charger les offres</option>';
-        showToast("Erreur de connexion : " + echapper(messageErreur(e)), "error");
+        $("operationSelect").innerHTML = '<option value="">Impossible de charger les offres</option>';
+        showToast("Erreur de connexion : " + messageErreur(e), "error");
       });
     }
+    dessinerArticles();
     surveillerCopie();
   });
-
-  // --- OUVRIR MENTIONS LEGALES ET AIDE ---
-  function ouvrirMentions() {
-    modal("modalMentions").show();
-  }
-
-  function ouvrirAide() {
-    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById("offcanvasHelp")).show();
-  }
-
-  function ouvrirOperations() {
-    modal("modalOperations").show();
-  }
 </script>

@@ -1,5 +1,5 @@
 <!-- Copie locale (offres + réservations des offres actives), envois en arrière-plan, doublons. -->
-<script data-version="2026.10.14-2030">
+<script data-version="2026.10.15-1026">
   // Copie reçue du serveur : { operations: [...], reservations: { idOp: [...] } }. Seules les
   // offres actives ont leurs réservations dans la copie ; celles d'une offre terminée sont
   // chargées à la demande dans horsCopie.
@@ -35,8 +35,7 @@
     copieRecueA = Date.now();
     // Une réservation envoyée mais pas encore lue par cette copie reste affichée
     Object.keys(enAttente).forEach((idRes) => ajouterALaCopie(enAttente[idRes].res));
-    afficherDonnees();
-    rafraichirDetailOuvert();
+    dessinerTout();
   }
 
   // Copie renvoyée par une modification (offre créée, modifiée, supprimée) : plus récente
@@ -89,7 +88,7 @@
       .withSuccessHandler(function (details) {
         horsCopie[idOp] = details.reservations;
         Object.keys(enAttente).forEach((idRes) => ajouterALaCopie(enAttente[idRes].res));
-        afficherDonnees();
+        dessinerTout();
         if (ensuite) ensuite();
       })
       .withFailureHandler(function (e) {
@@ -151,41 +150,82 @@
 
   function majApresEnvoi() {
     const n = Object.keys(enAttente).length;
-    const indicateur = document.getElementById("indicateurEnvoi");
-    indicateur.style.display = n ? "block" : "none";
-    indicateur.innerHTML = n
-      ? `<span class="spinner-border spinner-border-sm"></span> ${n} réservation${n > 1 ? "s" : ""} en cours d'envoi…`
-      : "";
-    afficherDonnees();
-    rafraichirDetailOuvert();
+    $("indicateurEnvoi").hidden = !n;
+    $("txtEnvoi").textContent = n + " en cours d'envoi";
+    dessinerTout();
   }
 
   function afficherEchecEnvoi() {
     const echec = echecsEnvoi[0];
-    if (!echec) return;
+    if (!echec || !$("voileEchec").hidden) return;
     const op = trouverOffre(echec.res.idOp);
-    document.getElementById("texteEchecEnvoi").innerHTML = `
-      <p class="mb-2">Le serveur n'a pas enregistré cette réservation :</p>
-      <p class="fw-bold text-danger mb-3">${echapper(echec.message)}</p>
-      <ul class="mb-0">
-        <li>Client : <strong>${echapper(echec.res.nom)} ${echapper(echec.res.prenom)}</strong> (${echapper(echec.res.contact)})</li>
-        <li>Offre : ${echapper(op ? op.nom : echec.res.idOp)}</li>
-        ${echec.res.articles.length ? `<li>Articles : ${echapper(texteArticles(echec.res))}</li>` : ""}
-      </ul>`;
-    modal("modalEchecEnvoi").show();
+    $("echecMessage").textContent = echec.message;
+    $("echecResume").innerHTML = `
+      <span>Client : <b>${echapper(echec.res.nom)} ${echapper(echec.res.prenom)}</b> (${echapper(echec.res.contact)})</span>
+      <span>Offre : ${echapper(op ? op.nom : echec.res.idOp)}</span>
+      ${echec.res.articles.length ? `<span>Articles : ${echapper(texteArticles(echec.res))}</span>` : ""}`;
+    ouvrirVoile("voileEchec");
+    $("echecReessayer").focus();
   }
 
-  document.getElementById("btnReessayerEnvoi").addEventListener("click", function () {
+  $("echecReessayer").addEventListener("click", function () {
     const echec = echecsEnvoi.shift();
-    modal("modalEchecEnvoi").hide();
+    fermerVoile("voileEchec");
     if (echec) envoyerReservation(echec.data, echec.res);
-    setTimeout(afficherEchecEnvoi, 400);
+    afficherEchecEnvoi();
   });
-  document.getElementById("btnAbandonnerEnvoi").addEventListener("click", function () {
+  $("echecAbandon").addEventListener("click", function () {
     echecsEnvoi.shift();
-    modal("modalEchecEnvoi").hide();
-    setTimeout(afficherEchecEnvoi, 400);
+    fermerVoile("voileEchec");
+    showToast("Réservation abandonnée");
+    afficherEchecEnvoi();
   });
+
+  // --- OUTILS D'AFFICHAGE COMMUNS ---
+  // Offre en cours, à venir ou terminée (la date du jour est celle du PC)
+  function statutOffre(op) {
+    if (!op.active) return "terminee";
+    return op.dateDebut && op.dateDebut > aujourdhuiIso() ? "avenir" : "encours";
+  }
+  const LIBELLE_STATUT = { encours: "En cours", avenir: "À venir", terminee: "Terminée" };
+
+  function periodeCourte(op) {
+    if (!op.dateDebut && !op.dateFin) return "sans date";
+    if (op.dateDebut === op.dateFin) return "le " + dateCourte(op.dateDebut);
+    return dateCourte(op.dateDebut) + " → " + dateCourte(op.dateFin);
+  }
+  function periodeLongue(op) {
+    if (!op.dateDebut && !op.dateFin) return "Sans date";
+    if (op.dateDebut === op.dateFin) return "Le " + dateFr(op.dateDebut);
+    return "Du " + (dateFr(op.dateDebut) || "…") + " au " + (dateFr(op.dateFin) || "…");
+  }
+  function chipsOffre(op, avecStatut) {
+    const s = statutOffre(op);
+    return (
+      `<span class="chip ${op.type === "Produit" ? "produit" : "evenement"}">${op.type === "Produit" ? "Produits" : "Évènement"}</span>` +
+      (avecStatut || s !== "encours" ? `<span class="chip ${s}">${LIBELLE_STATUT[s]}</span>` : "")
+    );
+  }
+
+  function texteArticles(res) {
+    return res.articles.map((a) => `${a.quantite} × ${a.nom}`).join(", ");
+  }
+
+  // « 06… / nom@… » enregistré dans une seule colonne : séparé pour l'affichage et la fiche
+  function separerContact(contact) {
+    const parties = String(contact || "")
+      .split("/")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return {
+      tel: parties.filter((p) => !p.includes("@")).join(" "),
+      email: parties.filter((p) => p.includes("@")).join(" "),
+    };
+  }
+  function contactLisible(res) {
+    const c = separerContact(res.contact);
+    return [c.tel, c.email].filter(Boolean).join(" · ");
+  }
 
   // --- DOUBLONS ---
   // Noms comparés sans accents, espaces, tirets ni apostrophes ; téléphones sur leurs chiffres

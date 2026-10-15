@@ -1,154 +1,281 @@
-<!-- Formulaire de saisie d'une réservation (articles, contacts, validation). -->
-<script data-version="2026.10.14-2030">
-  function gererAffichageProduits() {
-    const select = document.getElementById("operationSelect");
-    const optionSelectionnee = select.options[select.selectedIndex];
+<!-- Saisie d'une réservation : offre (menu), client, articles (+ / −), doublon, enregistrement. -->
+<script data-version="2026.10.15-1026">
+  // Offre choisie et quantités en cours de saisie
+  let offreChoisie = "";
+  let quantites = {}; // offre à liste fixe : { nomArticle: quantité }
+  let lignesLibres = [{ nom: "", quantite: 1 }]; // offre en saisie libre
 
-    const typeOperation = optionSelectionnee ? optionSelectionnee.getAttribute("data-type") : null;
-    const modeSaisie = optionSelectionnee ? optionSelectionnee.getAttribute("data-mode") : null;
-    const articlesPredefinis = optionSelectionnee ? optionSelectionnee.getAttribute("data-articles") : null;
+  const REGEX_TEL = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
+  const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    const sectionProduits = document.getElementById("sectionProduits");
-    const conteneurListe = document.getElementById("listeProduits");
-    const btnAjouter = document.getElementById("btnAjouterLigne");
-
-    conteneurListe.innerHTML = "";
-    assurerReservations(select.value); // offre terminée : ses réservations, pour les doublons
-
-    if (typeOperation === "Produit") {
-      sectionProduits.style.display = "block";
-      if (modeSaisie === "Predefini" && articlesPredefinis) {
-        btnAjouter.style.display = "none";
-        articlesPredefinis.split(",").forEach((article) => {
-          if (!article.trim()) return;
-          const div = document.createElement("div");
-          div.className = "row g-2 mb-2 ligne-produit";
-          div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article bg-light" value="${echapper(article.trim())}" readonly></div><div class="col-4"><input type="number" class="form-control quantite-article" placeholder="Qté" min="0"></div>`;
-          conteneurListe.appendChild(div);
-        });
-      } else {
-        btnAjouter.style.display = "inline-block";
-        ajouterLigneProduit();
-      }
-    } else {
-      sectionProduits.style.display = "none";
-    }
-  }
-
-  function ajouterLigneProduit() {
-    const div = document.createElement("div");
-    div.className = "row g-2 mb-2 ligne-produit";
-    div.innerHTML = `<div class="col-8"><input type="text" class="form-control nom-article" placeholder="Nom de l'article"></div><div class="col-3"><input type="number" class="form-control quantite-article" placeholder="Qté" min="1"></div><div class="col-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="supprimerLigne(this)"><i class="bi bi-x-lg"></i></button></div>`;
-    document.getElementById("listeProduits").appendChild(div);
-  }
-
-  function supprimerLigne(bouton) {
-    bouton.closest(".ligne-produit").remove();
-  }
-
-  function verifierContacts() {
-    const telInput = document.getElementById("telClient");
-    const emailInput = document.getElementById("emailClient");
-    const alerteContact = document.getElementById("alerteContact");
-
-    const regexTel = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    const telSaisi = telInput.value.trim();
-    const emailSaisi = emailInput.value.trim();
-
-    const telValide = telSaisi === "" || regexTel.test(telSaisi);
-    const emailValide = emailSaisi === "" || regexEmail.test(emailSaisi);
-
-    telInput.classList.toggle("is-invalid", telSaisi !== "" && !telValide);
-    telInput.classList.toggle("is-valid", telSaisi !== "" && telValide);
-    emailInput.classList.toggle("is-invalid", emailSaisi !== "" && !emailValide);
-    emailInput.classList.toggle("is-valid", emailSaisi !== "" && emailValide);
-
-    const valide = (telSaisi !== "" && telValide) || (emailSaisi !== "" && emailValide);
-    alerteContact.style.display = !valide && telSaisi === "" && emailSaisi === "" ? "block" : "none";
-    return valide && telValide && emailValide;
-  }
-
-  function validerFormulaire() {
-    const select = document.getElementById("operationSelect");
-    const operationId = select.value;
-    if (
-      !operationId ||
-      !document.getElementById("nomClient").value.trim() ||
-      !document.getElementById("prenomClient").value.trim()
-    ) {
-      showToast("Veuillez sélectionner une offre et remplir Nom/Prénom.", "error");
+  // --- Étape 1 : offre (menu déroulant, offres terminées à part) ---
+  function dessinerSelecteur() {
+    const select = $("operationSelect");
+    const ops = copie.operations;
+    if (offreChoisie && !trouverOffre(offreChoisie)) choisirOffre("");
+    const option = (op) =>
+      `<option value="${echapper(op.id)}">${echapper(op.nom)} · ${echapper(periodeCourte(op))}</option>`;
+    const actives = ops.filter((op) => op.active);
+    const finies = ops.filter((op) => !op.active);
+    select.innerHTML =
+      `<option value="" disabled>${ops.length ? "Choisir l'offre…" : "Aucune offre : créez-en une dans « Offres et réservations »"}</option>` +
+      (actives.length
+        ? `<optgroup label="En cours et à venir">${actives.map(option).join("")}</optgroup>`
+        : "") +
+      (finies.length ? `<optgroup label="Terminées">${finies.map(option).join("")}</optgroup>` : "");
+    select.value = offreChoisie;
+    const op = trouverOffre(offreChoisie);
+    if (!op) {
+      $("infosOffre").innerHTML = "";
       return;
     }
-    if (!verifierContacts()) {
-      document.getElementById("alerteContact").style.display = "block";
+    const n = compteOffre(op);
+    $("infosOffre").innerHTML =
+      chipsOffre(op, false) +
+      `<span>${n} réservation${n > 1 ? "s" : ""}</span><button type="button" class="lien-doux" id="voirListe">Voir la liste →</button>`;
+    $("voirListe").addEventListener("click", () => ouvrirDetail(op.id));
+  }
+  $("operationSelect").addEventListener("change", () => choisirOffre($("operationSelect").value));
+
+  function choisirOffre(idOp) {
+    offreChoisie = idOp || "";
+    quantites = {};
+    lignesLibres = [{ nom: "", quantite: 1 }];
+    assurerReservations(offreChoisie); // offre terminée : ses réservations, pour les doublons
+    dessinerSelecteur();
+    dessinerArticles();
+    majEtapes();
+  }
+
+  function articlesPredefinis(op) {
+    return String(op.articlesPredefinis || "")
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+  }
+  function enListeFixe(op) {
+    return op.type === "Produit" && op.modeSaisie === "Predefini" && articlesPredefinis(op).length > 0;
+  }
+
+  // Compteur + / − (classes plus / moins, quantité dans output.quantite-article)
+  function compteurHtml(quantite, nom) {
+    return `<span class="pas"><button type="button" class="moins" aria-label="Un ${echapper(nom)} de moins">−</button><output class="quantite-article">${quantite}</output><button type="button" class="plus" aria-label="Un ${echapper(nom)} de plus">+</button></span>`;
+  }
+
+  // --- Étape 3 : articles ---
+  function dessinerArticles() {
+    const zone = $("listeProduits");
+    const op = trouverOffre(offreChoisie);
+    $("titreEtape3").textContent = op && op.type === "Evenement" ? "Inscription" : "Articles";
+    if (!op) {
+      zone.innerHTML = `<div class="sans-article">Choisissez d'abord l'offre.</div>`;
       return;
     }
-
-    const optionSelectionnee = select.options[select.selectedIndex];
-    const estProduit = optionSelectionnee.getAttribute("data-type") === "Produit";
-    const modeLibre = !(
-      optionSelectionnee.getAttribute("data-mode") === "Predefini" &&
-      optionSelectionnee.getAttribute("data-articles")
-    );
-
-    const articlesSaisis = [];
-    let ligneIncomplete = null;
-    document.querySelectorAll(".ligne-produit").forEach((ligne) => {
-      const n = ligne.querySelector(".nom-article").value.trim();
-      const q = parseInt(ligne.querySelector(".quantite-article").value, 10);
-      if (n && q > 0) articlesSaisis.push({ nom: n, quantite: q });
-      // En saisie libre, une ligne à moitié remplie est probablement un oubli
-      else if (modeLibre && (n || q > 0) && !ligneIncomplete) ligneIncomplete = n || "sans nom";
+    if (op.type === "Evenement") {
+      zone.innerHTML = `<div class="sans-article">Évènement : pas d'article à choisir. Le client est inscrit dès l'enregistrement.</div>`;
+      return;
+    }
+    if (enListeFixe(op)) {
+      zone.innerHTML = articlesPredefinis(op)
+        .map((nom) => {
+          const q = quantites[nom] || 0;
+          return `<div class="ligne-produit ${q ? "choisi" : ""}" data-article="${echapper(nom)}"><span class="nom-article">${echapper(nom)}</span>${compteurHtml(q, nom)}</div>`;
+        })
+        .join("");
+      zone.querySelectorAll(".ligne-produit").forEach((ligne) => {
+        const nom = ligne.dataset.article;
+        ligne.querySelector(".plus").addEventListener("click", () => regler(nom, 1));
+        ligne.querySelector(".moins").addEventListener("click", () => regler(nom, -1));
+      });
+      return;
+    }
+    zone.innerHTML =
+      lignesLibres
+        .map(
+          (l, i) =>
+            `<div class="ligne-produit libre" data-ligne="${i}"><input class="nom-article" value="${echapper(l.nom)}" placeholder="Article (ex. : Ballotin 500 g)" aria-label="Article ${i + 1}">${compteurHtml(l.quantite, "article")}<button type="button" class="retirer" aria-label="Retirer la ligne"><svg class="ico p"><use href="#i-fermer"/></svg></button></div>`
+        )
+        .join("") +
+      `<button type="button" class="ajouter" id="btnAjouterLigne"><svg class="ico p"><use href="#i-plus"/></svg>Ajouter un article</button>`;
+    zone.querySelectorAll(".ligne-produit").forEach((ligne) => {
+      const l = lignesLibres[+ligne.dataset.ligne];
+      ligne.querySelector("input").addEventListener("input", (e) => {
+        l.nom = e.target.value;
+        majEtapes();
+      });
+      ligne.querySelector(".plus").addEventListener("click", () => {
+        l.quantite++;
+        ligne.querySelector("output").textContent = l.quantite;
+      });
+      ligne.querySelector(".moins").addEventListener("click", () => {
+        l.quantite = Math.max(1, l.quantite - 1);
+        ligne.querySelector("output").textContent = l.quantite;
+      });
+      ligne.querySelector(".retirer").addEventListener("click", () => {
+        lignesLibres.splice(+ligne.dataset.ligne, 1);
+        if (!lignesLibres.length) lignesLibres.push({ nom: "", quantite: 1 });
+        dessinerArticles();
+        majEtapes();
+      });
     });
+    $("btnAjouterLigne").addEventListener("click", () => {
+      lignesLibres.push({ nom: "", quantite: 1 });
+      dessinerArticles();
+      const champs = zone.querySelectorAll("input");
+      champs[champs.length - 1].focus();
+    });
+  }
 
-    if (ligneIncomplete) {
-      showToast("Article incomplet (nom ou quantité manquant) : " + echapper(ligneIncomplete), "error");
-      return;
-    }
-    if (estProduit && articlesSaisis.length === 0) {
-      showToast("Veuillez saisir au moins un article avec une quantité.", "error");
-      return;
-    }
+  function regler(nom, delta) {
+    quantites[nom] = Math.max(0, (quantites[nom] || 0) + delta);
+    dessinerArticles();
+    majEtapes();
+  }
 
+  function articlesSaisis() {
+    const op = trouverOffre(offreChoisie);
+    if (!op || op.type === "Evenement") return [];
+    if (enListeFixe(op)) {
+      return articlesPredefinis(op)
+        .filter((nom) => quantites[nom] > 0)
+        .map((nom) => ({ nom: nom, quantite: quantites[nom] }));
+    }
+    return lignesLibres.filter((l) => l.nom.trim()).map((l) => ({ nom: l.nom.trim(), quantite: l.quantite }));
+  }
+
+  // Numéros des étapes en vert quand elles sont remplies
+  function majEtapes() {
+    const op = trouverOffre(offreChoisie);
+    $("n1").classList.toggle("fait", !!op);
+    $("n2").classList.toggle(
+      "fait",
+      !!(
+        $("nomClient").value.trim() &&
+        $("prenomClient").value.trim() &&
+        ($("telClient").value.trim() || $("emailClient").value.trim())
+      )
+    );
+    $("n3").classList.toggle("fait", !!op && (op.type === "Evenement" || articlesSaisis().length > 0));
+  }
+  ["nomClient", "prenomClient", "telClient", "emailClient"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      $(id).classList.remove("erreur");
+      $("message").textContent = "";
+      majEtapes();
+    })
+  );
+
+  function refuser(texte, idChamp) {
+    $("message").textContent = texte;
+    if (idChamp) {
+      $(idChamp).classList.add("erreur");
+      $(idChamp).focus();
+    }
+  }
+
+  // --- Enregistrement (Entrée ou bouton) ---
+  $("formReservation").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const op = trouverOffre(offreChoisie);
     const data = {
-      operationId: operationId,
-      nom: document.getElementById("nomClient").value.trim(),
-      prenom: document.getElementById("prenomClient").value.trim(),
-      telephone: document.getElementById("telClient").value.trim(),
-      email: document.getElementById("emailClient").value.trim(),
-      articles: articlesSaisis,
+      operationId: offreChoisie,
+      nom: $("nomClient").value.trim().toUpperCase(),
+      prenom: $("prenomClient").value.trim(),
+      telephone: $("telClient").value.trim(),
+      email: $("emailClient").value.trim(),
+      articles: articlesSaisis(),
     };
+    if (!op) return refuser("Choisissez l'offre.", "operationSelect");
+    if (!data.nom) return refuser("Le nom du client est obligatoire.", "nomClient");
+    if (!data.prenom) return refuser("Le prénom du client est obligatoire.", "prenomClient");
+    if (!data.telephone && !data.email) {
+      $("emailClient").classList.add("erreur");
+      return refuser("Un téléphone ou un email est obligatoire.", "telClient");
+    }
+    if (data.telephone && !REGEX_TEL.test(data.telephone))
+      return refuser("Téléphone incomplet (ex. : 06 12 34 56 78).", "telClient");
+    if (data.email && !REGEX_EMAIL.test(data.email))
+      return refuser("Email incomplet (ex. : nom@exemple.fr).", "emailClient");
+    if (op.type === "Produit" && !data.articles.length)
+      return refuser(
+        enListeFixe(op) ? "Choisissez au moins un article (bouton +)." : "Tapez au moins un article."
+      );
 
     const doublon = chercherDoublon(data);
     if (doublon) {
       saisieEnSuspens = data;
-      afficherDoublon(doublon);
+      afficherDoublon(data, doublon);
       return;
     }
     enregistrerReservation(data);
-  }
+  });
 
-  // Réservation en attente de la réponse à l'alerte doublon
+  // --- Alerte doublon : comparaison côte à côte ---
   let saisieEnSuspens = null;
+  let doublonTrouve = null;
 
-  function afficherDoublon(r) {
-    document.getElementById("texteDoublon").innerHTML = `
-      <p>Une réservation existe déjà pour ce client sur cette offre :</p>
-      <ul class="mb-0">
-        <li><strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong> — ${echapper(r.contact)}</li>
-        <li>Saisie le ${echapper(r.dateSaisie)} · état : ${echapper(r.etat)}</li>
-        ${r.articles.length ? `<li>Articles : ${echapper(texteArticles(r))}</li>` : ""}
-      </ul>`;
-    modal("modalDoublon").show();
+  function afficherDoublon(data, r) {
+    doublonTrouve = r;
+    const op = trouverOffre(data.operationId);
+    const c = separerContact(r.contact);
+    $("doublonSous").textContent =
+      `${op ? op.nom : ""} · réservé le ${r.dateSaisie.slice(0, 10)} · état : ${r.etat}`;
+    const memeTel = data.telephone && c.tel ? normTel(data.telephone) === normTel(c.tel) : null;
+    const memeEmail =
+      data.email && c.email
+        ? data.email.toLowerCase() === c.email.toLowerCase()
+        : data.email || c.email
+          ? false
+          : null;
+    const rangs = [
+      ["Nom", data.nom, r.nom, normNom(data.nom) === normNom(r.nom)],
+      ["Prénom", data.prenom, r.prenom, normNom(data.prenom) === normNom(r.prenom)],
+      [
+        "Téléphone",
+        data.telephone || "—",
+        c.tel || "—",
+        memeTel === null && (data.telephone || c.tel) ? false : memeTel,
+      ],
+      ["Email", data.email || "—", c.email || "—", memeEmail],
+      ["Articles", texteArticles(data) || "—", texteArticles(r) || "—", null],
+    ];
+    $("tableauDoublon").innerHTML =
+      `<div class="rang entete"><span></span><span>Maintenant</span><span>Déjà réservé</span><span></span></div>` +
+      rangs
+        .map(
+          ([lib, a, b, egal]) =>
+            `<div class="rang"><span class="lib">${lib}</span><span class="${egal ? "pareil" : ""}">${echapper(a)}</span><span class="${egal ? "pareil" : ""}">${echapper(b)}</span>${egal === null ? "<span></span>" : `<span class="tag ${egal ? "eg" : "dif"}">${egal ? "IDENTIQUE" : "DIFFÉRENT"}</span>`}</div>`
+        )
+        .join("");
+    $("doublonConfirmer").hidden = true;
+    $("doublonQuandMeme").hidden = false;
+    $("doublonOuvrir").hidden = !!r.enAttente;
+    ouvrirVoile("voileDoublon");
+    $("doublonStop").focus();
   }
-
-  document.getElementById("btnForcerDoublon").addEventListener("click", function () {
+  $("doublonStop").addEventListener("click", function () {
+    fermerVoile("voileDoublon");
+    saisieEnSuspens = null;
+  });
+  $("doublonQuandMeme").addEventListener("click", function () {
+    $("doublonConfirmer").hidden = false;
+    $("doublonQuandMeme").hidden = true;
+  });
+  $("doublonAnnuler").addEventListener("click", function () {
+    $("doublonConfirmer").hidden = true;
+    $("doublonQuandMeme").hidden = false;
+  });
+  $("doublonForcer").addEventListener("click", function () {
+    fermerVoile("voileDoublon");
     const data = saisieEnSuspens;
     saisieEnSuspens = null;
-    modal("modalDoublon").hide();
     if (data) enregistrerReservation(data);
+  });
+  $("doublonOuvrir").addEventListener("click", function () {
+    fermerVoile("voileDoublon");
+    saisieEnSuspens = null;
+    viderFormulaire();
+    ouvrirFiche(doublonTrouve);
   });
 
   // Affichée et confirmée tout de suite ; le serveur l'écrit en arrière-plan (ScriptCopie).
@@ -167,10 +294,21 @@
       articles: data.articles.map((a) => ({ nom: a.nom, quantite: a.quantite })),
     };
     envoyerReservation(data, res);
-    showToast("<i class='bi bi-check-circle'></i> Réservation enregistrée !", "success");
-    document.getElementById("formReservation").reset();
-    document.getElementById("telClient").classList.remove("is-valid", "is-invalid");
-    document.getElementById("emailClient").classList.remove("is-valid", "is-invalid");
-    gererAffichageProduits();
+    showToast(`${res.nom} ${res.prenom} : réservation enregistrée`);
+    viderFormulaire();
+  }
+
+  // Client et quantités effacés ; l'offre reste choisie pour le client suivant
+  function viderFormulaire() {
+    ["nomClient", "prenomClient", "telClient", "emailClient"].forEach((id) => {
+      $(id).value = "";
+      $(id).classList.remove("erreur");
+    });
+    $("message").textContent = "";
+    quantites = {};
+    lignesLibres = [{ nom: "", quantite: 1 }];
+    dessinerArticles();
+    majEtapes();
+    $("nomClient").focus();
   }
 </script>

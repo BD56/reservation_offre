@@ -1,278 +1,554 @@
-<!-- Gestion des offres : listes, détail, état des réservations, création, modification, suppression. -->
-<script data-version="2026.10.14-2030">
-  // Offre ouverte dans la fenêtre de détail (null si fermée)
-  let idOffreOuverte = null;
-  let signatureDetail = "";
+<!-- Offres et réservations : liste des offres, réservations d'une offre (recherche, filtres,
+     « Retiré »), fiche d'une réservation, création / modification / suppression d'une offre. -->
+<script data-version="2026.10.15-1026">
+  const ETATS = ["Réservé", "Contacté", "Retrait", "Annulé"];
+  const CLASSE_ETAT = { Réservé: "reserve", Contacté: "contacte", Retrait: "retrait", Annulé: "annule" };
+  const LIBELLE_ETAT = { Réservé: "Réservé", Contacté: "Contacté", Retrait: "Retiré", Annulé: "Annulé" };
 
-  // Liste déroulante du formulaire + liste « Gérer les Opérations », depuis la copie
-  function afficherDonnees() {
-    const operations = copie.operations;
-    const select = document.getElementById("operationSelect");
-    const tbody = document.getElementById("tableOperationsBody");
-    const selectionPrecedente = select.value;
-    select.innerHTML = '<option value="" disabled selected>Sélectionnez l\'offre en cours...</option>';
-    tbody.innerHTML = "";
-
-    if (operations.length === 0) {
-      select.innerHTML = '<option value="" disabled selected>Aucune offre disponible</option>';
-      tbody.innerHTML =
-        '<tr><td colspan="4" class="text-center text-muted py-4">Aucune opération trouvée.</td></tr>';
-      gererAffichageProduits();
+  // =============== Liste des offres ===============
+  function dessinerOffres() {
+    const groupes = [
+      ["En cours et à venir", copie.operations.filter((op) => op.active)],
+      ["Terminées", copie.operations.filter((op) => !op.active)],
+    ];
+    if (!copie.operations.length) {
+      $("listeOffres").innerHTML =
+        `<div class="vide">Aucune offre. Créez la première avec « Nouvelle offre ».</div>`;
       return;
     }
+    $("listeOffres").innerHTML = groupes
+      .filter(([, liste]) => liste.length)
+      .map(
+        ([titre, liste]) =>
+          `<h2 class="groupe-titre">${titre}</h2>` +
+          liste
+            .map((op) => {
+              const n = compteOffre(op);
+              const liste = reservationsDe(op.id);
+              const retirees = liste ? liste.filter((r) => r.etat === "Retrait").length : null;
+              return `<article class="offre ${op.active ? "" : "terminee"}" data-offre="${echapper(op.id)}">
+                <div><h3>${echapper(op.nom)} ${chipsOffre(op, true)}</h3>
+                  <div class="infos"><span>${echapper(periodeLongue(op))}</span>
+                    <span><b>${n}</b> réservation${n > 1 ? "s" : ""}${op.type === "Produit" && retirees !== null ? ` · <b>${retirees}</b> retirée${retirees > 1 ? "s" : ""}` : ""}</span>
+                    ${op.type === "Produit" ? `<span>${enListeFixe(op) ? echapper(articlesPredefinis(op).join(", ")) : "Saisie libre des articles"}</span>` : ""}</div></div>
+                <div class="boutons-offre">
+                  <button type="button" class="sec" data-act="voir"><svg class="ico p"><use href="#i-liste"/></svg>Réservations</button>
+                  <button type="button" class="sec" data-act="feuille"><svg class="ico p"><use href="#i-imprimer"/></svg>Feuille</button>
+                  <button type="button" class="sec" data-act="modifier"><svg class="ico p"><use href="#i-crayon"/></svg>Modifier</button>
+                  <button type="button" class="sec danger" data-act="supprimer" aria-label="Supprimer l'offre ${echapper(op.nom)}" title="Supprimer l'offre"><svg class="ico p"><use href="#i-poubelle"/></svg></button></div>
+              </article>`;
+            })
+            .join("")
+      )
+      .join("");
+    $("listeOffres")
+      .querySelectorAll("[data-act]")
+      .forEach((b) =>
+        b.addEventListener("click", function () {
+          const carte = b.closest(".offre");
+          const id = carte.dataset.offre;
+          if (b.dataset.act === "voir") ouvrirDetail(id);
+          if (b.dataset.act === "feuille") assurerReservations(id, () => ouvrirFeuille(id));
+          if (b.dataset.act === "modifier") ouvrirEditeur(id);
+          if (b.dataset.act === "supprimer") demanderSuppression(carte, id);
+        })
+      );
+  }
 
-    operations.forEach((op) => {
-      const option = document.createElement("option");
-      option.value = op.id;
-      option.setAttribute("data-type", op.type);
-      option.setAttribute("data-mode", op.modeSaisie);
-      option.setAttribute("data-articles", op.articlesPredefinis);
-      option.textContent = `[${op.type}] ${op.nom}`;
-      select.appendChild(option);
-
-      const tr = document.createElement("tr");
-      tr.style.cursor = "pointer";
-      tr.onclick = function () {
-        voirReservationsDetail(op.id);
-      };
-
-      const nombre = compteOffre(op);
-      const infoMode =
-        op.type === "Produit" ? `<small class="text-muted">Saisie : ${echapper(op.modeSaisie)}</small>` : "";
-
-      tr.innerHTML = `
-        <td class="ps-4"><span class="fw-bold text-dark">${echapper(op.nom)}</span><br>${infoMode}</td>
-        <td><small>Du ${echapper(dateFr(op.dateDebut))}<br>Au ${echapper(dateFr(op.dateFin))}</small></td>
-        <td class="text-center"><span class="badge bg-${nombre > 0 ? "success" : "secondary"} rounded-pill fs-6">${nombre}</span></td>
-        <td class="text-end pe-4">
-          <button class="btn btn-sm btn-outline-danger border-0" title="Supprimer l'offre">
-            <i class="bi bi-trash"></i>
-          </button>
-        </td>
-      `;
-      tr.querySelector("button").addEventListener("click", function (event) {
-        event.stopPropagation();
-        demanderSuppression(op.id);
-      });
-      tbody.appendChild(tr);
+  // Suppression confirmée dans la carte (2e appui)
+  function demanderSuppression(carte, id) {
+    if (carte.querySelector(".confirme")) return;
+    const op = trouverOffre(id);
+    const liste = reservationsDe(id);
+    const n = liste ? liste.length : op.count;
+    carte.insertAdjacentHTML(
+      "beforeend",
+      `<div class="confirme"><p>Supprimer « ${echapper(op.nom)} » et ${n > 1 ? `ses ${n} réservations` : n ? "sa réservation" : "(aucune réservation)"} ? C'est définitif.</p>
+        <button type="button" class="sec plein-danger" data-oui>Supprimer l'offre</button><button type="button" class="sec" data-non>Garder</button></div>`
+    );
+    carte
+      .querySelector("[data-non]")
+      .addEventListener("click", () => carte.querySelector(".confirme").remove());
+    carte.querySelector("[data-oui]").addEventListener("click", function () {
+      this.disabled = true;
+      showToast("Suppression en cours…");
+      google.script.run
+        .withSuccessHandler(function (c) {
+          delete horsCopie[id];
+          if (offreDetail === id) offreDetail = null;
+          appliquerCopieServeur(c);
+          showToast(`Offre « ${op.nom} » supprimée`);
+        })
+        .withFailureHandler(function (err) {
+          showErreur(err);
+          dessinerOffres();
+        })
+        .deleteOperation(id);
     });
-
-    // On conserve l'offre sélectionnée si elle existe toujours, sinon on masque les articles
-    if (selectionPrecedente && operations.some((op) => op.id === selectionPrecedente)) {
-      select.value = selectionPrecedente;
-    } else {
-      gererAffichageProduits();
-    }
   }
 
-  function gererChampsNouvelleOffre(prefix) {
-    const type = document.getElementById(prefix + "OpType").value;
-    const mode = document.getElementById(prefix + "OpMode").value;
-    document.getElementById("blocModeSaisie_" + prefix).style.display =
-      type === "Evenement" ? "none" : "block";
-    document.getElementById("blocArticlesPredefinis_" + prefix).style.display =
-      type === "Produit" && mode === "Predefini" ? "block" : "none";
-  }
+  $("nouvelleOffre").addEventListener("click", () => ouvrirEditeur(null));
 
-  // Lit et vérifie le formulaire d'offre (prefix 'new' ou 'edit'). Renvoie null si invalide.
-  function lireFormulaireOffre(prefix) {
-    const form = document.getElementById(prefix === "new" ? "formNouvelleOffre" : "formEditOffre");
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return null;
-    }
+  // =============== Réservations d'une offre ===============
+  let offreDetail = null;
+  let filtre = "Toutes";
 
-    const type = document.getElementById(prefix + "OpType").value;
-    const mode = type === "Produit" ? document.getElementById(prefix + "OpMode").value : "";
-    const data = {
-      nom: document.getElementById(prefix + "OpNom").value.trim(),
-      type: type,
-      modeSaisie: mode,
-      dateDebut: document.getElementById(prefix + "OpDateDebut").value,
-      dateFin: document.getElementById(prefix + "OpDateFin").value,
-      articlesPredefinis:
-        mode === "Predefini" ? document.getElementById(prefix + "OpArticles").value.trim() : "",
-    };
-
-    if (!data.nom) {
-      showToast("Le nom de l'offre est obligatoire.", "error");
-      return null;
-    }
-    if (data.dateDebut && data.dateFin && data.dateFin < data.dateDebut) {
-      showToast("La date de fin doit être postérieure à la date de début.", "error");
-      return null;
-    }
-    if (mode === "Predefini" && !data.articlesPredefinis.replace(/,/g, "").trim()) {
-      showToast("Le mode prédéfini nécessite au moins un article.", "error");
-      return null;
-    }
-    return data;
-  }
-
-  function creerNouvelleOffre() {
-    modal("modalOperations").hide();
-    document.getElementById("formNouvelleOffre").reset();
-    gererChampsNouvelleOffre("new");
-    modal("modalCreerOffre").show();
-  }
-
-  function sauvegarderNouvelleOffre() {
-    const data = lireFormulaireOffre("new");
-    if (!data) return;
-    const btn = document.getElementById("btnSauvegarderOffre");
-    btn.disabled = true;
-    google.script.run
-      .withSuccessHandler(function (c) {
-        appliquerCopieServeur(c);
-        modal("modalCreerOffre").hide();
-        showToast("Nouvelle offre créée !", "success");
-        btn.disabled = false;
-        modal("modalOperations").show();
-      })
-      .withFailureHandler(function (err) {
-        showErreur(err);
-        btn.disabled = false;
-      })
-      .saveOperation(data);
-  }
-
-  // --- DÉTAIL DE L'OFFRE ---
-  // Offre active : affichée tout de suite depuis la copie. Offre terminée : chargée une fois.
-  function voirReservationsDetail(idOperation) {
-    modal("modalOperations").hide();
-    const op = trouverOffre(idOperation);
+  function ouvrirDetail(id) {
+    const op = trouverOffre(id);
     if (!op) return;
-    if (!reservationsDe(idOperation)) {
-      showToast("<span class='spinner-border spinner-border-sm'></span> Chargement des détails...", "info");
-    }
-    assurerReservations(idOperation, function () {
-      idOffreOuverte = idOperation;
-      signatureDetail = "";
-      document.getElementById("editOpId").value = op.id;
-      document.getElementById("editOpNom").value = op.nom;
-      document.getElementById("editOpType").value = op.type;
-      document.getElementById("editOpMode").value = op.modeSaisie || "Libre";
-      document.getElementById("editOpDateDebut").value = op.dateDebut;
-      document.getElementById("editOpDateFin").value = op.dateFin;
-      document.getElementById("editOpArticles").value = op.articlesPredefinis;
-      gererChampsNouvelleOffre("edit");
-      rafraichirDetailOuvert();
-      modal("modalDetailOffre").show();
+    if (!reservationsDe(id)) showToast("Chargement des réservations…");
+    assurerReservations(id, function () {
+      offreDetail = id;
+      filtre = "Toutes";
+      $("recherche").value = "";
+      allerEcran("detail");
     });
   }
+  $("retourOffres").addEventListener("click", () => allerEcran("offres"));
+  $("detailFeuille").addEventListener("click", () => ouvrirFeuille(offreDetail));
+  $("detailModifier").addEventListener("click", () => ouvrirEditeur(offreDetail));
+  $("recherche").addEventListener("input", () => dessinerDetail());
 
-  document.getElementById("modalDetailOffre").addEventListener("hidden.bs.modal", function () {
-    idOffreOuverte = null;
-  });
-
-  // Offre ouverte + ses réservations (sert aussi à l'impression)
-  function detailsOffreOuverte() {
-    const op = idOffreOuverte && trouverOffre(idOffreOuverte);
-    return op ? { operation: op, reservations: reservationsDe(op.id) || [] } : null;
-  }
-
-  // Redessine la liste des inscrits (après un rechargement de la copie, un envoi…), seulement
-  // si elle a changé : un menu « État » en cours d'utilisation n'est pas recréé pour rien.
-  function rafraichirDetailOuvert() {
-    const details = detailsOffreOuverte();
-    if (!details) return;
-    const signature = JSON.stringify(details);
-    if (signature === signatureDetail) return;
-    signatureDetail = signature;
-    document.getElementById("detailModalTitle").innerHTML =
-      `<i class="bi bi-box-seam"></i> ${echapper(details.operation.nom)}`;
-
-    const tbody = document.getElementById("tableInscritsBody");
-    tbody.innerHTML = "";
-    if (details.reservations.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="4" class="text-center text-muted">Aucun inscrit pour le moment.</td></tr>';
+  function dessinerDetail() {
+    const op = trouverOffre(offreDetail);
+    if (!op) {
+      allerEcran("offres");
       return;
     }
-    details.reservations.forEach((res) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><span class="fw-bold">${echapper(res.nom)} ${echapper(res.prenom)}</span><br><small>Saisi le ${echapper(res.dateSaisie)}</small></td>
-        <td>${echapper(res.contact)}</td>
-        <td><small>${echapper(texteArticles(res)) || "-"}</small></td>
-        <td>
-          <select class="form-select form-select-sm fw-bold border-secondary text-secondary" ${res.enAttente ? "disabled" : ""}>
-            ${["Réservé", "Contacté", "Retrait", "Annulé"].map((etat) => `<option value="${etat}" ${res.etat === etat ? "selected" : ""}>${etat}</option>`).join("")}
-          </select>
-          ${res.enAttente ? '<small class="text-muted">envoi en cours…</small>' : ""}
-        </td>
-      `;
-      const select = tr.querySelector("select");
-      select.addEventListener("change", function () {
-        changerStatutReservation(res, select);
+    const toutes = reservationsDe(op.id) || [];
+    const n = compteOffre(op);
+    $("titreDetail").textContent = op.nom;
+    $("infosDetail").innerHTML =
+      chipsOffre(op, true) +
+      `<span>${echapper(periodeLongue(op))}</span><span>${n} réservation${n > 1 ? "s" : ""}</span>`;
+
+    // Filtres par état (avec leur nombre)
+    const nombre = (f) => (f === "Toutes" ? toutes.length : toutes.filter((r) => r.etat === f).length);
+    const LIB_FILTRE = {
+      Toutes: "Toutes",
+      Réservé: "À retirer",
+      Contacté: "Contactés",
+      Retrait: "Retirées",
+      Annulé: "Annulées",
+    };
+    $("filtres").innerHTML = Object.keys(LIB_FILTRE)
+      .map(
+        (f) =>
+          `<button type="button" class="filtre" data-filtre="${f}" aria-pressed="${filtre === f}">${LIB_FILTRE[f]} <b>${nombre(f)}</b></button>`
+      )
+      .join("");
+    $("filtres")
+      .querySelectorAll(".filtre")
+      .forEach((b) =>
+        b.addEventListener("click", () => {
+          filtre = b.dataset.filtre;
+          dessinerDetail();
+        })
+      );
+
+    // Reste à préparer : articles des réservations ni annulées ni retirées
+    $("preparer").hidden = op.type !== "Produit";
+    const reste = totauxArticles(toutes.filter((r) => r.etat !== "Annulé" && r.etat !== "Retrait"));
+    $("preparer").innerHTML =
+      `<span>Reste à préparer</span>` +
+      (reste.length
+        ? reste.map((t) => `<span><b>${t.total}</b> ${echapper(t.nom)}</span>`).join("")
+        : "<span>rien</span>");
+
+    // Lignes (plus récentes en haut), filtrées par état et par la recherche
+    const texte = $("recherche").value.trim();
+    const q = normNom(texte);
+    const qTel = normTel(texte);
+    const visibles = toutes
+      .filter((r) => filtre === "Toutes" || r.etat === filtre)
+      .filter((r) => {
+        if (!texte) return true;
+        const c = separerContact(r.contact);
+        return (
+          normNom(r.nom + r.prenom).includes(q) ||
+          normNom(r.prenom + r.nom).includes(q) ||
+          (qTel.length >= 3 && normTel(c.tel).includes(qTel)) ||
+          c.email.toLowerCase().includes(texte.toLowerCase())
+        );
+      })
+      .slice()
+      .reverse();
+    $("lignes").innerHTML = visibles.length
+      ? visibles.map((r) => ligneHtml(r, op)).join("")
+      : `<div class="vide">${texte ? `Aucune réservation ne correspond à « ${echapper(texte)} ».` : "Aucune réservation pour le moment."}</div>`;
+    $("lignes")
+      .querySelectorAll(".ligne")
+      .forEach((ligne) => {
+        const r = toutes.find((x) => x.idRes === ligne.dataset.res);
+        ligne.addEventListener("click", (e) => {
+          if (e.target.closest(".retire-btn") || r.enAttente) return;
+          ouvrirFiche(r);
+        });
+        ligne.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !r.enAttente) ouvrirFiche(r);
+        });
+        const bouton = ligne.querySelector(".retire-btn");
+        if (bouton) bouton.addEventListener("click", () => marquerRetire(r));
       });
-      tbody.appendChild(tr);
-    });
   }
 
-  function texteArticles(res) {
-    return res.articles.map((a) => `${a.quantite}x ${a.nom}`).join(", ");
+  function ligneHtml(r, op) {
+    let droite;
+    if (r.enAttente) droite = `<span class="etat envoi"><span class="rond"></span>envoi…</span>`;
+    else if (op.type === "Produit" && (r.etat === "Réservé" || r.etat === "Contacté"))
+      droite = `<span class="etat ${CLASSE_ETAT[r.etat]}">${LIBELLE_ETAT[r.etat]}</span><button type="button" class="retire-btn"><svg class="ico p"><use href="#i-check"/></svg>Retiré</button>`;
+    else
+      droite = `<span class="etat ${CLASSE_ETAT[r.etat] || ""}">${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</span>`;
+    return `<div class="ligne ${r.etat === "Annulé" ? "annulee" : ""}" data-res="${echapper(r.idRes)}" tabindex="0" role="button" aria-label="Modifier la réservation de ${echapper(r.nom)} ${echapper(r.prenom)}">
+      <div class="qui"><b>${echapper(r.nom)} ${echapper(r.prenom)}</b><small>${echapper(contactLisible(r))}</small></div>
+      <div class="commande">${op.type === "Produit" ? echapper(texteArticles(r)) || "—" : `Inscrit le ${echapper(r.dateSaisie.slice(0, 10))}`}</div>
+      <div class="actions-ligne">${droite}</div></div>`;
   }
 
-  // État changé tout de suite à l'écran (et dans la copie) ; remis comme avant si le serveur refuse
-  function changerStatutReservation(res, select) {
-    const ancienStatut = res.etat;
-    const nouveauStatut = select.value;
-    res.etat = nouveauStatut;
-    signatureDetail = JSON.stringify(detailsOffreOuverte());
-    afficherDonnees(); // compteurs (les annulées ne comptent pas)
+  // Totaux par article, triés par nom
+  function totauxArticles(reservations) {
+    const totaux = {};
+    reservations.forEach((r) =>
+      r.articles.forEach((a) => (totaux[a.nom] = (totaux[a.nom] || 0) + a.quantite))
+    );
+    return Object.keys(totaux)
+      .sort((a, b) => a.localeCompare(b))
+      .map((nom) => ({ nom: nom, total: totaux[nom] }));
+  }
+
+  // --- État : changé tout de suite à l'écran, remis comme avant si le serveur refuse ---
+  function changerEtat(r, nouvelEtat, apres) {
+    const ancien = r.etat;
+    r.etat = nouvelEtat;
+    dessinerTout();
     google.script.run
       .withSuccessHandler(function () {
-        showToast("<i class='bi bi-check-circle'></i> Statut mis à jour !", "success");
+        if (apres) apres();
       })
       .withFailureHandler(function (err) {
-        res.etat = ancienStatut;
-        select.value = ancienStatut;
-        afficherDonnees();
-        rafraichirDetailOuvert();
+        r.etat = ancien;
+        dessinerTout();
         showErreur(err);
       })
-      .updateReservationStatus(res.idRes, nouveauStatut);
+      .updateReservationStatus(r.idRes, nouvelEtat);
   }
 
-  function sauvegarderModificationOffre() {
-    const data = lireFormulaireOffre("edit");
-    if (!data) return;
-    data.id = document.getElementById("editOpId").value;
+  // « Retiré » sans confirmation ; « Annuler » dans le message pour revenir en arrière
+  function marquerRetire(r) {
+    const ancien = r.etat;
+    changerEtat(r, "Retrait");
+    showToast(`${r.nom} ${r.prenom} : retrait noté`, "", function () {
+      changerEtat(r, ancien, () => showToast("Retrait annulé"));
+    });
+  }
 
-    const btn = document.getElementById("btnUpdateOffre");
-    btn.disabled = true;
+  // =============== Fiche d'une réservation ===============
+  let fiche = null; // { res, etat, articles: [{nom, quantite}] }
+
+  function ouvrirFiche(r) {
+    if (!r || r.enAttente) return;
+    const op = trouverOffre(r.idOp);
+    const c = separerContact(r.contact);
+    fiche = { res: r, etat: r.etat, articles: r.articles.map((a) => ({ nom: a.nom, quantite: a.quantite })) };
+    $("ficheTitre").innerHTML =
+      `${echapper(r.nom)} ${echapper(r.prenom)}<small>${echapper(op ? op.nom : "")} · saisie le ${echapper(r.dateSaisie)}</small>`;
+    $("fNom").value = r.nom;
+    $("fPrenom").value = r.prenom;
+    $("fTel").value = c.tel;
+    $("fEmail").value = c.email;
+    $("ficheBlocArticles").hidden = !op || op.type !== "Produit";
+    $("ficheAjout").hidden = !op || enListeFixe(op);
+    $("ficheConfirme").hidden = true;
+    $("ficheErreur").textContent = "";
+    ["fNom", "fPrenom", "fTel", "fEmail"].forEach((id) => $(id).classList.remove("erreur"));
+    dessinerFiche();
+    $("ficheEnregistrer").disabled = true;
+    ouvrirVoile("voileFiche");
+  }
+
+  function dessinerFiche() {
+    $("ficheEtat").innerHTML = ETATS.map(
+      (e) =>
+        `<button type="button" data-etat="${e}" aria-pressed="${fiche.etat === e}">${LIBELLE_ETAT[e]}</button>`
+    ).join("");
+    $("ficheEtat")
+      .querySelectorAll("button")
+      .forEach((b) =>
+        b.addEventListener("click", () => {
+          fiche.etat = b.dataset.etat;
+          dessinerFiche();
+          ficheModifiee();
+        })
+      );
+    const op = trouverOffre(fiche.res.idOp);
+    if (!op || op.type !== "Produit") return;
+    // Liste fixe : tous les articles de l'offre ; saisie libre : ceux de la réservation
+    const noms = enListeFixe(op) ? articlesPredefinis(op) : [];
+    fiche.articles.forEach((a) => {
+      if (!noms.includes(a.nom)) noms.push(a.nom);
+    });
+    $("ficheArticles").innerHTML = noms
+      .map((nom) => {
+        const a = fiche.articles.find((x) => x.nom === nom);
+        const q = a ? a.quantite : 0;
+        return `<div class="ligne-produit ${q ? "choisi" : ""}" data-article="${echapper(nom)}"><span class="nom-article">${echapper(nom)}</span>${compteurHtml(q, nom)}</div>`;
+      })
+      .join("");
+    $("ficheArticles")
+      .querySelectorAll(".ligne-produit")
+      .forEach((ligne) => {
+        const nom = ligne.dataset.article;
+        ligne.querySelector(".plus").addEventListener("click", () => reglerFiche(nom, 1));
+        ligne.querySelector(".moins").addEventListener("click", () => reglerFiche(nom, -1));
+      });
+  }
+
+  function reglerFiche(nom, delta) {
+    let a = fiche.articles.find((x) => x.nom === nom);
+    if (!a) {
+      a = { nom: nom, quantite: 0 };
+      fiche.articles.push(a);
+    }
+    a.quantite = Math.max(0, a.quantite + delta);
+    dessinerFiche();
+    ficheModifiee();
+  }
+
+  function ajouterArticleFiche() {
+    const nom = $("ficheNouvelArticle").value.trim();
+    if (!nom) return;
+    if (!fiche.articles.some((a) => a.nom === nom)) fiche.articles.push({ nom: nom, quantite: 1 });
+    $("ficheNouvelArticle").value = "";
+    dessinerFiche();
+    ficheModifiee();
+  }
+  $("ficheAjouter").addEventListener("click", ajouterArticleFiche);
+  $("ficheNouvelArticle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      ajouterArticleFiche();
+    }
+  });
+
+  function ficheModifiee() {
+    $("ficheEnregistrer").disabled = false;
+    $("ficheErreur").textContent = "";
+  }
+  ["fNom", "fPrenom", "fTel", "fEmail"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      $(id).classList.remove("erreur");
+      ficheModifiee();
+    })
+  );
+
+  function refuserFiche(texte, idChamp) {
+    $("ficheErreur").textContent = texte;
+    if (idChamp) {
+      $(idChamp).classList.add("erreur");
+      $(idChamp).focus();
+    }
+  }
+
+  $("ficheEnregistrer").addEventListener("click", function () {
+    const r = fiche.res;
+    const op = trouverOffre(r.idOp);
+    const data = {
+      idRes: r.idRes,
+      nom: $("fNom").value.trim().toUpperCase(),
+      prenom: $("fPrenom").value.trim(),
+      telephone: $("fTel").value.trim(),
+      email: $("fEmail").value.trim(),
+      etat: fiche.etat,
+      articles: fiche.articles.filter((a) => a.quantite > 0),
+    };
+    if (!data.nom) return refuserFiche("Le nom est obligatoire.", "fNom");
+    if (!data.prenom) return refuserFiche("Le prénom est obligatoire.", "fPrenom");
+    if (!data.telephone && !data.email)
+      return refuserFiche("Un téléphone ou un email est obligatoire.", "fTel");
+    if (data.telephone && !REGEX_TEL.test(data.telephone))
+      return refuserFiche("Téléphone incomplet (ex. : 06 12 34 56 78).", "fTel");
+    if (data.email && !REGEX_EMAIL.test(data.email))
+      return refuserFiche("Email incomplet (ex. : nom@exemple.fr).", "fEmail");
+    if (op && op.type === "Produit" && !data.articles.length)
+      return refuserFiche("Au moins un article : sinon, passez la réservation en « Annulé ».");
+
+    const bouton = $("ficheEnregistrer");
+    bouton.disabled = true;
     google.script.run
       .withSuccessHandler(function (c) {
+        // Offre terminée (hors copie) : la réservation affichée est mise à jour ici
+        let contact = data.telephone;
+        if (data.email) contact += (contact ? " / " : "") + data.email;
+        Object.assign(r, {
+          nom: data.nom,
+          prenom: data.prenom,
+          contact: contact,
+          etat: data.etat,
+          articles: data.articles,
+        });
         appliquerCopieServeur(c);
-        showToast("Offre mise à jour !", "success");
-        btn.disabled = false;
+        fermerVoile("voileFiche");
+        showToast(`${data.nom} ${data.prenom} : modifications enregistrées`);
       })
       .withFailureHandler(function (err) {
-        showErreur(err);
-        btn.disabled = false;
+        bouton.disabled = false;
+        refuserFiche(messageErreur(err));
       })
-      .updateOperation(data);
-  }
+      .updateReservation(data);
+  });
 
-  let idOffreASupprimer = null;
-  function demanderSuppression(idOperation) {
-    idOffreASupprimer = idOperation;
-    modal("modalConfirmDelete").show();
-  }
-  document.getElementById("btnConfirmerSuppression").addEventListener("click", function () {
-    if (!idOffreASupprimer) return;
-    const id = idOffreASupprimer;
-    idOffreASupprimer = null;
-    modal("modalConfirmDelete").hide();
-    showToast("<span class='spinner-border spinner-border-sm'></span> Suppression en cours...", "info");
+  $("ficheSupprimer").addEventListener("click", () => {
+    $("ficheConfirme").hidden = false;
+    $("ficheSupprimerOui").focus();
+  });
+  $("ficheSupprimerNon").addEventListener("click", () => ($("ficheConfirme").hidden = true));
+  $("ficheSupprimerOui").addEventListener("click", function () {
+    const r = fiche.res;
+    const bouton = this;
+    bouton.disabled = true;
     google.script.run
       .withSuccessHandler(function (c) {
-        delete horsCopie[id];
+        bouton.disabled = false;
+        retirerDeLaCopie(r);
         appliquerCopieServeur(c);
-        showToast("Opération supprimée !", "success");
+        fermerVoile("voileFiche");
+        showToast(`Réservation de ${r.nom} ${r.prenom} supprimée`);
       })
-      .withFailureHandler(showErreur)
-      .deleteOperation(id);
+      .withFailureHandler(function (err) {
+        bouton.disabled = false;
+        refuserFiche(messageErreur(err));
+      })
+      .deleteReservation(r.idRes);
+  });
+
+  // =============== Création / modification d'une offre ===============
+  let editeur = null; // { id, type, mode, articles }
+
+  function ouvrirEditeur(id) {
+    const op = id ? trouverOffre(id) : null;
+    editeur = {
+      id: op ? op.id : null,
+      type: op ? op.type || "Produit" : "Produit",
+      mode: op && op.modeSaisie ? op.modeSaisie : "Predefini",
+      articles: op ? articlesPredefinis(op) : [],
+    };
+    $("offreTitre").textContent = op ? "Modifier l'offre" : "Nouvelle offre";
+    $("oNom").value = op ? op.nom : "";
+    $("oDebut").value = op ? op.dateDebut : "";
+    $("oFin").value = op ? op.dateFin : "";
+    $("oErreur").textContent = "";
+    $("oNouvelArticle").value = "";
+    $("oEnregistrer").disabled = false;
+    dessinerEditeur();
+    ouvrirVoile("voileOffre");
+    $("oNom").focus();
+  }
+
+  function dessinerEditeur() {
+    $("oType")
+      .querySelectorAll("button")
+      .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.val === editeur.type)));
+    $("oMode")
+      .querySelectorAll("button")
+      .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.val === editeur.mode)));
+    $("oBlocMode").hidden = editeur.type !== "Produit";
+    $("oBlocArticles").hidden = editeur.type !== "Produit" || editeur.mode !== "Predefini";
+    $("oIndiceMode").textContent =
+      editeur.mode === "Predefini"
+        ? "L'accueil choisit les quantités dans cette liste (boutons + / −)."
+        : "L'accueil tape le nom de chaque article commandé.";
+    $("oArticles").innerHTML = editeur.articles.length
+      ? editeur.articles
+          .map(
+            (a, i) =>
+              `<span class="puce-article">${echapper(a)}<button type="button" data-i="${i}" aria-label="Retirer ${echapper(a)}"><svg class="ico p"><use href="#i-fermer"/></svg></button></span>`
+          )
+          .join("")
+      : `<span class="indice">Aucun article pour l'instant.</span>`;
+    $("oArticles")
+      .querySelectorAll("button")
+      .forEach((b) =>
+        b.addEventListener("click", () => {
+          editeur.articles.splice(+b.dataset.i, 1);
+          dessinerEditeur();
+        })
+      );
+  }
+  $("oType")
+    .querySelectorAll("button")
+    .forEach((b) =>
+      b.addEventListener("click", () => {
+        editeur.type = b.dataset.val;
+        dessinerEditeur();
+      })
+    );
+  $("oMode")
+    .querySelectorAll("button")
+    .forEach((b) =>
+      b.addEventListener("click", () => {
+        editeur.mode = b.dataset.val;
+        dessinerEditeur();
+      })
+    );
+
+  // Les articles sont enregistrés séparés par des virgules : une virgule tapée sépare deux articles
+  function ajouterArticleOffre() {
+    $("oNouvelArticle")
+      .value.split(",")
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .forEach((a) => {
+        if (!editeur.articles.includes(a)) editeur.articles.push(a);
+      });
+    $("oNouvelArticle").value = "";
+    dessinerEditeur();
+    $("oNouvelArticle").focus();
+  }
+  $("oAjouter").addEventListener("click", ajouterArticleOffre);
+  $("oNouvelArticle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      ajouterArticleOffre();
+    }
+  });
+
+  $("oEnregistrer").addEventListener("click", function () {
+    if ($("oNouvelArticle").value.trim()) ajouterArticleOffre(); // article tapé mais pas encore ajouté
+    const data = {
+      nom: $("oNom").value.trim(),
+      type: editeur.type,
+      modeSaisie: editeur.type === "Produit" ? editeur.mode : "",
+      dateDebut: $("oDebut").value,
+      dateFin: $("oFin").value,
+      articlesPredefinis:
+        editeur.type === "Produit" && editeur.mode === "Predefini" ? editeur.articles.join(", ") : "",
+    };
+    const erreur = (texte, idChamp) => {
+      $("oErreur").textContent = texte;
+      if (idChamp) $(idChamp).focus();
+    };
+    if (!data.nom) return erreur("Donnez un nom à l'offre.", "oNom");
+    if (data.dateDebut && data.dateFin && data.dateFin < data.dateDebut)
+      return erreur("La date de fin est avant la date de début.", "oFin");
+    if (data.modeSaisie === "Predefini" && !editeur.articles.length)
+      return erreur("Ajoutez au moins un article à la liste fixe.", "oNouvelArticle");
+
+    const bouton = $("oEnregistrer");
+    bouton.disabled = true;
+    const creation = !editeur.id;
+    if (!creation) data.id = editeur.id;
+    const serveur = google.script.run
+      .withSuccessHandler(function (c) {
+        bouton.disabled = false;
+        appliquerCopieServeur(c);
+        fermerVoile("voileOffre");
+        showToast(creation ? `Offre « ${data.nom} » créée` : `Offre « ${data.nom} » mise à jour`);
+      })
+      .withFailureHandler(function (err) {
+        bouton.disabled = false;
+        erreur(messageErreur(err));
+      });
+    if (creation) serveur.saveOperation(data);
+    else serveur.updateOperation(data);
   });
 </script>

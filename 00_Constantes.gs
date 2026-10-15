@@ -3,7 +3,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_00_Constantes_() {
-  return "2026.10.14-2030";
+  return "2026.10.15-1026";
 }
 
 // Onglets du classeur
@@ -38,6 +38,7 @@ const FICHIERS_SERVEUR = [
 const FICHIERS_PAGE = [
   "Index",
   "Style",
+  "Icones",
   "ScriptCommun",
   "ScriptCopie",
   "ScriptImpression",

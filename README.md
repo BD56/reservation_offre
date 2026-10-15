@@ -18,12 +18,29 @@ Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**
 - **Operations.gs** — offres : détail (offres terminées), création, modification, suppression
   en cascade (onglets réécrits en une fois). Chaque modification renvoie la copie à jour.
 - **Reservations.gs** — enregistrement d'une réservation (identifiant donné par la page :
-  un réessai n'écrit pas deux fois) et de ses articles, changement d'état.
+  un réessai n'écrit pas deux fois) et de ses articles, changement d'état, modification
+  (client, articles, état) et suppression d'une réservation.
 
 Page :
-- **Index.html** — squelette (+ `COPIE_INITIALE` injectée) qui inclut **Style.html** et les
-  scripts **ScriptCommun**, **ScriptCopie** (copie locale, envois en arrière-plan, doublons),
-  **ScriptSaisie**, **ScriptOffres**, **ScriptImpression** (`<?!= include_('Nom') ?>`).
+- **Index.html** — squelette (+ `COPIE_INITIALE` injectée) qui inclut **Style.html** (style
+  « Comptoir », comme l'app chèques), **Icones.html** (icônes SVG) et les scripts
+  **ScriptCommun** (outils, écrans, fenêtres), **ScriptCopie** (copie locale, envois en
+  arrière-plan, doublons), **ScriptSaisie** (nouvelle réservation), **ScriptOffres** (offres,
+  réservations d'une offre, fiche, éditeur d'offre), **ScriptImpression** (feuille de
+  préparation) — `<?!= include_('Nom') ?>`. **Aucune ressource externe** (plus de Bootstrap
+  ni de CDN).
+
+## Écrans
+- **Nouvelle réservation** : offre (menu déroulant ; reste choisie pour le client suivant),
+  client, articles avec + / − (liste fixe) ou tapés (saisie libre), Entrée pour valider.
+- **Offres et réservations** : offres en cours / à venir / terminées (Réservations,
+  Feuille, Modifier, Supprimer confirmé dans la carte) ; « Nouvelle offre » (articles en
+  étiquettes). Page des réservations d'une offre : recherche (nom, téléphone, email),
+  filtres par état, « Reste à préparer », bouton **Retiré** (sans confirmation, « Annuler »
+  dans le message), clic sur une ligne = **fiche** (état, coordonnées, quantités,
+  suppression confirmée).
+- **Feuille de préparation** : aperçu (total à préparer, liste à pointer triée par nom,
+  annulées en option) puis impression.
 
 ## Rapidité (copie locale)
 - À l'ouverture, les offres et les réservations des offres **actives** (fin non passée ou

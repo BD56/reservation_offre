@@ -1,78 +1,62 @@
-<!-- Impression du résumé d'une offre (totaux à préparer + liste des commandes). -->
-<script data-version="2026.10.14-2030">
-  // Totaux par article, hors réservations annulées
-  function calculerResume(reservations) {
-    const totaux = {};
-    reservations
-      .filter((r) => r.etat !== "Annulé")
-      .forEach((r) => {
-        r.articles.forEach((a) => {
-          totaux[a.nom] = (totaux[a.nom] || 0) + a.quantite;
-        });
-      });
-    return Object.keys(totaux)
-      .sort((a, b) => a.localeCompare(b))
-      .map((nom) => ({ nom: nom, total: totaux[nom] }));
+<!-- Feuille de préparation : aperçu (total à préparer + liste à pointer), puis impression. -->
+<script data-version="2026.10.15-1026">
+  let offreFeuille = null;
+
+  function ouvrirFeuille(idOp) {
+    if (!trouverOffre(idOp)) return;
+    offreFeuille = idOp;
+    $("feuilleAnnulees").checked = false;
+    dessinerFeuille();
+    ouvrirVoile("voileFeuille");
+  }
+  $("feuilleAnnulees").addEventListener("change", dessinerFeuille);
+
+  function dessinerFeuille() {
+    const op = trouverOffre(offreFeuille);
+    if (!op) return;
+    const toutes = reservationsDe(op.id) || [];
+    const actives = toutes.filter((r) => r.etat !== "Annulé");
+    const listees = toutes
+      .filter((r) => $("feuilleAnnulees").checked || r.etat !== "Annulé")
+      .slice()
+      .sort((a, b) => (a.nom + " " + a.prenom).localeCompare(b.nom + " " + b.prenom));
+    const total = totauxArticles(actives);
+    const produits = op.type === "Produit";
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+
+    let html = `<header><div><h1>${echapper(op.nom)}</h1><p>${echapper(periodeLongue(op))} · ${actives.length} réservation${actives.length > 1 ? "s" : ""}</p></div>
+      <div class="imprime">Imprimée le ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}<br>à ${p(d.getHours())}:${p(d.getMinutes())}</div></header>`;
+    if (produits) {
+      html += `<h2>Total à préparer</h2><div class="defile"><table><thead><tr><th>Article</th><th style="text-align:center">Quantité</th></tr></thead><tbody>${
+        total.map((t) => `<tr><td>${echapper(t.nom)}</td><td class="qte">${t.total}</td></tr>`).join("") ||
+        '<tr><td colspan="2">Rien à préparer</td></tr>'
+      }</tbody></table></div>`;
+    }
+    html += `<h2>${produits ? "Commandes à pointer" : "Inscrits"} (${listees.length})</h2>
+      <div class="defile"><table><thead><tr><th>✓</th><th>Client</th><th>Contact</th>${produits ? "<th>Commande</th>" : ""}<th>État</th></tr></thead><tbody>${
+        listees
+          .map(
+            (r) =>
+              `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${r.etat === "Retrait" ? "☑" : "☐"}</td><td><b>${echapper(r.nom)}</b> ${echapper(r.prenom)}</td><td>${echapper(contactLisible(r))}</td>${produits ? `<td>${echapper(texteArticles(r))}</td>` : ""}<td>${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</td></tr>`
+          )
+          .join("") || `<tr><td colspan="${produits ? 5 : 4}">Aucune réservation</td></tr>`
+      }</tbody></table></div>
+      <p class="pied">Classement par nom. Les réservations annulées ne comptent pas dans le total.</p>`;
+    $("feuille").innerHTML = html;
   }
 
-  function imprimerReservations() {
-    const details = detailsOffreOuverte();
-    if (!details) return;
-
-    const op = details.operation;
-    const res = details.reservations;
-    const resume = calculerResume(res);
-
-    let html = `
-      <div class="mb-4 text-center">
-        <h2 class="mb-1">${echapper(op.nom)}</h2>
-        <p class="text-muted">Dates : Du ${echapper(dateFr(op.dateDebut))} au ${echapper(dateFr(op.dateFin))}</p>
-      </div>
-    `;
-
-    if (resume.length > 0) {
-      html += `
-        <h4 class="mb-2">Résumé des Produits à préparer</h4>
-        <table class="table table-bordered border-dark mb-5">
-          <thead class="table-light"><tr><th>Désignation du produit</th><th style="width: 150px" class="text-center">Quantité Totale</th></tr></thead>
-          <tbody>
-      `;
-      resume.forEach((r) => {
-        html += `<tr><td>${echapper(r.nom)}</td><td class="fw-bold text-center fs-5">${r.total}</td></tr>`;
-      });
-      html += `</tbody></table>`;
-    }
-
-    html += `
-      <h4 class="mb-2">Liste des Commandes (${res.length})</h4>
-      <table class="table table-bordered border-dark">
-        <thead class="table-light">
-          <tr><th>Nom & Prénom</th><th>Contact</th><th>Détail de la commande</th><th>État</th></tr>
-        </thead>
-        <tbody>
-    `;
-    if (res.length === 0) {
-      html += `<tr><td colspan="4" class="text-center">Aucune réservation pour le moment.</td></tr>`;
-    } else {
-      res.forEach((r) => {
-        html += `<tr><td><strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong><br><small class="text-muted">${echapper(r.dateSaisie)}</small></td><td>${echapper(r.contact)}</td><td>${echapper(texteArticles(r)) || "-"}</td><td class="text-center"><strong>${echapper(r.etat)}</strong></td></tr>`;
-      });
-    }
-    html += `</tbody></table>`;
-
-    const zoneImpression = document.getElementById("zoneImpression");
-    zoneImpression.innerHTML = html;
-    zoneImpression.classList.remove("d-none");
-
-    // On vide la zone après l'impression (afterprint est plus fiable qu'un délai fixe, notamment sur Safari)
+  // Seule la copie de la feuille est imprimée (CSS @media print) ; vidée après l'impression
+  $("feuilleImprimer").addEventListener("click", function () {
+    const zone = $("zoneImpression");
+    zone.innerHTML = `<div class="feuille">${$("feuille").innerHTML}</div>`;
     window.addEventListener(
       "afterprint",
       function () {
-        zoneImpression.classList.add("d-none");
-        zoneImpression.innerHTML = "";
+        zone.innerHTML = "";
       },
       { once: true }
     );
     window.print();
-  }
+  });
 </script>

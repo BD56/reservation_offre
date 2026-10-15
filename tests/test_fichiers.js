@@ -64,11 +64,13 @@ try {
     [
       "chargerCopie",
       "deleteOperation",
+      "deleteReservation",
       "doGet",
       "getOperationDetails",
       "saveOperation",
       "saveReservation",
       "updateOperation",
+      "updateReservation",
       "updateReservationStatus",
     ],
     "fonctions appelables depuis la page"

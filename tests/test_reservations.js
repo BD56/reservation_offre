@@ -123,6 +123,116 @@ try {
     "ID d'articles uniques"
   );
 
+  // --- Modifier une réservation (client, articles, état) ---
+  const idMod = idMulti;
+  assert.throws(
+    () =>
+      c.updateReservation({
+        idRes: idMod,
+        nom: "Multi",
+        prenom: "J",
+        telephone: "",
+        email: "",
+        etat: "Réservé",
+      }),
+    /téléphone ou un email/
+  );
+  assert.throws(
+    () =>
+      c.updateReservation({
+        idRes: idMod,
+        nom: "Multi",
+        prenom: "J",
+        telephone: "06",
+        email: "",
+        etat: "Perdu",
+      }),
+    /État inconnu/
+  );
+  assert.throws(
+    () =>
+      c.updateReservation({
+        idRes: idMod,
+        nom: "M",
+        prenom: "J",
+        telephone: "0600000000",
+        email: "",
+        etat: "Réservé",
+        articles: [],
+      }),
+    /au moins un article/,
+    "produits : au moins un article"
+  );
+  assert.throws(
+    () =>
+      c.updateReservation({
+        idRes: "RES-INCONNUE",
+        nom: "M",
+        prenom: "J",
+        telephone: "06",
+        email: "",
+        etat: "Réservé",
+      }),
+    /introuvable/
+  );
+  const autresArticles = lignes(env, "Articles").filter((x) => x[1] !== idMod);
+  const apresMod = J(
+    c.updateReservation({
+      idRes: idMod,
+      nom: "=Multi",
+      prenom: "Jeanne",
+      telephone: "0611111111",
+      email: "j@x.fr",
+      etat: "Contacté",
+      articles: [
+        { nom: "B", quantite: 5 },
+        { nom: "D", quantite: 1 },
+        { nom: "Zéro", quantite: 0 },
+      ],
+    })
+  );
+  const ligneMod = lignes(env, "Reservations").find((x) => x[0] === idMod);
+  assert.deepStrictEqual(ligneMod.slice(2, 6), ["=Multi", "Jeanne", "0611111111 / j@x.fr", "Contacté"]);
+  assert.deepStrictEqual(
+    lignes(env, "Articles")
+      .filter((x) => x[1] === idMod)
+      .map((x) => [x[2], x[3]]),
+    [
+      ["B", 5],
+      ["D", 1],
+    ],
+    "anciens articles remplacés, quantité 0 ignorée"
+  );
+  assert.deepStrictEqual(
+    lignes(env, "Articles").filter((x) => x[1] !== idMod),
+    autresArticles,
+    "articles des autres réservations intacts"
+  );
+  assert.deepStrictEqual(
+    apresMod.reservations[idOp].find((x) => x.idRes === idMod).articles,
+    [
+      { nom: "B", quantite: 5 },
+      { nom: "D", quantite: 1 },
+    ],
+    "copie à jour renvoyée"
+  );
+  assert.strictEqual(
+    lignes(env, "Reservations")[0][4],
+    "0612345678",
+    "autres réservations intactes (0 gardé)"
+  );
+
+  // --- Supprimer une réservation et ses articles ---
+  const nbRes = lignes(env, "Reservations").length;
+  const apresSuppr = J(c.deleteReservation(idMod));
+  assert.strictEqual(lignes(env, "Reservations").length, nbRes - 1);
+  assert.ok(!lignes(env, "Reservations").some((x) => x[0] === idMod));
+  assert.ok(!lignes(env, "Articles").some((x) => x[1] === idMod), "ses articles aussi");
+  assert.deepStrictEqual(lignes(env, "Articles"), autresArticles);
+  assert.ok(!apresSuppr.reservations[idOp].some((x) => x.idRes === idMod));
+  assert.throws(() => c.deleteReservation(idMod), /introuvable/);
+  assert.strictEqual(env.verrous, 0);
+
   // --- Changement d'état ---
   const idRes = r[0][0];
   assert.throws(() => c.updateReservationStatus(idRes, "Perdu"), /État inconnu/);
@@ -131,8 +241,8 @@ try {
   assert.strictEqual(lignes(env, "Reservations")[0][5], "Annulé");
   assert.strictEqual(
     J(c.chargerCopie()).operations[0].count,
-    4,
-    "annulée retirée du compteur (5 réservations, 1 annulée)"
+    3,
+    "annulée retirée du compteur (4 réservations après la suppression, 1 annulée)"
   );
   assert.strictEqual(env.verrous, 0);
   console.log("test_reservations : OK");
