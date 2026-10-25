@@ -84,21 +84,18 @@
   1366 et 400 px, tous les écrans.
 - **Sécurité : PAS de sécurité pour l'instant** (décision de Bryan, 25/10 ; ni code
   responsable ni autorisation des PC).
-- **Arrivages par article (25/10, EN DISCUSSION, rien de codé dans l'appli)** : besoin de
-  Bryan = tous les produits n'arrivent pas en même temps, il faut savoir par client quel
-  article est arrivé ; les arrivées se font par gros lots → saisir la quantité reçue et
-  la répartir automatiquement. Maquette `docs/maquettes/arrivages.html` (artefact
-  https://claude.ai/artifact/5fLsiZ43UW2Q4NiBuM5pxS) avec 2 variantes à essayer :
-  A = arrivé oui/non par article (une commande trop grosse pour le reste est sautée),
-  B = quantité arrivée (2/3). Règles proposées : plus ancienne réservation d'abord,
-  annulées exclues, retirées = servies, lots cumulés, rien n'est repris, correction à la
-  main dans la fiche. Filtres « Prêtes à retirer / Partielles / En attente ». Question
-  ouverte : retrait partiel autorisé ? (le bouton « Retiré » n'apparaît que si tout est
-  arrivé dans la maquette). Stockage envisagé : colonne de plus dans « Articles ». — n'importe qui ayant le lien peut supprimer
-  une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
-  aussi autorisation des appareils comme l'app chèques.
-
-## Contexte (réponses de Bryan, 14/10)
+- **Arrivages par article (25/10, maquette v2 EN ATTENTE de validation, rien de codé dans
+  l'appli)** : besoin de Bryan = tous les produits n'arrivent pas en même temps ; arrivées
+  par gros lots → saisir la quantité reçue, répartie automatiquement. Décisions de Bryan :
+  **variante B** (quantité arrivée, ex. 2/3) et **retrait partiel permis**. Maquette
+  `docs/maquettes/arrivages.html` (artefact https://claude.ai/artifact/5fLsiZ43UW2Q4NiBuM5pxS,
+  v2) : par article q (commandé) / arr (arrivé ≤ q) / ret (remis ≤ arr) ; répartition =
+  plus ancienne réservation d'abord, annulées exclues, rien n'est repris, surplus « en
+  trop » ; « Retiré » = remet tout ce qui est arrivé (ret = arr) + Annuler dans le message ;
+  situation calculée : À remettre (« Tout est là » / « n à remettre ») / En attente /
+  Terminée / Annulée ; fiche = arrivé + remis par article. Stockage envisagé : 2 colonnes
+  de plus dans « Articles » (Arrivé, Remis) + quantité reçue par article de l'offre
+  (colonne d'« Operations » ou onglet « Arrivages »), à décider.
 - Utilisé **à l'accueil, sur PC** (pas de tablette).
 - **Copie locale des offres actives** voulue : ne plus attendre les chargements.
 - **Même look « Comptoir »** que l'app chèques (palette, icônes SVG, sans CDN).

@@ -1,7 +1,7 @@
 <title>Arrivages par lot</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-  /* Maquette « Arrivages » au style Comptoir (clair uniquement) : arrivage par lot réparti automatiquement, deux variantes de suivi par article. */
+  /* Maquette « Arrivages » au style Comptoir (clair uniquement) : arrivage par lot réparti automatiquement, quantité arrivée et remise par article (retrait partiel). */
   :root {
     --fond: #f5f3f0; --surface: #ffffff; --encre: #1c1917; --doux: #6f6863; --trait: #e5dfd8; --champ: #fbfaf8;
     --accent: #0f766e; --accent-fonce: #0b5d57; --accent-doux: #e3f1ef;
@@ -80,6 +80,12 @@
   .marque-art.ok { background: var(--ok-doux); color: var(--ok); }
   .marque-art.partiel { background: var(--orange-doux); color: var(--orange); }
   .marque-art.rien { background: var(--fond); color: var(--doux); }
+  .remis { color: var(--doux); font-size: 12px; }
+  .a-donner { color: var(--ok); font-weight: 750; font-size: 12px; }
+  .etat.terminee { background: var(--ok); color: var(--blanc); }
+  .etat.donner { background: var(--ok-doux); color: var(--ok); }
+  .f-art .deux-pas { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .f-art .pas-lib { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; font-size: 11.5px; color: var(--doux); font-weight: 650; }
   .droite { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
   .etat { font-size: 11.5px; font-weight: 750; padding: 4px 8px; border-radius: 7px; white-space: nowrap; }
   .etat.pret { background: var(--ok-doux); color: var(--ok); }
@@ -131,12 +137,8 @@
 
 <div class="demo" role="note">
   <span><b>Maquette</b> · données fictives.</span>
-  <span>Variante :</span>
-  <span class="segment-demo" id="variante">
-    <button data-v="A" aria-pressed="true">A · Arrivé oui / non</button>
-    <button data-v="B" aria-pressed="false">B · Quantité arrivée</button>
-  </span>
   <button class="essai" id="essaiLot">Essai : arrivage de 4 Plateaux Océan</button>
+  <button class="essai" id="essaiRetrait">Essai : Kerjean vient chercher ce qui est arrivé</button>
   <button class="lien" id="reinit">Réinitialiser</button>
 </div>
 
@@ -155,7 +157,7 @@
   </section>
 
   <section class="carte" aria-labelledby="titreListe">
-    <div class="carte-tete"><h2 id="titreListe">Réservations</h2><p>Classées de la plus ancienne à la plus récente (ordre de service).</p></div>
+    <div class="carte-tete"><h2 id="titreListe">Réservations</h2><p>Classées de la plus ancienne à la plus récente (ordre de service). « Retiré » remet au client tout ce qui est arrivé pour lui.</p></div>
     <div class="filtres" id="filtres"></div>
     <div class="lignes" id="lignes"></div>
   </section>
@@ -164,7 +166,7 @@
 <div class="voile" id="voileFiche" hidden>
   <div class="fenetre" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
     <div class="f-tete"><h2 id="ficheTitre"></h2><button class="icone-btn" id="ficheFermer" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
-    <div class="f-corps"><h3>Articles arrivés pour ce client</h3><div id="ficheArticles" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    <div class="f-corps"><h3>Arrivé et remis, article par article</h3><div id="ficheArticles" style="display:flex;flex-direction:column;gap:8px"></div></div>
     <div class="f-pied"><button class="plein" id="ficheEnregistrer">Enregistrer</button></div>
   </div>
 </div>
@@ -178,60 +180,57 @@
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const ARTICLES = ["Plateau Océan 2 pers.", "Plateau Prestige 4 pers.", "Douzaine d'huîtres n°3"];
 
+  // Par article : q = commandé, arr = arrivé pour ce client (≤ q), ret = déjà remis (≤ arr)
   function depart() {
-    // arr = quantité arrivée attribuée au client (variante A : 0 ou la quantité commandée)
-    const r = (nom, date, etat, articles) => ({ nom, date, etat, articles: articles.map(([n, q, arr]) => ({ n, q, arr: arr || 0 })) });
+    const r = (nom, date, annulee, articles) => ({ nom, date, annulee, articles: articles.map(([n, q, arr, ret]) => ({ n, q, arr: arr || 0, ret: ret || 0 })) });
     return {
-      lots: { "Plateau Océan 2 pers.": 2, "Plateau Prestige 4 pers.": 0, "Douzaine d'huîtres n°3": 6 },
+      lots: { "Plateau Océan 2 pers.": 3, "Plateau Prestige 4 pers.": 0, "Douzaine d'huîtres n°3": 6 },
       res: [
-        r("LE GALL Yannick", "06/10 10:12", "Réservé", [["Plateau Océan 2 pers.", 1, 1], ["Douzaine d'huîtres n°3", 2, 2]]),
-        r("MORVAN Anne", "06/10 11:40", "Réservé", [["Plateau Prestige 4 pers.", 1]]),
-        r("GUÉGUEN Paul", "07/10 09:05", "Retrait", [["Plateau Océan 2 pers.", 1, 1]]),
-        r("TANGUY Lucie", "08/10 16:20", "Réservé", [["Douzaine d'huîtres n°3", 3, 3]]),
-        r("DUPONT Marc", "09/10 14:02", "Annulé", [["Plateau Prestige 4 pers.", 1], ["Douzaine d'huîtres n°3", 1]]),
-        r("KERJEAN Sophie", "12/10 10:47", "Réservé", [["Plateau Océan 2 pers.", 2], ["Douzaine d'huîtres n°3", 1, 1]]),
-        r("RIOU Thomas", "13/10 18:31", "Réservé", [["Plateau Océan 2 pers.", 1], ["Plateau Prestige 4 pers.", 2]]),
-        r("PRIGENT Emma", "14/10 09:30", "Réservé", [["Plateau Océan 2 pers.", 3]]),
+        r("LE GALL Yannick", "06/10 10:12", false, [["Plateau Océan 2 pers.", 1, 1], ["Douzaine d'huîtres n°3", 2, 2]]),
+        r("MORVAN Anne", "06/10 11:40", false, [["Plateau Prestige 4 pers.", 1]]),
+        r("GUÉGUEN Paul", "07/10 09:05", false, [["Plateau Océan 2 pers.", 1, 1, 1]]),
+        r("TANGUY Lucie", "08/10 16:20", false, [["Douzaine d'huîtres n°3", 3, 3, 3]]),
+        r("DUPONT Marc", "09/10 14:02", true, [["Plateau Prestige 4 pers.", 1], ["Douzaine d'huîtres n°3", 1]]),
+        r("KERJEAN Sophie", "12/10 10:47", false, [["Plateau Océan 2 pers.", 2, 1, 1], ["Douzaine d'huîtres n°3", 1, 1]]),
+        r("RIOU Thomas", "13/10 18:31", false, [["Plateau Océan 2 pers.", 1], ["Plateau Prestige 4 pers.", 2]]),
+        r("PRIGENT Emma", "14/10 09:30", false, [["Plateau Océan 2 pers.", 3]]),
       ],
     };
   }
-  let D = depart(), variante = "A", filtre = "Toutes", fiche = null;
+  let D = depart(), filtre = "Toutes", fiche = null;
 
-  const actives = () => D.res.filter((r) => r.etat !== "Annulé");
-  const commande = (art) => actives().reduce((s, r) => s + r.articles.filter((a) => a.n === art).reduce((t, a) => t + a.q, 0), 0);
-  const attribue = (art) => actives().reduce((s, r) => s + r.articles.filter((a) => a.n === art).reduce((t, a) => t + a.arr, 0), 0);
-  const arrive = (art) => Math.max(D.lots[art], attribue(art));
-  const enStock = (art) => arrive(art) - attribue(art);
-  // Variante A : un article compte comme arrivé seulement s'il est complet
-  const complet = (a) => a.arr >= a.q;
+  const actives = () => D.res.filter((r) => !r.annulee);
+  const somme = (art, champ) => actives().reduce((s, r) => s + r.articles.filter((a) => a.n === art).reduce((t, a) => t + a[champ], 0), 0);
+  const arrive = (art) => Math.max(D.lots[art], somme(art, "arr"));
+  const enStock = (art) => arrive(art) - somme(art, "arr");
+  const aDonner = (r) => r.articles.reduce((s, a) => s + a.arr - a.ret, 0);
 
+  // Situation calculée : rien à saisir à la main
   function situation(r) {
-    if (r.etat === "Annulé") return "annule";
-    if (r.etat === "Retrait") return "retire";
-    const nbComplets = r.articles.filter(complet).length;
-    const unPeu = r.articles.some((a) => a.arr > 0);
-    if (nbComplets === r.articles.length) return "pret";
-    return unPeu ? "partiel" : "attente";
+    if (r.annulee) return "annule";
+    if (r.articles.every((a) => a.ret >= a.q)) return "terminee";
+    if (aDonner(r) > 0) return "donner";
+    return "attente";
   }
-  const LIB = { pret: "Tout arrivé", partiel: "Partiel", attente: "En attente", retire: "Retiré", annule: "Annulé" };
+  function libelle(r) {
+    const s = situation(r), n = aDonner(r);
+    if (s === "donner") return r.articles.every((a) => a.arr >= a.q) ? "Tout est là" : `${n} à remettre`;
+    return { terminee: "Terminée", attente: "En attente", annule: "Annulée" }[s];
+  }
 
-  // Répartition d'un lot : la plus ancienne réservation d'abord, rien n'est repris à personne.
+  // Répartition d'un lot : la plus ancienne réservation d'abord, chacun reçoit ce qui est
+  // disponible (même en partie) ; rien n'est repris à personne.
   function repartir(art, nombre) {
     D.lots[art] = arrive(art) + nombre;
     let stock = enStock(art);
     const servis = [];
     for (const r of actives()) {
-      if (r.etat === "Retrait") continue;
       for (const a of r.articles.filter((x) => x.n === art)) {
         const manque = a.q - a.arr;
         if (manque <= 0 || stock <= 0) continue;
-        if (variante === "A") {
-          if (stock < manque) continue; // commande trop grosse pour le reste : client suivant
-          a.arr = a.q; stock -= manque; servis.push(r);
-        } else {
-          const donne = Math.min(manque, stock);
-          a.arr += donne; stock -= donne; servis.push(r);
-        }
+        const donne = Math.min(manque, stock);
+        a.arr += donne; stock -= donne;
+        if (!servis.includes(r)) servis.push(r);
       }
     }
     return { servis, reste: stock };
@@ -240,21 +239,19 @@
   function dessiner(flash) {
     $("nbRes").textContent = actives().length + " réservations";
     $("arrivages").innerHTML = ARTICLES.map((art, i) => {
-      const c = commande(art), arr = arrive(art), att = attribue(art), stock = enStock(art), manque = Math.max(0, c - att);
-      const pAtt = c ? (att / c) * 100 : 0, pStock = c ? Math.min(stock, manque) / c * 100 : 0;
+      const c = somme(art, "q"), att = somme(art, "arr"), ret = somme(art, "ret"), stock = enStock(art);
+      const pRet = c ? (ret / c) * 100 : 0, pAtt = c ? ((att - ret) / c) * 100 : 0;
       return `<div class="art"><b>${esc(art)}</b>
-        <div class="jauge"><span><strong>${att}</strong> attribué${att > 1 ? "s" : ""} sur <strong>${c}</strong> commandé${c > 1 ? "s" : ""}${stock ? ` · <strong style="color:var(--orange)">${stock}</strong> reçu${stock > 1 ? "s" : ""} non attribué${stock > 1 ? "s" : ""}` : ""} · reçus : ${arr}</span>
-          <span class="barre"><i style="width:${pAtt}%"></i><i class="stock" style="width:${pStock}%"></i></span></div>
+        <div class="jauge"><span><strong>${att}</strong> arrivé${att > 1 ? "s" : ""} sur <strong>${c}</strong> commandé${c > 1 ? "s" : ""} · <strong>${ret}</strong> remis${stock ? ` · <strong style="color:var(--orange)">${stock}</strong> en trop` : ""}</span>
+          <span class="barre" title="Remis / arrivé pas encore remis"><i style="width:${pRet}%;background:var(--accent-fonce)"></i><i style="width:${pAtt}%"></i></span></div>
         <div class="lot"><input id="lot${i}" type="number" min="1" inputmode="numeric" placeholder="Reçu" aria-label="Quantité reçue de ${esc(art)}"><button class="sec accent" data-lot="${i}">Répartir</button></div></div>`;
     }).join("");
     $("arrivages").querySelectorAll("[data-lot]").forEach((b) => b.addEventListener("click", () => lot(+b.dataset.lot)));
     $("arrivages").querySelectorAll("input").forEach((inp, i) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") lot(i); }));
-    $("regle").innerHTML = variante === "A"
-      ? "<b>Variante A</b> · un article est « arrivé » pour un client seulement si toute sa quantité l'est. Répartition de la plus ancienne réservation à la plus récente ; une commande trop grosse pour ce qui reste est sautée au profit de la suivante. Les annulées ne reçoivent rien."
-      : "<b>Variante B</b> · chaque client reçoit ce qui est disponible, même en partie (ex. 2 sur 3). Répartition de la plus ancienne réservation à la plus récente. Les annulées ne reçoivent rien.";
+    $("regle").innerHTML = "Chaque client reçoit ce qui est disponible, même en partie (ex. 2 sur 3), de la plus ancienne réservation à la plus récente. Les annulées ne reçoivent rien ; rien n'est repris à un client déjà servi. Ce qui dépasse les commandes est indiqué « en trop ».";
 
+    const FILTRES = [["Toutes", "Toutes"], ["donner", "À remettre"], ["attente", "En attente"], ["terminee", "Terminées"], ["annule", "Annulées"]];
     const compte = (f) => D.res.filter((r) => f === "Toutes" || situation(r) === f).length;
-    const FILTRES = [["Toutes", "Toutes"], ["pret", "Prêtes à retirer"], ["partiel", "Partielles"], ["attente", "En attente"], ["retire", "Retirées"]];
     $("filtres").innerHTML = FILTRES.map(([f, lib]) => `<button class="filtre" data-f="${f}" aria-pressed="${filtre === f}">${lib} <b>${compte(f)}</b></button>`).join("");
     $("filtres").querySelectorAll(".filtre").forEach((b) => b.addEventListener("click", () => { filtre = b.dataset.f; dessiner(); }));
 
@@ -262,25 +259,34 @@
     $("lignes").innerHTML = visibles.length ? visibles.map((r) => {
       const s = situation(r), i = D.res.indexOf(r);
       const arts = r.articles.map((a) => {
-        let marque;
-        if (variante === "A") marque = complet(a) ? `<span class="marque-art ok">✓ ${a.q}</span>` : `<span class="marque-art rien">○ ${a.q}</span>`;
-        else marque = `<span class="marque-art ${a.arr >= a.q ? "ok" : a.arr ? "partiel" : "rien"}">${a.arr}/${a.q}</span>`;
-        return `<li>${marque}<span>${esc(a.n)}</span></li>`;
+        const classe = a.arr >= a.q ? "ok" : a.arr ? "partiel" : "rien";
+        const detail = r.annulee ? "" : a.ret >= a.q ? ` <span class="remis">· remis</span>` : a.arr - a.ret > 0 ? ` <span class="a-donner">· ${a.arr - a.ret} à remettre</span>${a.ret ? ` <span class="remis">(${a.ret} déjà remis)</span>` : ""}` : a.ret ? ` <span class="remis">· ${a.ret} déjà remis</span>` : "";
+        return `<li><span class="marque-art ${classe}">${a.arr}/${a.q}</span><span>${esc(a.n)}${detail}</span></li>`;
       }).join("");
-      const bouton = s === "pret" ? `<button class="retire-btn" data-retire="${i}"><svg class="ico" style="width:14px;height:14px"><use href="#i-check"/></svg>Retiré</button>` : "";
-      return `<div class="ligne ${s === "annule" ? "annulee" : ""} ${flash && flash.includes(r) ? "flash" : ""}" data-i="${i}">
+      const bouton = s === "donner" ? `<button class="retire-btn" data-retire="${i}"><svg class="ico" style="width:14px;height:14px"><use href="#i-check"/></svg>Retiré</button>` : "";
+      return `<div class="ligne ${r.annulee ? "annulee" : ""} ${flash && flash.includes(r) ? "flash" : ""}" data-i="${i}">
         <div class="qui"><b>${esc(r.nom)}</b><small>Réservé le ${esc(r.date)}</small></div>
         <ul class="articles">${arts}</ul>
-        <div class="droite"><span class="etat ${s}">${LIB[s]}</span>${bouton}</div></div>`;
+        <div class="droite"><span class="etat ${s === "annule" ? "annule" : s}">${libelle(r)}</span>${bouton}</div></div>`;
     }).join("") : `<div class="vide">Aucune réservation dans ce filtre.</div>`;
     $("lignes").querySelectorAll(".ligne").forEach((l) => l.addEventListener("click", (e) => {
       if (e.target.closest("[data-retire]")) return;
       const r = D.res[+l.dataset.i];
-      if (r.etat === "Réservé") ouvrirFiche(r);
+      if (!r.annulee) ouvrirFiche(r);
     }));
-    $("lignes").querySelectorAll("[data-retire]").forEach((b) => b.addEventListener("click", () => {
-      const r = D.res[+b.dataset.retire]; r.etat = "Retrait"; dessiner(); toast(r.nom + " : retrait noté");
-    }));
+    $("lignes").querySelectorAll("[data-retire]").forEach((b) => b.addEventListener("click", () => retirer(D.res[+b.dataset.retire])));
+  }
+
+  // « Retiré » : le client emporte tout ce qui est arrivé pour lui ; « Annuler » revient en arrière
+  function retirer(r) {
+    const avant = r.articles.map((a) => a.ret);
+    const n = aDonner(r);
+    r.articles.forEach((a) => (a.ret = a.arr));
+    const reste = r.articles.reduce((s, a) => s + a.q - a.ret, 0);
+    dessiner([r]);
+    toast(`${r.nom} : ${n} article${n > 1 ? "s" : ""} remis${reste ? ` · reste ${reste} à venir` : " · commande terminée"}`, () => {
+      r.articles.forEach((a, i) => (a.ret = avant[i])); dessiner([r]); toast("Retrait annulé");
+    });
   }
 
   function lot(i) {
@@ -289,46 +295,47 @@
     if (!(n > 0)) { toast("Indiquez la quantité reçue (ex. 6)."); $("lot" + i).focus(); return; }
     const { servis, reste } = repartir(art, n);
     dessiner(servis);
-    const uniques = [...new Set(servis)];
-    toast(`${n} × ${art} : ${uniques.length ? uniques.length + " client" + (uniques.length > 1 ? "s" : "") + " servi" + (uniques.length > 1 ? "s" : "") : "personne à servir"}${reste ? ` · ${reste} non attribué${reste > 1 ? "s" : ""}` : ""}`);
+    toast(`${n} × ${art} : ${servis.length ? servis.length + " client" + (servis.length > 1 ? "s" : "") + " servi" + (servis.length > 1 ? "s" : "") : "personne à servir"}${reste ? ` · ${reste} en trop` : ""}`);
   }
 
-  // Fiche : correction à la main
+  // Fiche : arrivé et remis, article par article (correction à la main)
   function ouvrirFiche(r) {
-    fiche = { r, arr: r.articles.map((a) => a.arr) };
+    fiche = { r, arr: r.articles.map((a) => a.arr), ret: r.articles.map((a) => a.ret) };
     $("ficheTitre").innerHTML = `${esc(r.nom)}<small>Réservé le ${esc(r.date)}</small>`;
     dessinerFiche();
     $("voileFiche").hidden = false;
   }
+  function pas(champ, i, valeur, max) {
+    return `<span class="pas"><button data-c="${champ}" data-i="${i}" data-d="-1" aria-label="Moins">−</button><output>${valeur} / ${max}</output><button data-c="${champ}" data-i="${i}" data-d="1" aria-label="Plus">+</button></span>`;
+  }
   function dessinerFiche() {
     $("ficheArticles").innerHTML = fiche.r.articles.map((a, i) => {
-      const arr = fiche.arr[i];
-      const ctrl = variante === "A"
-        ? `<button class="bascule" data-b="${i}" aria-pressed="${arr >= a.q}"><span class="case">${arr >= a.q ? "✓" : ""}</span>${arr >= a.q ? "Arrivé" : "Pas arrivé"}</button>`
-        : `<span class="pas"><button data-m="${i}" aria-label="Moins">−</button><output>${arr} / ${a.q}</output><button data-p="${i}" aria-label="Plus">+</button></span>`;
-      return `<div class="f-art ${arr >= a.q ? "ok" : ""}"><div><b>${esc(a.n)}</b><small>Commandé : ${a.q}</small></div>${ctrl}</div>`;
+      const arr = fiche.arr[i], ret = fiche.ret[i];
+      return `<div class="f-art ${ret >= a.q ? "ok" : ""}"><div><b>${esc(a.n)}</b><small>Commandé : ${a.q}</small></div>
+        <div class="deux-pas"><span class="pas-lib">Arrivé${pas("arr", i, arr, a.q)}</span><span class="pas-lib">Remis${pas("ret", i, ret, arr)}</span></div></div>`;
     }).join("");
-    $("ficheArticles").querySelectorAll("[data-b]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.b; const a = fiche.r.articles[i]; fiche.arr[i] = fiche.arr[i] >= a.q ? 0 : a.q; dessinerFiche(); }));
-    $("ficheArticles").querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.p; fiche.arr[i] = Math.min(fiche.r.articles[i].q, fiche.arr[i] + 1); dessinerFiche(); }));
-    $("ficheArticles").querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.m; fiche.arr[i] = Math.max(0, fiche.arr[i] - 1); dessinerFiche(); }));
+    $("ficheArticles").querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => {
+      const i = +b.dataset.i, d = +b.dataset.d, a = fiche.r.articles[i];
+      if (b.dataset.c === "arr") { fiche.arr[i] = Math.min(a.q, Math.max(0, fiche.arr[i] + d)); fiche.ret[i] = Math.min(fiche.ret[i], fiche.arr[i]); }
+      else fiche.ret[i] = Math.min(fiche.arr[i], Math.max(0, fiche.ret[i] + d));
+      dessinerFiche();
+    }));
   }
-  $("ficheEnregistrer").addEventListener("click", () => { fiche.r.articles.forEach((a, i) => (a.arr = fiche.arr[i])); $("voileFiche").hidden = true; dessiner([fiche.r]); toast(fiche.r.nom + " : arrivées mises à jour"); });
+  $("ficheEnregistrer").addEventListener("click", () => { fiche.r.articles.forEach((a, i) => { a.arr = fiche.arr[i]; a.ret = fiche.ret[i]; }); $("voileFiche").hidden = true; dessiner([fiche.r]); toast(fiche.r.nom + " : mis à jour"); });
   $("ficheFermer").addEventListener("click", () => ($("voileFiche").hidden = true));
   $("voileFiche").addEventListener("click", (e) => { if (e.target === $("voileFiche")) $("voileFiche").hidden = true; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("voileFiche").hidden = true; });
 
-  let minuteur;
-  function toast(t) { $("toast").textContent = t; $("toast").hidden = false; clearTimeout(minuteur); minuteur = setTimeout(() => ($("toast").hidden = true), 4500); }
+  let minuteur, annuler = null;
+  function toast(t, siAnnuler) {
+    annuler = siAnnuler || null;
+    $("toast").innerHTML = esc(t) + (annuler ? ' <button id="toastAnnuler" style="margin-left:10px;border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 10px;font-weight:700">Annuler</button>' : "");
+    if (annuler) $("toastAnnuler").addEventListener("click", () => { const f = annuler; annuler = null; f(); });
+    $("toast").hidden = false; clearTimeout(minuteur); minuteur = setTimeout(() => ($("toast").hidden = true), 6000);
+  }
 
-  // Bascule de variante : en A, une quantité partielle ne compte pas comme arrivée
-  $("variante").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-    variante = b.dataset.v;
-    $("variante").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    if (variante === "A") D.res.forEach((r) => r.articles.forEach((a) => { if (a.arr < a.q) a.arr = 0; }));
-    dessiner();
-    toast(variante === "A" ? "Variante A : arrivé oui / non par article" : "Variante B : quantité arrivée par article");
-  }));
   $("essaiLot").addEventListener("click", () => { $("lot0").value = 4; lot(0); });
+  $("essaiRetrait").addEventListener("click", () => retirer(D.res[5]));
   $("reinit").addEventListener("click", () => { D = depart(); filtre = "Toutes"; dessiner(); toast("Données de départ remises"); });
   dessiner();
 })();
