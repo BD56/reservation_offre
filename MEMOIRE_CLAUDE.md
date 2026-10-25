@@ -82,7 +82,19 @@
   étiquettes, message bref) ; quantité collée au nom dans « Reste à préparer » (`.prep`).
   Test `test_ui_textes_longs` (10 séries) : aucun texte hors de sa case ni sous un bouton,
   1366 et 400 px, tous les écrans.
-- **Prochaine étape proposée : 4 (sécurité)** — n'importe qui ayant le lien peut supprimer
+- **Sécurité : PAS de sécurité pour l'instant** (décision de Bryan, 25/10 ; ni code
+  responsable ni autorisation des PC).
+- **Arrivages par article (25/10, EN DISCUSSION, rien de codé dans l'appli)** : besoin de
+  Bryan = tous les produits n'arrivent pas en même temps, il faut savoir par client quel
+  article est arrivé ; les arrivées se font par gros lots → saisir la quantité reçue et
+  la répartir automatiquement. Maquette `docs/maquettes/arrivages.html` (artefact
+  https://claude.ai/artifact/5fLsiZ43UW2Q4NiBuM5pxS) avec 2 variantes à essayer :
+  A = arrivé oui/non par article (une commande trop grosse pour le reste est sautée),
+  B = quantité arrivée (2/3). Règles proposées : plus ancienne réservation d'abord,
+  annulées exclues, retirées = servies, lots cumulés, rien n'est repris, correction à la
+  main dans la fiche. Filtres « Prêtes à retirer / Partielles / En attente ». Question
+  ouverte : retrait partiel autorisé ? (le bouton « Retiré » n'apparaît que si tout est
+  arrivé dans la maquette). Stockage envisagé : colonne de plus dans « Articles ». — n'importe qui ayant le lien peut supprimer
   une offre ; question posée à Bryan : code responsable seul (conseillé pour 2 PC) ou
   aussi autorisation des appareils comme l'app chèques.
 
