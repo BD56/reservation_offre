@@ -93,7 +93,11 @@
   plus ancienne réservation d'abord, annulées exclues, rien n'est repris, surplus « en
   trop » ; « Retiré » = remet tout ce qui est arrivé (ret = arr) + Annuler dans le message ;
   situation calculée : À remettre (« Tout est là » / « n à remettre ») / En attente /
-  Terminée / Annulée ; fiche = arrivé + remis par article. Stockage envisagé : 2 colonnes
+  Terminée / Annulée ; fiche = arrivé + remis par article. **v3 (25/10, validée
+  dans le principe par Bryan : « OK »)** : on GARDE les deux entrées (lot par article =
+  cas normal ; fiche client = exceptions) avec la règle **« reçu = attribué + en stock »** :
+  dans la fiche, « + arrivé » bloqué si plus rien en stock ; ce qu'on retire à un client
+  retourne en stock ; « Répartir » sans quantité redistribue le stock. Stockage envisagé : 2 colonnes
   de plus dans « Articles » (Arrivé, Remis) + quantité reçue par article de l'offre
   (colonne d'« Operations » ou onglet « Arrivages »), à décider.
 - Utilisé **à l'accueil, sur PC** (pas de tablette).

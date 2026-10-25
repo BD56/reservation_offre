@@ -114,6 +114,7 @@
   .bascule .case { width: 18px; height: 18px; border-radius: 5px; border: 2px solid currentColor; display: grid; place-items: center; }
   .pas { display: inline-flex; align-items: center; border: 1.5px solid var(--trait); border-radius: 11px; background: var(--surface); overflow: hidden; }
   .pas button { width: 38px; height: 38px; border: 0; background: none; font-size: 19px; font-weight: 700; }
+  .pas button:disabled { opacity: .35; cursor: default; }
   .pas output { min-width: 58px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
   .f-pied { padding: 14px 22px 18px; border-top: 1px solid var(--trait); display: flex; gap: 10px; }
   .plein { height: 48px; flex: 1; border-radius: 13px; border: 0; background: var(--accent); color: var(--blanc); font-weight: 750; font-size: 15px; }
@@ -139,6 +140,7 @@
   <span><b>Maquette</b> · données fictives.</span>
   <button class="essai" id="essaiLot">Essai : arrivage de 4 Plateaux Océan</button>
   <button class="essai" id="essaiRetrait">Essai : Kerjean vient chercher ce qui est arrivé</button>
+  <button class="essai" id="essaiFiche">Essai : fiche de Prigent (stock épuisé)</button>
   <button class="lien" id="reinit">Réinitialiser</button>
 </div>
 
@@ -201,8 +203,9 @@
 
   const actives = () => D.res.filter((r) => !r.annulee);
   const somme = (art, champ) => actives().reduce((s, r) => s + r.articles.filter((a) => a.n === art).reduce((t, a) => t + a[champ], 0), 0);
-  const arrive = (art) => Math.max(D.lots[art], somme(art, "arr"));
-  const enStock = (art) => arrive(art) - somme(art, "arr");
+  // Le stock reçu est la référence : reçu = attribué + en stock, toujours
+  const recu = (art) => D.lots[art];
+  const enStock = (art) => recu(art) - somme(art, "arr");
   const aDonner = (r) => r.articles.reduce((s, a) => s + a.arr - a.ret, 0);
 
   // Situation calculée : rien à saisir à la main
@@ -221,7 +224,7 @@
   // Répartition d'un lot : la plus ancienne réservation d'abord, chacun reçoit ce qui est
   // disponible (même en partie) ; rien n'est repris à personne.
   function repartir(art, nombre) {
-    D.lots[art] = arrive(art) + nombre;
+    D.lots[art] = recu(art) + nombre;
     let stock = enStock(art);
     const servis = [];
     for (const r of actives()) {
@@ -240,15 +243,15 @@
     $("nbRes").textContent = actives().length + " réservations";
     $("arrivages").innerHTML = ARTICLES.map((art, i) => {
       const c = somme(art, "q"), att = somme(art, "arr"), ret = somme(art, "ret"), stock = enStock(art);
-      const pRet = c ? (ret / c) * 100 : 0, pAtt = c ? ((att - ret) / c) * 100 : 0;
+      const pRet = c ? (ret / c) * 100 : 0, pAtt = c ? ((att - ret) / c) * 100 : 0, pStock = c ? (Math.min(stock, c - att) / c) * 100 : 0;
       return `<div class="art"><b>${esc(art)}</b>
-        <div class="jauge"><span><strong>${att}</strong> arrivé${att > 1 ? "s" : ""} sur <strong>${c}</strong> commandé${c > 1 ? "s" : ""} · <strong>${ret}</strong> remis${stock ? ` · <strong style="color:var(--orange)">${stock}</strong> en trop` : ""}</span>
-          <span class="barre" title="Remis / arrivé pas encore remis"><i style="width:${pRet}%;background:var(--accent-fonce)"></i><i style="width:${pAtt}%"></i></span></div>
-        <div class="lot"><input id="lot${i}" type="number" min="1" inputmode="numeric" placeholder="Reçu" aria-label="Quantité reçue de ${esc(art)}"><button class="sec accent" data-lot="${i}">Répartir</button></div></div>`;
+        <div class="jauge"><span><strong>${att}</strong> arrivé${att > 1 ? "s" : ""} sur <strong>${c}</strong> commandé${c > 1 ? "s" : ""} · <strong>${ret}</strong> remis · reçus : ${recu(art)}${stock ? ` · <strong style="color:var(--orange)">${stock}</strong> en stock` : ""}</span>
+          <span class="barre" title="Remis / arrivé pas encore remis"><i style="width:${pRet}%;background:var(--accent-fonce)"></i><i style="width:${pAtt}%"></i><i class="stock" style="width:${pStock}%"></i></span></div>
+        <div class="lot"><input id="lot${i}" type="number" min="1" inputmode="numeric" placeholder="${stock ? "Stock" : "Reçu"}" aria-label="Quantité reçue de ${esc(art)}"><button class="sec accent" data-lot="${i}">Répartir</button></div></div>`;
     }).join("");
     $("arrivages").querySelectorAll("[data-lot]").forEach((b) => b.addEventListener("click", () => lot(+b.dataset.lot)));
     $("arrivages").querySelectorAll("input").forEach((inp, i) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") lot(i); }));
-    $("regle").innerHTML = "Chaque client reçoit ce qui est disponible, même en partie (ex. 2 sur 3), de la plus ancienne réservation à la plus récente. Les annulées ne reçoivent rien ; rien n'est repris à un client déjà servi. Ce qui dépasse les commandes est indiqué « en trop ».";
+    $("regle").innerHTML = "<b>Le reçu est la référence : reçu = attribué + en stock.</b> Chaque client reçoit ce qui est disponible, même en partie (ex. 2 sur 3), de la plus ancienne réservation à la plus récente ; les annulées ne reçoivent rien et rien n'est repris. Dans la fiche d'un client, on ne peut donner que ce qui est en stock ; ce qu'on lui retire retourne en stock. « Répartir » sans quantité redistribue le stock.";
 
     const FILTRES = [["Toutes", "Toutes"], ["donner", "À remettre"], ["attente", "En attente"], ["terminee", "Terminées"], ["annule", "Annulées"]];
     const compte = (f) => D.res.filter((r) => f === "Toutes" || situation(r) === f).length;
@@ -291,11 +294,13 @@
 
   function lot(i) {
     const art = ARTICLES[i];
-    const n = parseInt($("lot" + i).value, 10);
-    if (!(n > 0)) { toast("Indiquez la quantité reçue (ex. 6)."); $("lot" + i).focus(); return; }
+    const saisi = $("lot" + i).value.trim();
+    const n = saisi ? parseInt(saisi, 10) : 0;
+    if (saisi && !(n > 0)) { toast("Indiquez la quantité reçue (ex. 6)."); $("lot" + i).focus(); return; }
+    if (!n && !enStock(art)) { toast("Indiquez la quantité reçue (ex. 6)."); $("lot" + i).focus(); return; }
     const { servis, reste } = repartir(art, n);
     dessiner(servis);
-    toast(`${n} × ${art} : ${servis.length ? servis.length + " client" + (servis.length > 1 ? "s" : "") + " servi" + (servis.length > 1 ? "s" : "") : "personne à servir"}${reste ? ` · ${reste} en trop` : ""}`);
+    toast(`${n ? n + " reçus" : "Stock redistribué"} · ${art} : ${servis.length ? servis.length + " client" + (servis.length > 1 ? "s" : "") + " servi" + (servis.length > 1 ? "s" : "") : "personne à servir"}${reste ? ` · ${reste} en stock` : ""}`);
   }
 
   // Fiche : arrivé et remis, article par article (correction à la main)
@@ -305,18 +310,26 @@
     dessinerFiche();
     $("voileFiche").hidden = false;
   }
-  function pas(champ, i, valeur, max) {
-    return `<span class="pas"><button data-c="${champ}" data-i="${i}" data-d="-1" aria-label="Moins">−</button><output>${valeur} / ${max}</output><button data-c="${champ}" data-i="${i}" data-d="1" aria-label="Plus">+</button></span>`;
+  // Stock d'un article en tenant compte des corrections en cours dans la fiche
+  function stockFiche(art) {
+    return fiche.r.articles.reduce((s, a, i) => (a.n === art ? s + a.arr - fiche.arr[i] : s), enStock(art));
+  }
+  function pas(champ, i, valeur, max, plusBloque) {
+    return `<span class="pas"><button data-c="${champ}" data-i="${i}" data-d="-1" aria-label="Moins" ${valeur <= 0 ? "disabled" : ""}>−</button><output>${valeur} / ${max}</output><button data-c="${champ}" data-i="${i}" data-d="1" aria-label="Plus" ${valeur >= max || plusBloque ? "disabled" : ""}>+</button></span>`;
   }
   function dessinerFiche() {
     $("ficheArticles").innerHTML = fiche.r.articles.map((a, i) => {
-      const arr = fiche.arr[i], ret = fiche.ret[i];
-      return `<div class="f-art ${ret >= a.q ? "ok" : ""}"><div><b>${esc(a.n)}</b><small>Commandé : ${a.q}</small></div>
-        <div class="deux-pas"><span class="pas-lib">Arrivé${pas("arr", i, arr, a.q)}</span><span class="pas-lib">Remis${pas("ret", i, ret, arr)}</span></div></div>`;
+      const arr = fiche.arr[i], ret = fiche.ret[i], stock = stockFiche(a.n);
+      const info = arr < a.q ? (stock > 0 ? `${stock} en stock` : `<span style="color:var(--danger)">plus rien en stock</span>`) : "";
+      return `<div class="f-art ${ret >= a.q ? "ok" : ""}"><div><b>${esc(a.n)}</b><small>Commandé : ${a.q}${info ? " · " + info : ""}</small></div>
+        <div class="deux-pas"><span class="pas-lib">Arrivé${pas("arr", i, arr, a.q, stock <= 0)}</span><span class="pas-lib">Remis${pas("ret", i, ret, arr, false)}</span></div></div>`;
     }).join("");
     $("ficheArticles").querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => {
       const i = +b.dataset.i, d = +b.dataset.d, a = fiche.r.articles[i];
-      if (b.dataset.c === "arr") { fiche.arr[i] = Math.min(a.q, Math.max(0, fiche.arr[i] + d)); fiche.ret[i] = Math.min(fiche.ret[i], fiche.arr[i]); }
+      if (b.dataset.c === "arr") {
+        if (d > 0 && stockFiche(a.n) <= 0) return; // on ne donne que ce qui est en stock
+        fiche.arr[i] = Math.min(a.q, Math.max(0, fiche.arr[i] + d)); fiche.ret[i] = Math.min(fiche.ret[i], fiche.arr[i]);
+      }
       else fiche.ret[i] = Math.min(fiche.arr[i], Math.max(0, fiche.ret[i] + d));
       dessinerFiche();
     }));
@@ -336,6 +349,7 @@
 
   $("essaiLot").addEventListener("click", () => { $("lot0").value = 4; lot(0); });
   $("essaiRetrait").addEventListener("click", () => retirer(D.res[5]));
+  $("essaiFiche").addEventListener("click", () => ouvrirFiche(D.res[7]));
   $("reinit").addEventListener("click", () => { D = depart(); filtre = "Toutes"; dessiner(); toast("Données de départ remises"); });
   dessiner();
 })();
