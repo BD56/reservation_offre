@@ -209,7 +209,9 @@ try {
     "articles des autres réservations intacts"
   );
   assert.deepStrictEqual(
-    apresMod.reservations[idOp].find((x) => x.idRes === idMod).articles,
+    apresMod.reservations[idOp]
+      .find((x) => x.idRes === idMod)
+      .articles.map(({ nom, quantite }) => ({ nom, quantite })),
     [
       { nom: "B", quantite: 5 },
       { nom: "D", quantite: 1 },

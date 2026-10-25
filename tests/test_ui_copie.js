@@ -70,7 +70,7 @@ async function remplir(page, idOp, nom, prenom, tel, email, article) {
     await attendre(page, 1600);
     assert.strictEqual(nb(), 4);
     assert.ok(!(await page.isVisible("#indicateurEnvoi")));
-    assert.match(await page.textContent(premiere), /Réservé[\s\S]*Retiré/);
+    assert.match(await page.textContent(premiere), /En attente/);
     delete env.retards.saveReservation;
 
     // --- Réponse perdue (le serveur a écrit) puis Réessayer : pas de double ---

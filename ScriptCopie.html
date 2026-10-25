@@ -1,5 +1,5 @@
 <!-- Copie locale (offres + réservations des offres actives), envois en arrière-plan, doublons. -->
-<script data-version="2026.10.15-1339">
+<script data-version="2026.10.25-1128">
   // Copie reçue du serveur : { operations: [...], reservations: { idOp: [...] } }. Seules les
   // offres actives ont leurs réservations dans la copie ; celles d'une offre terminée sont
   // chargées à la demande dans horsCopie.
@@ -209,16 +209,6 @@
 
   function texteArticles(res) {
     return res.articles.map((a) => `${a.quantite} × ${a.nom}`).join(", ");
-  }
-
-  // Un article par ligne, quantité en gras (liste des réservations, feuille de préparation)
-  function listeArticlesHtml(res) {
-    if (!res.articles.length) return "—";
-    return (
-      '<ul class="liste-articles">' +
-      res.articles.map((a) => `<li><b>${a.quantite} ×</b> <span>${echapper(a.nom)}</span></li>`).join("") +
-      "</ul>"
-    );
   }
 
   // « 06… / nom@… » enregistré dans une seule colonne : séparé pour l'affichage et la fiche

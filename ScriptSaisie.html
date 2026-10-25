@@ -1,5 +1,5 @@
 <!-- Saisie d'une réservation : offre (menu), client, articles (+ / −), doublon, enregistrement. -->
-<script data-version="2026.10.15-1339">
+<script data-version="2026.10.25-1128">
   // Offre choisie et quantités en cours de saisie
   let offreChoisie = "";
   let quantites = {}; // offre à liste fixe : { nomArticle: quantité }
@@ -291,7 +291,13 @@
       contact: contact,
       etat: "Réservé",
       dateSaisie: maintenantFr(),
-      articles: data.articles.map((a) => ({ nom: a.nom, quantite: a.quantite })),
+      articles: data.articles.map((a) => ({
+        nom: a.nom,
+        quantite: a.quantite,
+        arrive: 0,
+        remis: 0,
+        suivi: true,
+      })),
     };
     envoyerReservation(data, res);
     showToast(`${res.nom} ${res.prenom} : réservation enregistrée`);

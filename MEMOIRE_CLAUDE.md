@@ -1,6 +1,6 @@
 # Mémoire de travail — Claude
 
-> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-15.
+> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-25.
 
 ## ▶️ État actuel
 - Branche de travail : `claude/happy-franklin-af909r` (pas de pull request).
@@ -84,22 +84,46 @@
   1366 et 400 px, tous les écrans.
 - **Sécurité : PAS de sécurité pour l'instant** (décision de Bryan, 25/10 ; ni code
   responsable ni autorisation des PC).
-- **Arrivages par article (25/10, maquette v2 EN ATTENTE de validation, rien de codé dans
-  l'appli)** : besoin de Bryan = tous les produits n'arrivent pas en même temps ; arrivées
-  par gros lots → saisir la quantité reçue, répartie automatiquement. Décisions de Bryan :
-  **variante B** (quantité arrivée, ex. 2/3) et **retrait partiel permis**. Maquette
-  `docs/maquettes/arrivages.html` (artefact https://claude.ai/artifact/5fLsiZ43UW2Q4NiBuM5pxS,
-  v2) : par article q (commandé) / arr (arrivé ≤ q) / ret (remis ≤ arr) ; répartition =
-  plus ancienne réservation d'abord, annulées exclues, rien n'est repris, surplus « en
-  trop » ; « Retiré » = remet tout ce qui est arrivé (ret = arr) + Annuler dans le message ;
-  situation calculée : À remettre (« Tout est là » / « n à remettre ») / En attente /
-  Terminée / Annulée ; fiche = arrivé + remis par article. **v3 (25/10, validée
-  dans le principe par Bryan : « OK »)** : on GARDE les deux entrées (lot par article =
-  cas normal ; fiche client = exceptions) avec la règle **« reçu = attribué + en stock »** :
-  dans la fiche, « + arrivé » bloqué si plus rien en stock ; ce qu'on retire à un client
-  retourne en stock ; « Répartir » sans quantité redistribue le stock. Stockage envisagé : 2 colonnes
-  de plus dans « Articles » (Arrivé, Remis) + quantité reçue par article de l'offre
-  (colonne d'« Operations » ou onglet « Arrivages »), à décider.
+- **Arrivages par article — CODÉS (25/10, version 2026.10.25-1128, maquette v3 validée :
+  « OK », « oui ok »)**. Besoin de Bryan : les produits n'arrivent pas tous en même temps,
+  par gros lots → on saisit la quantité reçue, répartie automatiquement. Décisions :
+  **variante B** (quantité arrivée, ex. 2/3), **retrait partiel permis**, deux entrées
+  gardées (lot par article = cas normal ; fiche client = exceptions), règle **« reçu =
+  attribué + en stock »**. Maquette `docs/maquettes/arrivages.html` (artefact
+  https://claude.ai/artifact/5fLsiZ43UW2Q4NiBuM5pxS, v3).
+  - Stockage : onglet **`Arrivages`** (Date, ID_Operation, Article, Quantite : une ligne par
+    lot reçu) + colonnes **Arrive** et **Remis** dans `Articles`. Cases vides = ligne
+    d'avant le suivi (`ligneArticle_`) : rien d'arrivé, sauf réservation déjà « Retrait »
+    (tout remis, `suivi: false`, hors stock). Propriété **`SCHEMA` = "2"** : `doGet`
+    relance `installerFeuilles_` si elle diffère ou si un onglet manque (mise à niveau
+    automatique d'un classeur en service : onglet + 2 en-têtes ajoutés, rien d'écrasé).
+  - Serveur (`Arrivages.gs`) : `enregistrerArrivage(idOp, article, n)` (n = 0 :
+    redistribuer le stock) → `repartir_` (plus ancienne réservation d'abord, partiel
+    permis, annulées exclues, rien repris) ; `remettre(idRes, {idArt: n})` (« Retiré » et
+    son Annuler) ; état **calculé** : « Retrait » = tout remis, un Retrait incomplet
+    repasse « Réservé ». `updateReservation` reçoit arrivé / remis par article et refuse
+    plus que le stock ; une annulation rend au stock ce qui n'est pas remis
+    (`libererAnnulee_`). La copie porte `op.recus` et, par article, `arrive`, `remis`,
+    `suivi`, `idArt`.
+  - Page : bloc **Arrivages** (à la place de « Reste à préparer ») : par article, arrivés /
+    commandés / remis / reçus / en stock, jauge, champ « Reçu » + **Répartir** (Entrée ;
+    vide = redistribuer ; saisie gardée lors des rechargements de la copie). Lignes :
+    « 2/3 » par article (vert / orange / gris), « n à remettre (k déjà remis) » ;
+    situation « Tout est là » / « n à remettre » / En attente / Terminée / Annulée (+
+    « Contacté ») ; **Retiré** seulement s'il y a quelque chose à remettre (remet
+    l'arrivé ; Annuler envoyé APRÈS la réponse du retrait ; « Contacté » rendu). Filtres
+    produits : Toutes / À remettre / En attente / Contactés / Terminées / Annulées (les
+    évènements gardent les anciens). Fiche produits : Commandé / Arrivé / Remis (+ / −),
+    « + arrivé » bloqué sans stock, états Réservé / Contacté / Annulé (« Terminée »
+    annoncé). Feuille : totaux par article (commandé, arrivé, remis, à remettre, en
+    stock), « 2/3 » dans la commande.
+  - Tests : `test_arrivages` (serveur) et `test_ui_arrivages` (page), 12 séries vertes ;
+    défauts réintroduits volontairement → détectés (stock de la fiche, ordre de
+    l'Annuler, saisie perdue, « Contacté » rendu).
+  - Corrigé au passage : barre de l'aperçu de la feuille illisible (texte blanc sur voile
+    trop clair, bouton « Fermer » blanc sur blanc).
+  - Ordre des lignes inchangé (plus récentes en haut), la maquette les montrait de la
+    plus ancienne à la plus récente : à proposer à Bryan s'il le souhaite.
 - Utilisé **à l'accueil, sur PC** (pas de tablette).
 - **Copie locale des offres actives** voulue : ne plus attendre les chargements.
 - **Même look « Comptoir »** que l'app chèques (palette, icônes SVG, sans CDN).
@@ -124,10 +148,17 @@
    (rouge, Réessayer) ; écran Offres (en cours / à venir / terminées, suppression
    confirmée) ; éditeur d'offre (articles en puces) ; feuille de préparation (total,
    liste à pointer triée par nom, annulées en option).
-4. Sécurité : code responsable (+ appareils autorisés ?) pour créer/modifier/supprimer
-   les offres — à discuter (aujourd'hui tout le monde ayant le lien peut supprimer).
-5. RGPD : purge automatique (durée à décider), mentions.
-6. Documentation (AGENTS.md…).
+4. ✅ Arrivages par article (voir ci-dessus).
+5. **Prochaine étape validée (« ok ok », 25/10) : installateur par magasin**, comme l'app
+   chèques : modèle vierge + lien `/copy`, guide `INSTALLATION.md`, bouton ⚙️ Réglages
+   dans l'application SANS sécurité (« rien de sensible ») : nom du magasin (avec
+   l'article), titre peut-être ; valeurs par défaut = Vannes ; une copie n'hérite pas des
+   réglages (détection par ID_CLASSEUR, comme `nettoyerSiCopie_`) ; mentions légales
+   avec la formule de l'app chèques (licence non exclusive au nom du magasin réglé,
+   « dans les conditions convenues par écrit avec l'auteur »).
+   Sécurité : AUCUNE (décision de Bryan, 25/10).
+6. RGPD : purge automatique (durée à décider), mentions.
+7. Documentation (AGENTS.md…).
 
 ## À vérifier sur un vrai Google Sheet
 - Impression de la feuille dans l'iframe Apps Script (`window.print`, seule
@@ -141,3 +172,7 @@
 - Le manifeste `appsscript.json` réel (accès du déploiement) : le récupérer par
   `clasp pull` avant tout `npm run push`.
 - Première mise à jour après découpage : supprimer `Code.gs` dans l'éditeur.
+- Mise à jour « arrivages » : créer le fichier **`Arrivages.gs`** dans l'éditeur ; à la
+  1re ouverture, l'onglet `Arrivages` et les en-têtes Arrive / Remis doivent apparaître
+  seuls (propriété SCHEMA) ; anciennes réservations « Retrait » affichées « Terminée »
+  sans entamer le stock.

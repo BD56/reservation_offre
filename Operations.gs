@@ -3,7 +3,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Operations_() {
-  return "2026.10.15-1339";
+  return "2026.10.25-1128";
 }
 
 function verifierOffre_(data) {
@@ -105,6 +105,12 @@ function deleteOperation(idOp) {
     if (Object.keys(idsReservations).length) {
       reecrire_(feuille_(FEUILLE_ARTICLES), function (row) {
         return !idsReservations[String(row[ART.RES]).trim()];
+      });
+    }
+    const arrivages = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FEUILLE_ARRIVAGES);
+    if (arrivages) {
+      reecrire_(arrivages, function (row) {
+        return String(row[ARV.OP]).trim() !== cible;
       });
     }
   });

@@ -31,7 +31,7 @@ async function ouvrir(repo, opts = {}) {
   const env = makeEnv(Object.assign({ repo }, opts));
   env.pannes = {}; // { nomFonction: "message" } : la fonction serveur échoue
   env.pannesApres = {}; // { nomFonction: "message" } : elle écrit, mais la réponse se perd
-  env.retards = {}; // { nomFonction: ms } : réponse retardée (envoi « en cours »)
+  env.retards = {}; // { nomFonction: ms, ou fonction -> ms } : réponse retardée (envoi « en cours »)
   if (opts.preparer) opts.preparer(env); // données de départ (offres, réservations…)
   // Comme doGet : la copie est glissée dans la page (opts.sansCopie : lecture échouée -> null)
   const copieJson = opts.sansCopie ? "null" : env.ctx.jsonPourPage_(env.ctx.copie_());
@@ -45,7 +45,8 @@ async function ouvrir(repo, opts = {}) {
   const erreursPage = [];
   page.on("pageerror", (e) => erreursPage.push(e.message));
   await page.exposeFunction("__serveur", async (nom, argsJson) => {
-    if (env.retards[nom]) await new Promise((ok) => setTimeout(ok, env.retards[nom]));
+    const retard = typeof env.retards[nom] === "function" ? env.retards[nom]() : env.retards[nom];
+    if (retard) await new Promise((ok) => setTimeout(ok, retard));
     try {
       if (typeof env.ctx[nom] !== "function" || /_$/.test(nom))
         throw new Error("fonction inconnue/privée : " + nom);

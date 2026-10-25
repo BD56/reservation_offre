@@ -2,7 +2,7 @@
 
 Application web **Google Apps Script** de prise de réservations pour les offres du
 magasin (produits à préparer ou évènements), utilisée **à l'accueil sur PC** et adossée
-à un Google Sheets (onglets `Operations`, `Reservations`, `Articles`).
+à un Google Sheets (onglets `Operations`, `Reservations`, `Articles`, `Arrivages`).
 © 2026 DESJARDINS Bryan.
 
 > Reprise de travail (assistants IA) : lire [`MEMOIRE_CLAUDE.md`](MEMOIRE_CLAUDE.md) et le
@@ -11,6 +11,9 @@ magasin (produits à préparer ou évènements), utilisée **à l'accueil sur PC
 ## Fichiers
 Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**) :
 - **00_Constantes.gs** — noms des onglets, colonnes (`OP`, `RES`, `ART`), états, liste des fichiers.
+- **Arrivages.gs** — arrivages par lot : quantité reçue d'un article répartie entre les
+  clients (`enregistrerArrivage`, la plus ancienne réservation d'abord, même en partie),
+  remise au client (`remettre`, retrait partiel permis). Règle : reçu = attribué + en stock.
 - **Application.gs** — `doGet`, `include_`, outils communs (`avecVerrou_`, `texte_`, `nouvelId_`…).
 - **Copie.gs** — copie de la page : toutes les offres + réservations des offres actives
   (glissée dans la page par `doGet`, rechargée par `chargerCopie`).
@@ -37,11 +40,16 @@ Page :
 - **Offres et réservations** : offres en cours / à venir / terminées (Réservations,
   Feuille, Modifier, Supprimer confirmé dans la carte) ; « Nouvelle offre » (articles en
   étiquettes). Page des réservations d'une offre : recherche (nom, téléphone, email),
-  filtres par état, « Reste à préparer », bouton **Retiré** (sans confirmation, « Annuler »
-  dans le message), clic sur une ligne = **fiche** (état, coordonnées, quantités,
-  suppression confirmée).
-- **Feuille de préparation** : aperçu (total à préparer, liste à pointer triée par nom,
-  annulées en option) puis impression.
+  filtres, bouton **Retiré** (sans confirmation, « Annuler » dans le message), clic sur une
+  ligne = **fiche** (état, coordonnées, quantités, suppression confirmée).
+- **Arrivages** (offres de produits, page des réservations) : quantité reçue d'un article +
+  **Répartir** → attribuée aux clients, de la plus ancienne réservation à la plus récente,
+  même en partie (« 2/3 ») ; le reste est « en stock ». « Retiré » remet au client tout ce
+  qui est arrivé pour lui (le reste suivra) ; « Terminée » quand tout est remis. Dans la
+  fiche : commandé, arrivé (limité au stock) et remis par article ; une annulation rend
+  au stock ce qui n'a pas été remis.
+- **Feuille de préparation** : aperçu (totaux par article : commandé, arrivé, remis, à
+  remettre, en stock ; liste à pointer triée par nom, annulées en option) puis impression.
 
 ## Rapidité (copie locale)
 - À l'ouverture, les offres et les réservations des offres **actives** (fin non passée ou
@@ -58,11 +66,13 @@ Page :
 Les fonctions serveur dont le nom finit par `_` ne sont pas appelables depuis la page.
 
 ## Installer sur un nouveau Google Sheets
-Les onglets `Operations`, `Reservations` et `Articles` (et leurs en-têtes) sont **créés par
-le code** : à la première ouverture de l'application, ou par le menu du Sheet
+Les onglets `Operations`, `Reservations`, `Articles` et `Arrivages` (et leurs en-têtes) sont
+**créés par le code** : à la première ouverture de l'application, ou par le menu du Sheet
 **🚀 APPLICATION → 🧰 Installer / vérifier l'installation** (compte rendu : ce qui a été
 créé, fichiers manquants, version). Rien n'est jamais écrasé : sur un classeur déjà en
-service, seules les cases d'en-tête vides sont complétées.
+service, seules les cases d'en-tête vides sont complétées. Après une mise à jour qui ajoute des
+colonnes ou un onglet (numéro `SCHEMA` de `00_Constantes.gs`), la première ouverture de
+l'application les ajoute d'elle-même.
 1. Créer un Google Sheets vide, puis Extensions → Apps Script.
 2. Créer les fichiers du dépôt (`.gs` et `.html`, mêmes noms) et y coller leur contenu.
 3. Recharger le Sheet → menu 🚀 APPLICATION → 🧰 Installer (accepter les autorisations).
@@ -77,7 +87,7 @@ d'une application à moitié à jour.
 1. **Première fois après le découpage :** dans l'éditeur, **supprimer `Code.gs`**
    (sinon Google refuse de lancer le projet : noms déclarés deux fois), puis créer les
    fichiers manquants avec **exactement** les mêmes noms (`+` → Script / HTML, sans
-   l'extension).
+   l'extension). Mise à jour « arrivages » : créer **`Arrivages.gs`**.
 2. Pour chaque fichier `.gs` / `.html` : tout sélectionner, coller le contenu **Raw** de
    GitHub, enregistrer.
 3. **Déployer → Gérer les déploiements → ✏️ sur le déploiement existant → Version :

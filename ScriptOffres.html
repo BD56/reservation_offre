@@ -1,6 +1,6 @@
-<!-- Offres et réservations : liste des offres, réservations d'une offre (recherche, filtres,
-     « Retiré »), fiche d'une réservation, création / modification / suppression d'une offre. -->
-<script data-version="2026.10.15-1339">
+<!-- Offres et réservations : liste des offres, réservations d'une offre (arrivages, recherche,
+     filtres, « Retiré »), fiche d'une réservation, création / modification / suppression d'une offre. -->
+<script data-version="2026.10.25-1128">
   const ETATS = ["Réservé", "Contacté", "Retrait", "Annulé"];
   const CLASSE_ETAT = { Réservé: "reserve", Contacté: "contacte", Retrait: "retrait", Annulé: "annule" };
   const LIBELLE_ETAT = { Réservé: "Réservé", Contacté: "Contacté", Retrait: "Retiré", Annulé: "Annulé" };
@@ -109,6 +109,30 @@
   $("detailModifier").addEventListener("click", () => ouvrirEditeur(offreDetail));
   $("recherche").addEventListener("input", () => dessinerDetail());
 
+  // Filtres : situation calculée pour les produits, état pour les évènements
+  const FILTRES_PRODUITS = {
+    Toutes: "Toutes",
+    remettre: "À remettre",
+    attente: "En attente",
+    Contacté: "Contactés",
+    terminee: "Terminées",
+    annule: "Annulées",
+  };
+  const FILTRES_EVENEMENT = {
+    Toutes: "Toutes",
+    Réservé: "À retirer",
+    Contacté: "Contactés",
+    Retrait: "Retirées",
+    Annulé: "Annulées",
+  };
+  function dansFiltre(r, f, produits) {
+    if (f === "Toutes") return true;
+    if (!produits) return r.etat === f;
+    const s = situation(r);
+    if (f === "Contacté") return r.etat === "Contacté" && (s === "remettre" || s === "attente");
+    return s === f;
+  }
+
   function dessinerDetail() {
     const op = trouverOffre(offreDetail);
     if (!op) {
@@ -116,25 +140,20 @@
       return;
     }
     const toutes = reservationsDe(op.id) || [];
+    const produits = op.type === "Produit";
     const n = compteOffre(op);
     $("titreDetail").textContent = op.nom;
     $("infosDetail").innerHTML =
       chipsOffre(op, true) +
       `<span>${echapper(periodeLongue(op))}</span><span>${n} réservation${n > 1 ? "s" : ""}</span>`;
 
-    // Filtres par état (avec leur nombre)
-    const nombre = (f) => (f === "Toutes" ? toutes.length : toutes.filter((r) => r.etat === f).length);
-    const LIB_FILTRE = {
-      Toutes: "Toutes",
-      Réservé: "À retirer",
-      Contacté: "Contactés",
-      Retrait: "Retirées",
-      Annulé: "Annulées",
-    };
-    $("filtres").innerHTML = Object.keys(LIB_FILTRE)
+    // Filtres (avec leur nombre)
+    const libelles = produits ? FILTRES_PRODUITS : FILTRES_EVENEMENT;
+    if (!(filtre in libelles)) filtre = "Toutes";
+    $("filtres").innerHTML = Object.keys(libelles)
       .map(
         (f) =>
-          `<button type="button" class="filtre" data-filtre="${f}" aria-pressed="${filtre === f}">${LIB_FILTRE[f]} <b>${nombre(f)}</b></button>`
+          `<button type="button" class="filtre" data-filtre="${f}" aria-pressed="${filtre === f}">${libelles[f]} <b>${toutes.filter((r) => dansFiltre(r, f, produits)).length}</b></button>`
       )
       .join("");
     $("filtres")
@@ -146,23 +165,14 @@
         })
       );
 
-    // Reste à préparer : articles des réservations ni annulées ni retirées
-    $("preparer").hidden = op.type !== "Produit";
-    const reste = totauxArticles(toutes.filter((r) => r.etat !== "Annulé" && r.etat !== "Retrait"));
-    $("preparer").innerHTML =
-      `<span>Reste à préparer</span>` +
-      (reste.length
-        ? reste
-            .map((t) => `<span class="prep"><b>${t.total}</b> <span>${echapper(t.nom)}</span></span>`)
-            .join("")
-        : "<span>rien</span>");
+    dessinerArrivages(op, toutes);
 
-    // Lignes (plus récentes en haut), filtrées par état et par la recherche
+    // Lignes (plus récentes en haut), filtrées et cherchées
     const texte = $("recherche").value.trim();
     const q = normNom(texte);
     const qTel = normTel(texte);
     const visibles = toutes
-      .filter((r) => filtre === "Toutes" || r.etat === filtre)
+      .filter((r) => dansFiltre(r, filtre, produits))
       .filter((r) => {
         if (!texte) return true;
         const c = separerContact(r.contact);
@@ -177,7 +187,7 @@
       .reverse();
     $("lignes").innerHTML = visibles.length
       ? visibles.map((r) => ligneHtml(r, op)).join("")
-      : `<div class="vide">${texte ? `Aucune réservation ne correspond à « ${echapper(texte)} ».` : "Aucune réservation pour le moment."}</div>`;
+      : `<div class="vide">${texte ? `Aucune réservation ne correspond à « ${echapper(texte)} ».` : filtre !== "Toutes" ? "Aucune réservation dans ce filtre." : "Aucune réservation pour le moment."}</div>`;
     $("lignes")
       .querySelectorAll(".ligne")
       .forEach((ligne) => {
@@ -194,71 +204,300 @@
       });
   }
 
+  const CLASSE_SITUATION = { remettre: "pret", attente: "attente", terminee: "terminee", annule: "annule" };
+  function libelleSituation(r) {
+    const s = situation(r);
+    if (s === "remettre")
+      return r.articles.every((a) => a.arrive >= a.quantite) ? "Tout est là" : `${aRemettre(r)} à remettre`;
+    return { attente: "En attente", terminee: "Terminée", annule: "Annulée" }[s];
+  }
+
   function ligneHtml(r, op) {
+    const produits = op.type === "Produit";
     let droite;
     if (r.enAttente) droite = `<span class="etat envoi"><span class="rond"></span>envoi…</span>`;
-    else if (op.type === "Produit" && (r.etat === "Réservé" || r.etat === "Contacté"))
-      droite = `<span class="etat ${CLASSE_ETAT[r.etat]}">${LIBELLE_ETAT[r.etat]}</span><button type="button" class="retire-btn"><svg class="ico p"><use href="#i-check"/></svg>Retiré</button>`;
-    else
+    else if (produits) {
+      const s = situation(r);
+      droite =
+        (r.etat === "Contacté" && (s === "remettre" || s === "attente")
+          ? `<span class="etat contacte">Contacté</span>`
+          : "") +
+        `<span class="etat ${CLASSE_SITUATION[s]}">${libelleSituation(r)}</span>` +
+        (s === "remettre"
+          ? `<button type="button" class="retire-btn"><svg class="ico p"><use href="#i-check"/></svg>Retiré</button>`
+          : "");
+    } else
       droite = `<span class="etat ${CLASSE_ETAT[r.etat] || ""}">${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</span>`;
     return `<div class="ligne ${r.etat === "Annulé" ? "annulee" : ""}" data-res="${echapper(r.idRes)}" tabindex="0" role="button" aria-label="Modifier la réservation de ${echapper(r.nom)} ${echapper(r.prenom)}">
       <div class="qui"><b>${echapper(r.nom)} ${echapper(r.prenom)}</b><small>${echapper(contactLisible(r))}</small></div>
-      <div class="commande">${op.type === "Produit" ? listeArticlesHtml(r) : `Inscrit le ${echapper(r.dateSaisie.slice(0, 10))}`}</div>
+      <div class="commande">${produits ? listeArrivagesHtml(r) : `Inscrit le ${echapper(r.dateSaisie.slice(0, 10))}`}</div>
       <div class="actions-ligne">${droite}</div></div>`;
   }
 
-  // Totaux par article, triés par nom
-  function totauxArticles(reservations) {
-    const totaux = {};
-    reservations.forEach((r) =>
-      r.articles.forEach((a) => (totaux[a.nom] = (totaux[a.nom] || 0) + a.quantite))
-    );
-    return Object.keys(totaux)
-      .sort((a, b) => a.localeCompare(b))
-      .map((nom) => ({ nom: nom, total: totaux[nom] }));
+  // =============== Arrivages (offre de produits) ===============
+  // Article d'une réservation : quantite = commandé, arrive (≤ quantite) = attribué au client,
+  // remis (≤ arrive) = emporté. suivi faux : ligne d'avant le suivi des arrivages (hors stock).
+  // Le reçu (op.recus) est la référence : reçu = attribué + en stock.
+  function aRemettre(r) {
+    return r.articles.reduce((s, a) => s + Math.max(0, a.arrive - a.remis), 0);
+  }
+  function toutRemis(articles) {
+    return articles.every((a) => a.remis >= a.quantite);
+  }
+  // Situation calculée : à remettre, en attente, terminée (tout remis), annulée
+  function situation(r) {
+    if (r.etat === "Annulé") return "annule";
+    if (r.etat === "Retrait" || toutRemis(r.articles)) return "terminee";
+    return aRemettre(r) > 0 ? "remettre" : "attente";
+  }
+  // État enregistré, comme le serveur le calcule : « Retrait » quand tout est remis
+  function etatProduit(etat, articles) {
+    if (etat === "Annulé") return etat;
+    if (toutRemis(articles)) return "Retrait";
+    return etat === "Retrait" ? "Réservé" : etat;
   }
 
-  // --- État : changé tout de suite à l'écran, remis comme avant si le serveur refuse ---
-  function changerEtat(r, nouvelEtat, apres) {
-    const ancien = r.etat;
-    r.etat = nouvelEtat;
-    dessinerTout();
-    google.script.run
-      .withSuccessHandler(function () {
-        if (apres) apres();
-      })
-      .withFailureHandler(function (err) {
-        r.etat = ancien;
-        dessinerTout();
-        showErreur(err);
-      })
-      .updateReservationStatus(r.idRes, nouvelEtat);
-  }
-
-  // « Retiré » sans confirmation ; « Annuler » dans le message pour revenir en arrière
-  function marquerRetire(r) {
-    const ancien = r.etat;
-    changerEtat(r, "Retrait");
-    showToast(`${r.nom} ${r.prenom} : retrait noté`, "", function () {
-      changerEtat(r, ancien, () => showToast("Retrait annulé"));
+  // Par article : commandé, arrivé, remis, reçu et stock (réservations annulées exclues)
+  function bilanArrivages(op, toutes) {
+    const recus = op.recus || {};
+    const fixes = enListeFixe(op) ? articlesPredefinis(op) : [];
+    const autres = [];
+    const ajouter = (nom) => {
+      if (!fixes.includes(nom) && !autres.includes(nom)) autres.push(nom);
+    };
+    toutes.forEach((r) => r.articles.forEach((a) => ajouter(a.nom)));
+    Object.keys(recus).forEach(ajouter);
+    return fixes.concat(autres.sort((a, b) => a.localeCompare(b))).map((nom) => {
+      const t = { nom: nom, commande: 0, arrive: 0, remis: 0, recu: recus[nom] || 0, attribue: 0 };
+      toutes.forEach((r) => {
+        if (r.etat === "Annulé") return;
+        r.articles.forEach((a) => {
+          if (a.nom !== nom) return;
+          t.commande += a.quantite;
+          t.arrive += a.arrive;
+          t.remis += a.remis;
+          if (a.suivi !== false) t.attribue += a.arrive;
+        });
+      });
+      t.stock = t.recu - t.attribue; // négatif : correction à la main dans le classeur
+      return t;
     });
   }
 
+  function listeArrivagesHtml(r) {
+    if (!r.articles.length) return "—";
+    const annulee = r.etat === "Annulé";
+    return (
+      '<ul class="liste-articles suivi">' +
+      r.articles
+        .map((a) => {
+          const arr = a.arrive;
+          const rem = a.remis;
+          const q = a.quantite;
+          let detail = "";
+          if (!annulee) {
+            if (rem >= q) detail = ` <span class="deja">· remis</span>`;
+            else if (arr > rem)
+              detail =
+                ` <span class="a-remettre">· ${arr - rem} à remettre</span>` +
+                (rem ? ` <span class="deja">(${rem} déjà remis)</span>` : "");
+            else if (rem) detail = ` <span class="deja">· ${rem} déjà remis</span>`;
+          }
+          return `<li><span class="marque-art ${arr >= q ? "ok" : arr ? "partiel" : "rien"}" title="${arr} arrivé${arr > 1 ? "s" : ""} sur ${q} commandé${q > 1 ? "s" : ""}">${arr}/${q}</span><span>${echapper(a.nom)}${detail}</span></li>`;
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+
+  // Bloc « Arrivages » : une ligne par article. Redessiné à chaque rechargement de la copie :
+  // la quantité en cours de saisie (et le curseur) sont gardés.
+  let nomsArrivages = [];
+  let offreArrivages = null; // saisies gardées seulement pour la même offre
+  const lotsEnvoi = {}; // article -> envoi en cours
+  function dessinerArrivages(op, toutes) {
+    const bloc = $("blocArrivages");
+    bloc.hidden = op.type !== "Produit";
+    if (bloc.hidden) return;
+    const saisies = {};
+    let focus = null;
+    if (offreArrivages !== op.id) nomsArrivages = [];
+    offreArrivages = op.id;
+    $("arrivages")
+      .querySelectorAll("input")
+      .forEach((champ, i) => {
+        if (i >= nomsArrivages.length) return;
+        saisies[nomsArrivages[i]] = champ.value;
+        if (document.activeElement === champ) focus = nomsArrivages[i];
+      });
+    const bilan = bilanArrivages(op, toutes);
+    nomsArrivages = bilan.map((t) => t.nom);
+    $("arrivages").innerHTML = bilan.length
+      ? bilan
+          .map((t) => {
+            const pct = (n) => (t.commande ? Math.max(0, Math.min(100, (n / t.commande) * 100)) : 0);
+            const stock = Math.max(0, t.stock);
+            return `<div class="art"><b>${echapper(t.nom)}</b>
+              <div class="jauge"><span><strong>${t.arrive}</strong> arrivé${t.arrive > 1 ? "s" : ""} sur <strong>${t.commande}</strong> commandé${t.commande > 1 ? "s" : ""} · <strong>${t.remis}</strong> remis · reçus : ${t.recu}${stock ? ` · <strong class="stock">${stock}</strong> en stock` : ""}</span>
+                <span class="barre" title="Remis, arrivé pas encore remis, en stock"><i class="b-remis" style="width:${pct(t.remis)}%"></i><i class="b-arrive" style="width:${pct(t.arrive - t.remis)}%"></i><i class="b-stock" style="width:${pct(Math.min(stock, t.commande - t.arrive))}%"></i></span></div>
+              <div class="lot"><input type="number" min="1" step="1" inputmode="numeric" placeholder="Reçu" aria-label="Quantité reçue de ${echapper(t.nom)}"><button type="button" class="sec accent" ${lotsEnvoi[t.nom] ? "disabled" : ""}>Répartir</button></div></div>`;
+          })
+          .join("")
+      : `<div class="vide">Aucun article pour le moment.</div>`;
+    $("arrivages")
+      .querySelectorAll(".lot")
+      .forEach((lot, i) => {
+        const nom = nomsArrivages[i];
+        const champ = lot.querySelector("input");
+        if (saisies[nom]) champ.value = saisies[nom];
+        if (focus === nom) champ.focus();
+        lot.querySelector("button").addEventListener("click", () => repartirLot(op.id, nom, champ));
+        champ.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") repartirLot(op.id, nom, champ);
+        });
+      });
+  }
+
+  function champArrivage(nom) {
+    const i = nomsArrivages.indexOf(nom);
+    return i >= 0 ? $("arrivages").querySelectorAll("input")[i] : null;
+  }
+
+  // Quantité reçue envoyée au serveur, qui la répartit ; vide = redistribuer le stock
+  function repartirLot(idOp, nom, champ) {
+    const op = trouverOffre(idOp);
+    if (!op || lotsEnvoi[nom]) return;
+    const saisi = champ.value.trim();
+    const n = saisi === "" ? 0 : Number(saisi);
+    const t = bilanArrivages(op, reservationsDe(idOp) || []).find((x) => x.nom === nom);
+    if ((saisi !== "" && !(Number.isInteger(n) && n > 0 && n <= 100000)) || (!n && !(t && t.stock > 0))) {
+      showToast("Indiquez la quantité reçue (ex. 6).", "error");
+      champ.focus();
+      return;
+    }
+    lotsEnvoi[nom] = true;
+    dessinerDetail();
+    google.script.run
+      .withSuccessHandler(function (bilan) {
+        delete lotsEnvoi[nom];
+        const c = champArrivage(nom);
+        if (c) c.value = "";
+        appliquerCopieServeur(bilan.copie);
+        rafraichirHorsCopie(idOp);
+        const s = bilan.servis;
+        showToast(
+          `${n ? n + " reçu" + (n > 1 ? "s" : "") : "Stock redistribué"} · ${nom} : ${s ? s + " client" + (s > 1 ? "s" : "") + " servi" + (s > 1 ? "s" : "") : "personne à servir"}${bilan.reste ? ` · ${bilan.reste} en stock` : ""}`
+        );
+      })
+      .withFailureHandler(function (err) {
+        delete lotsEnvoi[nom];
+        dessinerDetail();
+        showErreur(err);
+      })
+      .enregistrerArrivage(idOp, nom, n);
+  }
+
+  // Offre terminée (hors copie) : ses réservations sont relues après une répartition
+  function rafraichirHorsCopie(idOp) {
+    if (!horsCopie[idOp]) return;
+    google.script.run
+      .withSuccessHandler(function (details) {
+        horsCopie[idOp] = details.reservations;
+        dessinerTout();
+      })
+      .getOperationDetails(idOp);
+  }
+
+  // « Retiré » sans confirmation : le client emporte tout ce qui est arrivé pour lui (le
+  // reste suivra). « Annuler » dans le message renvoie les quantités remises d'avant.
+  function marquerRetire(r) {
+    const avant = r.articles.map((a) => a.remis);
+    const etatAvant = r.etat;
+    const n = aRemettre(r);
+    const remis = {};
+    r.articles.forEach((a) => {
+      if (a.idArt) remis[a.idArt] = a.arrive;
+      a.remis = a.arrive;
+    });
+    r.etat = etatProduit(etatAvant, r.articles);
+    dessinerTout();
+    const envoi = { fini: false, ensuite: null };
+    const restaurer = () => {
+      r.articles.forEach((a, i) => (a.remis = avant[i]));
+      r.etat = etatAvant;
+      dessinerTout();
+    };
+    google.script.run
+      .withSuccessHandler(function () {
+        envoi.fini = true;
+        if (envoi.ensuite) envoi.ensuite();
+      })
+      .withFailureHandler(function (err) {
+        envoi.fini = true;
+        envoi.ensuite = null;
+        restaurer();
+        showErreur(err);
+      })
+      .remettre(r.idRes, remis);
+
+    const reste = r.articles.reduce((s, a) => s + a.quantite - a.remis, 0);
+    showToast(
+      `${r.nom} ${r.prenom} : ${n} article${n > 1 ? "s" : ""} remis${reste ? ` · reste ${reste} à venir` : " · commande terminée"}`,
+      "",
+      function () {
+        const retour = {};
+        r.articles.forEach((a, i) => {
+          if (a.idArt) retour[a.idArt] = avant[i];
+        });
+        restaurer();
+        // Après l'envoi du retrait (sinon les deux pourraient arriver dans le désordre)
+        const annuler = () =>
+          google.script.run
+            .withSuccessHandler(function (res) {
+              // Le serveur repasse un « Retrait » incomplet en « Réservé » : « Contacté » est remis
+              if (res && res.etat !== etatAvant && etatAvant === "Contacté")
+                google.script.run.updateReservationStatus(r.idRes, etatAvant);
+              showToast("Retrait annulé");
+            })
+            .withFailureHandler(function (err) {
+              showErreur(err);
+              rechargerCopie();
+            })
+            .remettre(r.idRes, retour);
+        if (envoi.fini) annuler();
+        else envoi.ensuite = annuler;
+      }
+    );
+  }
+
   // =============== Fiche d'une réservation ===============
-  let fiche = null; // { res, etat, articles: [{nom, quantite}] }
+  // fiche = { res, etat, articles: [{ nom, quantite, arrive, remis, suivi, avant }] }
+  let fiche = null;
 
   function ouvrirFiche(r) {
     if (!r || r.enAttente) return;
     const op = trouverOffre(r.idOp);
     const c = separerContact(r.contact);
-    fiche = { res: r, etat: r.etat, articles: r.articles.map((a) => ({ nom: a.nom, quantite: a.quantite })) };
+    const produits = !!op && op.type === "Produit";
+    fiche = {
+      res: r,
+      etat: produits && r.etat === "Retrait" ? "Réservé" : r.etat, // « Terminée » : calculé
+      articles: r.articles.map((a) => ({
+        nom: a.nom,
+        quantite: a.quantite,
+        arrive: a.arrive,
+        remis: a.remis,
+        suivi: a.suivi !== false,
+        avant: { q: a.quantite, arr: a.arrive, rem: a.remis },
+      })),
+    };
     $("ficheTitre").innerHTML =
       `${echapper(r.nom)} ${echapper(r.prenom)}<small>${echapper(op ? op.nom : "")} · saisie le ${echapper(r.dateSaisie)}</small>`;
     $("fNom").value = r.nom;
     $("fPrenom").value = r.prenom;
     $("fTel").value = c.tel;
     $("fEmail").value = c.email;
-    $("ficheBlocArticles").hidden = !op || op.type !== "Produit";
+    $("ficheBlocArticles").hidden = !produits;
     $("ficheAjout").hidden = !op || enListeFixe(op);
     $("ficheConfirme").hidden = true;
     $("ficheErreur").textContent = "";
@@ -268,11 +507,40 @@
     ouvrirVoile("voileFiche");
   }
 
+  // Ligne d'avant le suivi des arrivages, non modifiée : reste hors stock (comme le serveur)
+  function horsSuiviInchange(a) {
+    return !a.suivi && a.quantite === a.avant.q && a.arrive === a.avant.arr && a.remis === a.avant.rem;
+  }
+
+  // Stock d'un article, corrections en cours dans la fiche comprises
+  function stockFiche(op, nom) {
+    const t = bilanArrivages(op, reservationsDe(op.id) || []).find((x) => x.nom === nom);
+    let stock = t ? t.stock : 0;
+    if (fiche.res.etat !== "Annulé")
+      fiche.res.articles.forEach((a) => {
+        if (a.nom === nom && a.suivi !== false) stock += a.arrive; // sa part d'origine
+      });
+    fiche.articles.forEach((a) => {
+      if (a.nom === nom && !horsSuiviInchange(a)) stock -= a.arrive;
+    });
+    return stock;
+  }
+
+  function pasHtml(champ, valeur, max, plusBloque, nom) {
+    const lib = champ === "arrive" ? "arrivé" : "remis";
+    return `<span class="pas" data-champ="${champ}"><button type="button" data-d="-1" aria-label="${echapper(nom)} : un ${lib} de moins" ${valeur <= 0 ? "disabled" : ""}>−</button><output>${valeur}</output><button type="button" data-d="1" aria-label="${echapper(nom)} : un ${lib} de plus" ${valeur >= max || plusBloque ? "disabled" : ""}>+</button></span>`;
+  }
+
   function dessinerFiche() {
-    $("ficheEtat").innerHTML = ETATS.map(
-      (e) =>
-        `<button type="button" data-etat="${e}" aria-pressed="${fiche.etat === e}">${LIBELLE_ETAT[e]}</button>`
-    ).join("");
+    const op = trouverOffre(fiche.res.idOp);
+    const produits = !!op && op.type === "Produit";
+    const etats = produits ? ["Réservé", "Contacté", "Annulé"] : ETATS;
+    $("ficheEtat").innerHTML = etats
+      .map(
+        (e) =>
+          `<button type="button" data-etat="${e}" aria-pressed="${fiche.etat === e}">${LIBELLE_ETAT[e]}</button>`
+      )
+      .join("");
     $("ficheEtat")
       .querySelectorAll("button")
       .forEach((b) =>
@@ -282,8 +550,10 @@
           ficheModifiee();
         })
       );
-    const op = trouverOffre(fiche.res.idOp);
-    if (!op || op.type !== "Produit") return;
+    const commandes = fiche.articles.filter((a) => a.quantite > 0);
+    $("ficheTerminee").hidden =
+      !produits || fiche.etat === "Annulé" || !commandes.length || !toutRemis(commandes);
+    if (!produits) return;
     // Liste fixe : tous les articles de l'offre ; saisie libre : ceux de la réservation
     const noms = enListeFixe(op) ? articlesPredefinis(op) : [];
     fiche.articles.forEach((a) => {
@@ -293,7 +563,19 @@
       .map((nom) => {
         const a = fiche.articles.find((x) => x.nom === nom);
         const q = a ? a.quantite : 0;
-        return `<div class="ligne-produit ${q ? "choisi" : ""}" data-article="${echapper(nom)}"><span class="nom-article">${echapper(nom)}</span>${compteurHtml(q, nom)}</div>`;
+        if (!q)
+          return `<div class="ligne-produit" data-article="${echapper(nom)}"><span class="nom-article">${echapper(nom)}</span>${compteurHtml(0, nom)}</div>`;
+        const stock = stockFiche(op, nom);
+        const info =
+          a.remis >= q
+            ? "tout est remis"
+            : a.arrive >= q
+              ? "tout est arrivé"
+              : stock > 0
+                ? `${stock} en stock`
+                : `<span class="vide-stock">plus rien en stock</span>`;
+        return `<div class="ligne-produit suivi choisi ${a.remis >= q ? "complet" : ""}" data-article="${echapper(nom)}"><span class="nom-article">${echapper(nom)}<span class="info-stock">${info}</span></span>
+          <div class="trois-pas"><span class="pas-lib">Commandé${compteurHtml(q, nom)}</span><span class="pas-lib">Arrivé${pasHtml("arrive", a.arrive, q, stock <= 0, nom)}</span><span class="pas-lib">Remis${pasHtml("remis", a.remis, a.arrive, false, nom)}</span></div></div>`;
       })
       .join("");
     $("ficheArticles")
@@ -302,16 +584,38 @@
         const nom = ligne.dataset.article;
         ligne.querySelector(".plus").addEventListener("click", () => reglerFiche(nom, 1));
         ligne.querySelector(".moins").addEventListener("click", () => reglerFiche(nom, -1));
+        ligne
+          .querySelectorAll("[data-champ] button")
+          .forEach((b) =>
+            b.addEventListener("click", () =>
+              reglerSuivi(op, nom, b.closest("[data-champ]").dataset.champ, +b.dataset.d)
+            )
+          );
       });
   }
 
   function reglerFiche(nom, delta) {
     let a = fiche.articles.find((x) => x.nom === nom);
     if (!a) {
-      a = { nom: nom, quantite: 0 };
+      a = { nom: nom, quantite: 0, arrive: 0, remis: 0, suivi: true, avant: { q: 0, arr: 0, rem: 0 } };
       fiche.articles.push(a);
     }
     a.quantite = Math.max(0, a.quantite + delta);
+    a.arrive = Math.min(a.arrive, a.quantite); // le surplus retourne en stock
+    a.remis = Math.min(a.remis, a.arrive);
+    dessinerFiche();
+    ficheModifiee();
+  }
+
+  // Arrivé : rien de plus que ce qui est en stock ; Remis : au plus l'arrivé
+  function reglerSuivi(op, nom, champ, delta) {
+    const a = fiche.articles.find((x) => x.nom === nom);
+    if (!a) return;
+    if (champ === "arrive") {
+      if (delta > 0 && stockFiche(op, nom) <= 0) return;
+      a.arrive = Math.min(a.quantite, Math.max(0, a.arrive + delta));
+      a.remis = Math.min(a.remis, a.arrive);
+    } else a.remis = Math.min(a.arrive, Math.max(0, a.remis + delta));
     dessinerFiche();
     ficheModifiee();
   }
@@ -319,7 +623,15 @@
   function ajouterArticleFiche() {
     const nom = $("ficheNouvelArticle").value.trim();
     if (!nom) return;
-    if (!fiche.articles.some((a) => a.nom === nom)) fiche.articles.push({ nom: nom, quantite: 1 });
+    if (!fiche.articles.some((a) => a.nom === nom))
+      fiche.articles.push({
+        nom: nom,
+        quantite: 1,
+        arrive: 0,
+        remis: 0,
+        suivi: true,
+        avant: { q: 0, arr: 0, rem: 0 },
+      });
     $("ficheNouvelArticle").value = "";
     dessinerFiche();
     ficheModifiee();
@@ -354,6 +666,8 @@
   $("ficheEnregistrer").addEventListener("click", function () {
     const r = fiche.res;
     const op = trouverOffre(r.idOp);
+    const produits = !!op && op.type === "Produit";
+    const gardes = fiche.articles.filter((a) => a.quantite > 0);
     const data = {
       idRes: r.idRes,
       nom: $("fNom").value.trim().toUpperCase(),
@@ -361,7 +675,7 @@
       telephone: $("fTel").value.trim(),
       email: $("fEmail").value.trim(),
       etat: fiche.etat,
-      articles: fiche.articles.filter((a) => a.quantite > 0),
+      articles: gardes.map((a) => ({ nom: a.nom, quantite: a.quantite, arrive: a.arrive, remis: a.remis })),
     };
     if (!data.nom) return refuserFiche("Le nom est obligatoire.", "fNom");
     if (!data.prenom) return refuserFiche("Le prénom est obligatoire.", "fPrenom");
@@ -371,7 +685,7 @@
       return refuserFiche("Téléphone incomplet (ex. : 06 12 34 56 78).", "fTel");
     if (data.email && !REGEX_EMAIL.test(data.email))
       return refuserFiche("Email incomplet (ex. : nom@exemple.fr).", "fEmail");
-    if (op && op.type === "Produit" && !data.articles.length)
+    if (produits && !data.articles.length)
       return refuserFiche("Au moins un article : sinon, passez la réservation en « Annulé ».");
 
     const bouton = $("ficheEnregistrer");
@@ -381,12 +695,21 @@
         // Offre terminée (hors copie) : la réservation affichée est mise à jour ici
         let contact = data.telephone;
         if (data.email) contact += (contact ? " / " : "") + data.email;
+        const annulee = data.etat === "Annulé";
+        const articles = gardes.map((a) => ({
+          idArt: (r.articles.find((x) => x.nom === a.nom) || {}).idArt,
+          nom: a.nom,
+          quantite: a.quantite,
+          arrive: annulee ? a.remis : a.arrive, // annulée : le reste retourne en stock
+          remis: a.remis,
+          suivi: !horsSuiviInchange(a),
+        }));
         Object.assign(r, {
           nom: data.nom,
           prenom: data.prenom,
           contact: contact,
-          etat: data.etat,
-          articles: data.articles,
+          etat: produits ? etatProduit(data.etat, articles) : data.etat,
+          articles: articles,
         });
         appliquerCopieServeur(c);
         fermerVoile("voileFiche");

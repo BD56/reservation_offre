@@ -32,6 +32,11 @@ function preparer(env) {
     ],
   });
   env.ids.res = env.sheets.Reservations.getDataRange().getValues()[1][0];
+  // Arrivages : en partie arrivés, en partie remis, du stock en trop
+  c.enregistrerArrivage(idOp, "oiuyftdrdwfgh", 2);
+  c.enregistrerArrivage(idOp, TRES_LONG, 4);
+  const idArt = env.sheets.Articles.getDataRange().getValues()[1][0];
+  c.remettre(env.ids.res, { [idArt]: 1 });
 }
 
 // Éléments dont un descendant sort (à droite) de la boîte, hors zones défilantes prévues
@@ -93,7 +98,7 @@ async function chevauchements(page) {
         fautes.push(`${largeur}px offres : texte sous les boutons (${id})`);
       // Réservations de l'offre
       await page.click('[data-act="voir"]');
-      await verifier("détail", ".titre-ecran, #preparer, .ligne");
+      await verifier("détail", ".titre-ecran, #blocArrivages, .art, .ligne");
       // Fiche
       await page.click(`.ligne[data-res="${env.ids.res}"] .qui`);
       await verifier("fiche", "#voileFiche .fenetre-form");

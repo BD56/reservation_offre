@@ -85,10 +85,13 @@ try {
   const d = J(c.getOperationDetails(idA));
   assert.strictEqual(d.operation.dateDebut, "2026-12-01", "date au format du champ date");
   assert.strictEqual(d.reservations.length, 4);
-  assert.deepStrictEqual(d.reservations[1].articles, [
-    { nom: "Bloc 200g", quantite: 5 },
-    { nom: "L'entier", quantite: 1 },
-  ]);
+  assert.deepStrictEqual(
+    d.reservations[1].articles.map(({ nom, quantite }) => ({ nom, quantite })),
+    [
+      { nom: "Bloc 200g", quantite: 5 },
+      { nom: "L'entier", quantite: 1 },
+    ]
+  );
   assert.strictEqual(d.reservations[0].dateSaisie, "01/12/2026 10:00");
   assert.strictEqual(d.reservations[3].contact, "0612345678");
   assert.throws(() => c.getOperationDetails("OP-INCONNU"), /introuvable/);

@@ -1,6 +1,6 @@
 // Faux services Apps Script communs aux tests
 const crypto = require("crypto");
-const { loadCode } = require("./harness");
+const { loadCode, makeProps } = require("./harness");
 const { FakeSheet, makeSpreadsheet } = require("./fakesheet");
 
 // Classeur vide avec les en-têtes des trois onglets
@@ -12,7 +12,10 @@ function classeurVide() {
     Reservations: new FakeSheet("Reservations", [
       ["ID_Reservation", "ID_Operation", "Nom", "Prenom", "Contact", "Etat", "Date_Saisie"],
     ]),
-    Articles: new FakeSheet("Articles", [["ID_Article", "ID_Reservation", "Article", "Quantite"]]),
+    Articles: new FakeSheet("Articles", [
+      ["ID_Article", "ID_Reservation", "Article", "Quantite", "Arrive", "Remis"],
+    ]),
+    Arrivages: new FakeSheet("Arrivages", [["Date", "ID_Operation", "Article", "Quantite"]]),
   };
 }
 
@@ -24,6 +27,7 @@ function makeEnv(opts = {}) {
     menus: [], // éléments du menu du Google Sheets
     alertes: [], // fenêtres affichées dans le Google Sheets
   };
+  env.props = makeProps(opts.props);
   const ss = makeSpreadsheet(env);
   env.ctx = loadCode(opts.repo, {
     LockService: {
@@ -42,6 +46,7 @@ function makeEnv(opts = {}) {
       }),
     },
     Logger: { log() {} },
+    PropertiesService: { getDocumentProperties: () => env.props },
     Session: { getScriptTimeZone: () => "Europe/Paris" },
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ss,

@@ -1,5 +1,5 @@
-<!-- Feuille de préparation : aperçu (total à préparer + liste à pointer), puis impression. -->
-<script data-version="2026.10.15-1339">
+<!-- Feuille de préparation : aperçu (totaux par article + liste à pointer), puis impression. -->
+<script data-version="2026.10.25-1128">
   let offreFeuille = null;
 
   function ouvrirFeuille(idOp) {
@@ -20,7 +20,6 @@
       .filter((r) => $("feuilleAnnulees").checked || r.etat !== "Annulé")
       .slice()
       .sort((a, b) => (a.nom + " " + a.prenom).localeCompare(b.nom + " " + b.prenom));
-    const total = totauxArticles(actives);
     const produits = op.type === "Produit";
     const d = new Date();
     const p = (n) => String(n).padStart(2, "0");
@@ -28,9 +27,14 @@
     let html = `<header><div><h1>${echapper(op.nom)}</h1><p>${echapper(periodeLongue(op))} · ${actives.length} réservation${actives.length > 1 ? "s" : ""}</p></div>
       <div class="imprime">Imprimée le ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}<br>à ${p(d.getHours())}:${p(d.getMinutes())}</div></header>`;
     if (produits) {
-      html += `<h2>Total à préparer</h2><div class="defile"><table><thead><tr><th>Article</th><th style="text-align:center">Quantité</th></tr></thead><tbody>${
-        total.map((t) => `<tr><td>${echapper(t.nom)}</td><td class="qte">${t.total}</td></tr>`).join("") ||
-        '<tr><td colspan="2">Rien à préparer</td></tr>'
+      const bilan = bilanArrivages(op, toutes).filter((t) => t.commande || t.recu);
+      html += `<h2>Totaux par article</h2><div class="defile"><table><thead><tr><th>Article</th><th class="qte">Commandé</th><th class="qte">Arrivé</th><th class="qte">Remis</th><th class="qte">À remettre</th><th class="qte">En stock</th></tr></thead><tbody>${
+        bilan
+          .map(
+            (t) =>
+              `<tr><td>${echapper(t.nom)}</td><td class="qte">${t.commande}</td><td class="qte">${t.arrive}</td><td class="qte">${t.remis}</td><td class="qte">${t.arrive - t.remis}</td><td class="qte">${Math.max(0, t.stock)}</td></tr>`
+          )
+          .join("") || '<tr><td colspan="6">Rien à préparer</td></tr>'
       }</tbody></table></div>`;
     }
     html += `<h2>${produits ? "Commandes à pointer" : "Inscrits"} (${listees.length})</h2>
@@ -38,11 +42,11 @@
         listees
           .map(
             (r) =>
-              `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${r.etat === "Retrait" ? "☑" : "☐"}</td><td><b>${echapper(r.nom)}</b> ${echapper(r.prenom)}</td><td>${echapper(contactLisible(r))}</td>${produits ? `<td>${listeArticlesHtml(r)}</td>` : ""}<td>${echapper(LIBELLE_ETAT[r.etat] || r.etat)}</td></tr>`
+              `<tr class="${r.etat === "Annulé" ? "barre" : ""}"><td class="case">${(produits ? situation(r) === "terminee" : r.etat === "Retrait") ? "☑" : "☐"}</td><td><b>${echapper(r.nom)}</b> ${echapper(r.prenom)}</td><td>${echapper(contactLisible(r))}</td>${produits ? `<td>${listeArrivagesHtml(r)}</td>` : ""}<td>${echapper(produits ? libelleSituation(r) : LIBELLE_ETAT[r.etat] || r.etat)}</td></tr>`
           )
           .join("") || `<tr><td colspan="${produits ? 5 : 4}">Aucune réservation</td></tr>`
       }</tbody></table></div>
-      <p class="pied">Classement par nom. Les réservations annulées ne comptent pas dans le total.</p>`;
+      <p class="pied">Classement par nom. Les réservations annulées ne comptent pas dans les totaux. « 1/2 » : 1 arrivé sur 2 commandés.</p>`;
     $("feuille").innerHTML = html;
   }
 

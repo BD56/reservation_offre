@@ -5,7 +5,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Copie_() {
-  return "2026.10.15-1339";
+  return "2026.10.25-1128";
 }
 
 // Lignes d'un onglet sans l'en-tête ; onglet absent -> aucune ligne
@@ -58,7 +58,16 @@ function reservationsDesOffres_(idsOffres, lignesRes) {
     lignesSiPresent_(FEUILLE_ARTICLES).forEach(function (row) {
       const res = parId[String(row[ART.RES]).trim()];
       const nomArt = String(row[ART.NOM] || "").trim();
-      if (res && nomArt) res.articles.push({ nom: nomArt, quantite: parseInt(row[ART.QTE], 10) || 0 });
+      if (!res || !nomArt) return;
+      const l = ligneArticle_(row, res.etat);
+      res.articles.push({
+        idArt: String(row[ART.ID] || "").trim(),
+        nom: nomArt,
+        quantite: l.q,
+        arrive: l.arr,
+        remis: l.rem,
+        suivi: l.suivi, // faux : ligne d'avant le suivi des arrivages (hors stock)
+      });
     });
   }
   return parOffre;
@@ -78,8 +87,10 @@ function copie_() {
     .filter(function (op) {
       return op.id !== "";
     });
+  const recus = recusParOffre_();
   operations.forEach(function (op) {
     op.count = compte[op.id] || 0;
+    op.recus = recus[op.id] || {}; // quantités reçues par article (arrivages)
     // Date de fin illisible (texte tapé à la main) : considérée comme active
     op.active = !/^\d{4}-\d{2}-\d{2}$/.test(op.dateFin) || op.dateFin >= aujourdhui;
   });

@@ -16,7 +16,7 @@ try {
   );
   assert.match(rapport, /Version \d{4}\.\d{2}\.\d{2}/);
   const attendus = J(classeurVide());
-  for (const nom of ["Operations", "Reservations", "Articles"]) {
+  for (const nom of ["Operations", "Reservations", "Articles", "Arrivages"]) {
     assert.deepStrictEqual(
       env.sheets[nom].getDataRange().getValues()[0],
       attendus[nom].cells[0],
@@ -48,7 +48,10 @@ try {
     rapport2,
     /Operations » : colonnes ajoutées \(Type, Date_Debut, Date_Fin, Mode_Saisie, Articles_Predefinis\)/
   );
-  assert.match(rapport2, /Articles » : colonnes ajoutées \(ID_Article, ID_Reservation, Article, Quantite\)/);
+  assert.match(
+    rapport2,
+    /Articles » : colonnes ajoutées \(ID_Article, ID_Reservation, Article, Quantite, Arrive, Remis\)/
+  );
   assert.doesNotMatch(rapport2, /Reservations/, "onglet complet : rien");
   assert.deepStrictEqual(env2.sheets.Operations.getDataRange().getValues()[0], [
     "ID",
@@ -85,7 +88,22 @@ try {
     return modele;
   };
   env3.ctx.doGet({});
-  assert.deepStrictEqual(Object.keys(env3.sheets).sort(), ["Articles", "Operations", "Reservations"]);
+  assert.deepStrictEqual(Object.keys(env3.sheets).sort(), [
+    "Arrivages",
+    "Articles",
+    "Operations",
+    "Reservations",
+  ]);
+  assert.strictEqual(env3.props.getProperty("SCHEMA"), "2", "version du schéma notée");
+  // Nouvelle version qui ajoute des colonnes : l'ouverture complète l'installation (une fois)
+  const env5 = makeEnv({ repo, props: { SCHEMA: "1" } });
+  env5.sheets.Articles = new FakeSheet("Articles", [["ID_Article", "ID_Reservation", "Article", "Quantite"]]);
+  delete env5.sheets.Arrivages;
+  env5.ctx.HtmlService.createTemplateFromFile = env3.ctx.HtmlService.createTemplateFromFile;
+  env5.ctx.doGet({});
+  assert.deepStrictEqual(env5.sheets.Articles.getDataRange().getValues()[0].slice(4), ["Arrive", "Remis"]);
+  assert.ok(env5.sheets.Arrivages, "onglet Arrivages ajouté à l'ouverture");
+  assert.strictEqual(env5.props.getProperty("SCHEMA"), "2");
   assert.strictEqual(JSON.parse(modele.copieJson).operations.length, 0, "copie vide mais valide");
   assert.strictEqual(env3.verrous, 0);
   // Création impossible (droits, quota…) : la page s'ouvre quand même

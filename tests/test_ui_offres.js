@@ -1,5 +1,5 @@
 // Page : offres et réservations — liste des offres, réservations d'une offre (recherche,
-// filtres, reste à préparer, « Retiré » + Annuler), fiche (modifier, supprimer), feuille de
+// filtres, arrivages, « Retiré » + Annuler), fiche (modifier, supprimer), feuille de
 // préparation, création / modification / suppression d'une offre.
 const assert = require("assert");
 const { ouvrir, attendre } = require("./navigateur");
@@ -47,13 +47,23 @@ const repo = process.argv[2];
       "Dupont Al",
       "O'Brien<img src=x onerror=window.__xss=1> Jo",
     ]);
-    assert.match(await page.textContent("#preparer"), /Reste à préparer\s*7 Bloc 200g\s*1 L'entier/);
+    const arrivages = () =>
+      page.$$eval("#arrivages .art", (x) => x.map((e) => e.querySelector(".jauge span").textContent));
+    assert.deepStrictEqual(await arrivages(), [
+      "0 arrivé sur 7 commandés · 0 remis · reçus : 0",
+      "0 arrivé sur 1 commandé · 0 remis · reçus : 0",
+    ]);
+    const articlesLigne = (id) =>
+      page.$$eval(`.ligne[data-res="${id}"] .liste-articles li`, (x) => x.map((e) => e.textContent));
     assert.deepStrictEqual(
-      await page.$$eval(`.ligne[data-res="${env.ids.resDupont}"] .liste-articles li`, (x) =>
-        x.map((e) => e.textContent)
-      ),
-      ["5 × Bloc 200g", "1 × L'entier"],
-      "un article par ligne"
+      await articlesLigne(env.ids.resDupont),
+      ["0/5Bloc 200g", "0/1L'entier"],
+      "un article par ligne, arrivé sur commandé"
+    );
+    assert.strictEqual(
+      await page.$$eval(".retire-btn", (x) => x.length),
+      0,
+      "rien d'arrivé : rien à remettre"
     );
     // Recherche : nom, téléphone, email
     await page.fill("#recherche", "brien");
@@ -66,29 +76,49 @@ const repo = process.argv[2];
     assert.match(await page.textContent("#lignes"), /Aucune réservation ne correspond à « personne »/);
     await page.fill("#recherche", "");
 
+    // --- Arrivage : 2 Bloc 200g reçus, servis à la plus ancienne réservation (O'Brien) ---
+    await page.fill("#arrivages .art:first-child input", "2");
+    await page.press("#arrivages .art:first-child input", "Enter");
+    await attendre(page);
+    assert.match(await toast(), /2 reçus · Bloc 200g : 1 client servi/);
+    assert.strictEqual(await page.inputValue("#arrivages .art:first-child input"), "", "champ vidé");
+    assert.match((await arrivages())[0], /^2 arrivés sur 7 commandés · 0 remis · reçus : 2$/);
+    assert.deepStrictEqual(await articlesLigne(env.ids.resObrien), ["2/2Bloc 200g · 2 à remettre"]);
+    assert.match(
+      await page.textContent(`.ligne[data-res="${env.ids.resObrien}"] .actions-ligne`),
+      /Tout est là/
+    );
+
     // --- « Retiré » sans confirmation, « Annuler » dans le message ---
     await page.click(`.ligne[data-res="${env.ids.resObrien}"] .retire-btn`);
-    assert.match(await toast(), /O'Brien.* : retrait noté/);
+    assert.match(await toast(), /O'Brien.* Jo : 2 articles remis · commande terminée/);
     await attendre(page);
     assert.strictEqual(resa(env.ids.resObrien)[5], "Retrait");
-    assert.match(await page.textContent("#preparer"), /5 Bloc 200g/, "retirée : plus à préparer");
+    const artObrien = () => lignes(env, "Articles").find((a) => a[1] === env.ids.resObrien);
+    assert.deepStrictEqual(artObrien().slice(3), [2, 2, 2], "commandé, arrivé, remis");
+    assert.match(await page.textContent(`.ligne[data-res="${env.ids.resObrien}"]`), /Terminée/);
     await page.click("#toastAnnuler");
     await attendre(page);
     assert.strictEqual(resa(env.ids.resObrien)[5], "Réservé", "Annuler remet l'ancien état");
+    assert.deepStrictEqual(artObrien().slice(3), [2, 2, 0]);
     assert.match(await toast(), /Retrait annulé/);
     // Refus du serveur : l'écran revient comme avant
-    env.pannes.updateReservationStatus = "Réseau coupé";
+    env.pannes.remettre = "Réseau coupé";
     await page.click(`.ligne[data-res="${env.ids.resObrien}"] .retire-btn`);
     await attendre(page);
     assert.match(await toast(), /Erreur : Réseau coupé/);
-    assert.match(await page.textContent(`.ligne[data-res="${env.ids.resObrien}"]`), /Réservé[\s\S]*Retiré/);
-    delete env.pannes.updateReservationStatus;
-    // Filtres par état
+    assert.match(
+      await page.textContent(`.ligne[data-res="${env.ids.resObrien}"]`),
+      /Tout est là[\s\S]*Retiré/
+    );
+    delete env.pannes.remettre;
+    // Filtres (situation calculée)
     await page.click(`.ligne[data-res="${env.ids.resObrien}"] .retire-btn`);
     await attendre(page);
-    await page.click('.filtre[data-filtre="Retrait"]');
+    await page.click('.filtre[data-filtre="terminee"]');
     assert.deepStrictEqual(await lignesEcran(), ["O'Brien<img src=x onerror=window.__xss=1> Jo"]);
-    assert.match(await page.textContent('.filtre[data-filtre="Réservé"]'), /À retirer\s*1/);
+    assert.match(await page.textContent('.filtre[data-filtre="attente"]'), /En attente\s*1/);
+    assert.match(await page.textContent('.filtre[data-filtre="remettre"]'), /À remettre\s*0/);
     await page.click('.filtre[data-filtre="Toutes"]');
 
     // --- Fiche : modifier une réservation ---
@@ -130,12 +160,7 @@ const repo = process.argv[2];
         .map((a) => [a[2], a[3]]),
       [["Bloc 200g", 2]]
     );
-    assert.deepStrictEqual(
-      await page.$$eval(`.ligne[data-res="${env.ids.resDupont}"] .liste-articles li`, (x) =>
-        x.map((e) => e.textContent)
-      ),
-      ["2 × Bloc 200g"]
-    );
+    assert.deepStrictEqual(await articlesLigne(env.ids.resDupont), ["0/2Bloc 200g"]);
     assert.match(
       await page.textContent(`.ligne[data-res="${env.ids.resDupont}"] .actions-ligne`),
       /Contacté/
@@ -151,7 +176,7 @@ const repo = process.argv[2];
     let feuille = await page.innerHTML("#feuille");
     assert.match(
       feuille,
-      /Total à préparer[\s\S]*<td>Bloc 200g<\/td><td class="qte">2<\/td>/,
+      /Totaux par article[\s\S]*<td>Bloc 200g<\/td><td class="qte">2<\/td><td class="qte">2<\/td><td class="qte">2<\/td>/,
       "annulée hors total"
     );
     assert.doesNotMatch(feuille, /DUPONT/, "annulée pas listée par défaut");
@@ -163,7 +188,11 @@ const repo = process.argv[2];
     await page.click("#feuilleImprimer");
     const imprime = await page.evaluate(() => window.__imprime);
     assert.match(imprime, /Commandes à pointer \(2\)/);
-    assert.match(imprime, /<li><b>2 ×<\/b> <span>Bloc 200g<\/span><\/li>/, "feuille : un article par ligne");
+    assert.match(
+      imprime,
+      /<li><span class="marque-art ok"[^>]*>2\/2<\/span><span>Bloc 200g <span class="deja">· remis<\/span><\/span><\/li>/,
+      "feuille : un article par ligne"
+    );
     assert.ok(!(await page.isVisible("#voileFeuille")), "aperçu fermé avant l'impression");
     assert.strictEqual(
       await page.innerHTML("#zoneImpression"),

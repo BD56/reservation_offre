@@ -4,7 +4,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Installation_() {
-  return "2026.10.15-1339";
+  return "2026.10.25-1128";
 }
 
 // Liste des problèmes (vide si tout va bien). La version de référence est celle de ce fichier.
@@ -113,6 +113,7 @@ function installerFeuilles_() {
 // Installation complète (idempotente) : onglets, colonnes, contrôle des fichiers.
 function installer_() {
   const rapport = installerFeuilles_();
+  PropertiesService.getDocumentProperties().setProperty("SCHEMA", SCHEMA);
   let problemes = [];
   try {
     problemes = verifierInstallation_();

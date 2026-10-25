@@ -10,7 +10,8 @@ Simulation de Google Apps Script / Google Sheets (`harness.js`, `mocks.js`,
   France) : « 0612… » et « +33… » deviennent des nombres, « 2026-12-01 » et
   « 01/12/2026 10:00 » des dates, une apostrophe initiale force le texte.
 - `env.pannesApres.nomFonction` : la fonction écrit puis la réponse se perd ;
-  `env.retards.nomFonction = ms` : réponse retardée (envoi « en cours »).
+  `env.retards.nomFonction = ms` (ou une fonction qui renvoie le délai, appel par appel) :
+  réponse retardée (envoi « en cours », réponses dans le désordre).
 - `donnees.js` : jeu de données commun aux tests de la page.
 - `env.pannes.nomFonction = "message"` fait échouer une fonction serveur (tests d'erreur).
 - Limites : ce sont des **simulations** ; le comportement réel de Google est à vérifier

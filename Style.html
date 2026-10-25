@@ -1,4 +1,4 @@
-<style data-version="2026.10.15-1339">
+<style data-version="2026.10.25-1128">
   /* Style « Comptoir » (repris de l'app chèques) : clair uniquement, police du système,
      icônes SVG intégrées (Icones.html), aucune ressource externe. PC de l'accueil. */
   :root {
@@ -423,6 +423,43 @@
     font-size: 17px;
     font-variant-numeric: tabular-nums;
   }
+  /* Fiche d'une réservation de produits : commandé, arrivé, remis par article */
+  .ligne-produit.suivi {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px 12px;
+  }
+  .ligne-produit.complet {
+    border-color: var(--ok);
+    background: var(--ok-doux);
+  }
+  .ligne-produit .info-stock {
+    display: block;
+    color: var(--doux);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .ligne-produit .info-stock .vide-stock {
+    color: var(--danger);
+  }
+  .trois-pas {
+    display: flex;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+  }
+  .pas-lib {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11.5px;
+    color: var(--doux);
+    font-weight: 650;
+  }
+  .pas button:disabled {
+    opacity: 0.3;
+  }
+  .pas button:disabled:hover {
+    background: none;
+  }
   .retirer {
     width: 40px;
     height: 40px;
@@ -728,26 +765,116 @@
   .filtre[aria-pressed="true"] b {
     color: var(--blanc);
   }
-  .preparer {
-    margin: 0 18px;
-    background: var(--fond);
-    border-radius: 12px;
-    padding: 10px 12px;
+  /* Arrivages par article (offre de produits) */
+  .carte-arrivages {
+    background: var(--surface);
+    border: 1px solid var(--trait);
+    border-radius: 16px;
+    min-width: 0;
+  }
+  .arrivages-tete {
+    padding: 16px 18px 6px;
     display: flex;
+    gap: 6px 12px;
+    align-items: baseline;
     flex-wrap: wrap;
-    gap: 6px 14px;
-    font-size: 13.5px;
+  }
+  .arrivages-tete h2 {
+    margin: 0;
+    font-size: 16px;
+    display: inline-flex;
+    gap: 7px;
     align-items: center;
   }
-  .preparer > span:first-child {
+  .arrivages-tete p {
+    margin: 0;
     color: var(--doux);
-    font-weight: 700;
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 13px;
+    flex: 1 1 260px;
   }
-  .preparer b {
+  .arrivages {
+    padding: 6px 18px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .art {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1.5px solid var(--trait);
+    border-radius: 13px;
+  }
+  .art > b {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .jauge {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12.5px;
+    color: var(--doux);
     font-variant-numeric: tabular-nums;
+    min-width: 0;
+  }
+  .jauge strong {
+    color: var(--encre);
+  }
+  .jauge .stock {
+    color: var(--orange);
+  }
+  .barre {
+    height: 8px;
+    border-radius: 99px;
+    background: var(--fond);
+    overflow: hidden;
+    display: flex;
+  }
+  .barre i {
+    display: block;
+    height: 100%;
+  }
+  .barre .b-remis {
+    background: var(--accent-fonce);
+  }
+  .barre .b-arrive {
+    background: var(--ok);
+  }
+  .barre .b-stock {
+    background: var(--orange);
+  }
+  .lot {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .lot input {
+    width: 78px;
+    height: 40px;
+    border: 1.5px solid var(--trait);
+    border-radius: 10px;
+    padding: 0 8px;
+    font-weight: 700;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    background: var(--champ);
+  }
+  .lot input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-doux);
+  }
+  .regle {
+    margin: 0 18px 16px;
+    font-size: 12.5px;
+    color: var(--doux);
+    background: var(--fond);
+    border-radius: 10px;
+    padding: 9px 12px;
+    line-height: 1.5;
   }
   .lignes {
     padding: 6px 10px;
@@ -807,11 +934,52 @@
   .liste-articles span {
     overflow-wrap: anywhere;
   }
+  /* Arrivé / commandé par article, dans une ligne de réservation */
+  .liste-articles.suivi {
+    gap: 4px;
+  }
+  .liste-articles.suivi li {
+    gap: 8px;
+    align-items: center;
+  }
+  .marque-art {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 42px;
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .marque-art.ok {
+    background: var(--ok-doux);
+    color: var(--ok);
+  }
+  .marque-art.partiel {
+    background: var(--orange-doux);
+    color: var(--orange);
+  }
+  .marque-art.rien {
+    background: var(--fond);
+    color: var(--doux);
+  }
+  .liste-articles .a-remettre {
+    color: var(--ok);
+    font-weight: 750;
+    font-size: 12px;
+  }
+  .liste-articles .deja {
+    color: var(--doux);
+    font-size: 12px;
+  }
   .actions-ligne {
     display: flex;
     gap: 6px;
     align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
   .etat {
     font-size: 11.5px;
@@ -835,6 +1003,18 @@
   .etat.annule {
     background: var(--danger-doux);
     color: var(--danger);
+  }
+  .etat.pret {
+    background: var(--ok-doux);
+    color: var(--ok);
+  }
+  .etat.attente {
+    background: var(--info-doux);
+    color: var(--info);
+  }
+  .etat.terminee {
+    background: var(--ok);
+    color: var(--blanc);
   }
   .etat.envoi {
     background: var(--fond);
@@ -1253,6 +1433,13 @@
     flex-wrap: wrap;
     color: var(--blanc);
   }
+  /* Voile plus sombre : la barre (texte blanc) reste lisible sur l'application */
+  #voileFeuille {
+    background: rgba(28, 25, 23, 0.82);
+  }
+  .apercu-barre .sec:not(.accent) {
+    color: var(--encre);
+  }
   .apercu-barre b {
     flex: 1;
     font-size: 15px;
@@ -1323,11 +1510,14 @@
     text-transform: uppercase;
     letter-spacing: 0.4px;
   }
-  .feuille td.qte {
+  .feuille td.qte,
+  .feuille th.qte {
     text-align: center;
+    width: 84px;
+  }
+  .feuille td.qte {
     font-weight: 800;
     font-size: 16px;
-    width: 110px;
   }
   .feuille td.case {
     width: 34px;
@@ -1426,7 +1616,6 @@
      ni sous les boutons --- */
   .infos-offre > *,
   .offre .infos > *,
-  .preparer > *,
   .rang > *,
   .resume > *,
   .fenetre .tete > div,
@@ -1442,17 +1631,6 @@
   .feuille header > div:first-child {
     flex: 1 1 300px;
   }
-  /* Reste à préparer : la quantité reste collée au nom */
-  .preparer .prep {
-    display: inline-flex;
-    gap: 5px;
-    align-items: baseline;
-  }
-  .preparer .prep span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
   /* --- Écran étroit --- */
   @media (max-width: 900px) {
     .etape {
@@ -1503,6 +1681,9 @@
     .ligne .commande {
       grid-column: 1 / -1;
       grid-row: 2;
+    }
+    .art {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

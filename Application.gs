@@ -2,16 +2,21 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Application_() {
-  return "2026.10.15-1339";
+  return "2026.10.25-1128";
 }
 
 function doGet() {
   // Fichier manquant ou resté à l'ancienne version : on n'ouvre pas une application à moitié
   const problemes = problemesInstallation_();
   if (problemes.length) return pageInstallationIncomplete_(problemes);
-  // Nouveau classeur : onglets créés à la première ouverture (rien n'est écrasé)
+  // Nouveau classeur, ou nouvelle version qui ajoute des onglets / colonnes : installation
+  // complétée à l'ouverture (rien n'est écrasé)
   try {
-    if (feuillesManquantes_().length) avecVerrou_(installerFeuilles_);
+    const props = PropertiesService.getDocumentProperties();
+    if (props.getProperty("SCHEMA") !== SCHEMA || feuillesManquantes_().length) {
+      avecVerrou_(installerFeuilles_);
+      props.setProperty("SCHEMA", SCHEMA);
+    }
   } catch (e) {
     Logger.log("Création des onglets impossible : " + e);
   }

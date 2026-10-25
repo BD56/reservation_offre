@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-version="2026.10.15-1339">
+<html lang="fr" data-version="2026.10.25-1128">
   <head>
     <base target="_top">
     <?!= include_('Style') ?>
@@ -69,13 +69,18 @@
             <button type="button" class="sec" id="detailFeuille"><svg class="ico p"><use href="#i-imprimer"/></svg>Feuille de préparation</button>
             <button type="button" class="sec" id="detailModifier"><svg class="ico p"><use href="#i-crayon"/></svg>Modifier l'offre</button>
           </div>
+          <section class="carte-arrivages" id="blocArrivages" aria-labelledby="titreArrivages" hidden>
+            <div class="arrivages-tete"><h2 id="titreArrivages"><svg class="ico"><use href="#i-camion"/></svg>Arrivages</h2>
+              <p>Saisissez la quantité reçue : elle est répartie entre les clients, de la plus ancienne réservation à la plus récente.</p></div>
+            <div class="arrivages" id="arrivages"></div>
+            <p class="regle">Reçu = attribué aux clients + en stock. Chacun reçoit ce qui est disponible, même en partie ; les annulées ne reçoivent rien. « Répartir » sans quantité redistribue le stock.</p>
+          </section>
           <section class="liste-res" aria-label="Réservations de l'offre">
             <div class="liste-tete">
               <div class="recherche"><svg class="ico p"><use href="#i-recherche"/></svg>
                 <input id="recherche" type="search" placeholder="Rechercher un nom, un téléphone, un email…" aria-label="Rechercher une réservation"></div>
               <div class="filtres" id="filtres"></div>
             </div>
-            <div class="preparer" id="preparer"></div>
             <div class="lignes" id="lignes"></div>
             <div class="liste-pied">Clic sur une ligne : modifier ou supprimer la réservation.</div>
           </section>
@@ -87,7 +92,8 @@
         <div class="fenetre-form" role="dialog" aria-modal="true" aria-labelledby="ficheTitre">
           <div class="tiroir-tete"><h2 id="ficheTitre"></h2><button type="button" class="icone-btn" data-fermer="voileFiche" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
           <div class="tiroir-corps">
-            <div class="bloc"><h3>État</h3><div class="segment" id="ficheEtat"></div></div>
+            <div class="bloc"><h3>État</h3><div class="segment" id="ficheEtat"></div>
+              <p class="indice" id="ficheTerminee" hidden>Tout est remis : la réservation sera « Terminée ».</p></div>
             <div class="bloc"><h3>Client</h3><div class="deux">
               <div class="champ"><label for="fNom">Nom</label><input id="fNom" class="maj"></div>
               <div class="champ"><label for="fPrenom">Prénom</label><input id="fPrenom"></div>
@@ -179,8 +185,9 @@
           <div class="tiroir-tete"><h2 id="aideTitre">Aide</h2><button type="button" class="icone-btn" id="fermerAide" aria-label="Fermer l'aide"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
           <div class="tiroir-corps aide-corps">
             <p><b>Enregistrer une réservation :</b> choisissez l'offre, le client (téléphone ou email), les quantités avec + / −, puis Entrée. La réservation est confirmée tout de suite ; « en cours d'envoi » s'affiche en haut le temps que le Google Sheets l'enregistre.</p>
-            <p><b>Un client vient chercher sa commande :</b> Offres et réservations → l'offre → tapez son nom dans la recherche, puis « Retiré ». Une erreur ? « Annuler » dans le message qui apparaît.</p>
-            <p><b>Modifier ou supprimer une réservation :</b> cliquez sur la ligne du client (état, coordonnées, quantités).</p>
+            <p><b>Un arrivage :</b> Offres et réservations → l'offre → bloc « Arrivages » : tapez la quantité reçue d'un article, puis « Répartir ». Elle est attribuée aux clients, la plus ancienne réservation d'abord (même en partie) ; ce qui reste est « en stock ».</p>
+            <p><b>Un client vient chercher sa commande :</b> tapez son nom dans la recherche, puis « Retiré » : il emporte tout ce qui est arrivé pour lui (le reste suivra). Une erreur ? « Annuler » dans le message qui apparaît.</p>
+            <p><b>Modifier ou supprimer une réservation :</b> cliquez sur la ligne du client (état, coordonnées, quantités commandées, arrivées et remises). On ne peut donner à un client que ce qui est en stock ; ce qu'on lui retire retourne en stock.</p>
             <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
             <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer, triée par nom (les annulées ne comptent pas).</p>
             <p><b>Réservation NON enregistrée :</b> la connexion a été perdue ou le serveur a refusé. « Réessayer » ne crée jamais de double.</p>
