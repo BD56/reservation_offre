@@ -149,7 +149,30 @@
    confirmée) ; éditeur d'offre (articles en puces) ; feuille de préparation (total,
    liste à pointer triée par nom, annulées en option).
 4. ✅ Arrivages par article (voir ci-dessus).
-5. ✅ **Installateur par magasin** (« go » de Bryan, 26/10), comme l'app chèques mais
+5. ⏳ **Installateur par magasin — À REFAIRE (26/10)**. Bryan : « l'installateur n'est pas
+   du tout comme celui de chèque différé ». ERREUR DE MA PART : j'avais lu une copie locale
+   PÉRIMÉE de l'app chèques (14/10, ancien `INSTALLATION.md`). L'installateur réel (branche
+   `design`, 18-24/10) = **assistant dans le Google Sheets** : `preparerModele` pose un
+   onglet « Démarrer » + bouton vert → autorisations vérifiées case par case
+   (`exigerAutorisations_`, `oauthScopes` dans `appsscript.json`) → fenêtre
+   `FenetreAssistant.html` (Préparation, Votre magasin + renommage du Sheet, Mise en ligne
+   guidée en 7 étapes + adresse /exec, Tablettes, Fin qui retire « Démarrer ») + menu
+   🚀 APPLICATION → fenêtre « ⚙️ Gestion de l'application » ; `INSTALLATION.md` retiré là-bas
+   (l'appli = la documentation ; `avant-d-installer.md`, `DEPLOIEMENT.md`).
+   **Décisions de Bryan (26/10)** : maquette d'abord (« go pour la maquette ») ; **PAS de
+   reprise d'une ancienne installation** ; **ne pas tenir compte de Vannes** (`appsscript.json`
+   propre au projet, comme l'app chèques). Maquette `docs/maquettes/assistant-installation.html`
+   (artefact https://claude.ai/artifact/QmPPJSdHcPTwFNwFsrqM74, v1) : onglet Démarrer + bouton
+   vert, écrans Google simplifiés (case décochée ⇒ « Une autorisation manque »), assistant en
+   4 étapes (Préparation ; Votre magasin = nom + titre replié, Sheet renommé « Réservations des
+   offres — <magasin> » s'il s'appelle « Copie de … » ; Mise en ligne = 7 étapes, « Qui a
+   accès : Tout le monde », encadré « Encore une autorisation à redonner » ; **Le PC de
+   l'accueil** = lien + Copier + favoris, pas de QR ni de code) ; Fin ; fenêtre Gestion
+   (L'application : lien ; Installation : Vérifier, Ouvrir l'assistant, Règles d'accès).
+   EN ATTENTE de validation. Ensuite : coder, retirer `INSTALLATION.md`, garder `Reglages.gs`
+   et le bouton ⚙️ de l'appli (déjà poussés le 26/10, commit 64b3f8a).
+   Ancienne version de ce point (commit 64b3f8a), pour mémoire :
+   ✅ **Installateur par magasin** (« go » de Bryan, 26/10), comme l'app chèques mais
    SANS sécurité (« rien de sensible ») : guide **`INSTALLATION.md`** (modèle vierge,
    lien `/copy`, 🧰 Installer, déploiement, ⚙️ Réglages) ; **`Reglages.gs`** :
    `reglages_()` (défauts = Vannes : « l'Hypermarché Carrefour Vannes », « Application

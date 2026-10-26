@@ -1,0 +1,597 @@
+<title>Assistant d'installation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Maquette de l'assistant d'installation (repris de l'app chèques, sans sécurité) : copie du
+     modèle avec l'onglet « Démarrer », écrans de Google simplifiés, fenêtre en 4 étapes, puis
+     fenêtre « Gestion de l'application ». Style « Comptoir », clair uniquement (comme l'appli). */
+  :root {
+    --fond: #f5f3f0; --surface: #ffffff; --encre: #1c1917; --doux: #6f6863; --trait: #e5dfd8; --champ: #fbfaf8;
+    --accent: #0f766e; --accent-fonce: #0b5d57; --accent-doux: #e3f1ef;
+    --ok: #15803d; --ok-doux: #e7f4eb; --danger: #c81e1e; --danger-doux: #fcebea; --orange: #b45309; --orange-doux: #fdf1e2;
+    --demo: #2b2724; --demo-texte: #f2efeb; --voile: rgba(28, 25, 23, .5); --blanc: #ffffff;
+    --g-fond: #f9fbfd; --g-trait: #e1e3e1; --g-texte: #1f1f1f; --g-doux: #5f6368; --g-bleu: #0b57d0; --g-vert: #188038; --g-onglet: #e1e9f7;
+    --texte: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--fond); color: var(--encre); font-family: var(--texte); font-size: 15px; line-height: 1.45; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  h1, h2, h3 { text-wrap: balance; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* Bandeau de la maquette */
+  .demo { background: var(--demo); color: var(--demo-texte); padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; }
+  .demo .essai { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: var(--demo-texte); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; }
+  .demo .essai[aria-pressed="true"] { background: var(--demo-texte); color: var(--demo); }
+  .demo .lien { margin-left: auto; background: none; border: 0; color: var(--demo-texte); text-decoration: underline; text-underline-offset: 3px; padding: 4px; }
+
+  /* Faux Google Sheets */
+  .cadre { padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .sheets { max-width: 1060px; margin: 0 auto; background: var(--g-fond); border: 1px solid var(--g-trait); border-radius: 14px; overflow: hidden; color: var(--g-texte); box-shadow: 0 10px 40px rgba(28,25,23,.08); }
+  .g-tete { display: flex; gap: 12px; align-items: center; padding: 10px 14px 4px; }
+  .g-logo { width: 26px; height: 34px; border-radius: 3px; background: var(--g-vert); display: grid; place-items: center; flex: none; }
+  .g-logo i { width: 14px; height: 12px; border: 2px solid #fff; display: block; border-radius: 1px; }
+  .g-nom { font-size: 17px; min-width: 0; overflow-wrap: anywhere; }
+  .g-nom.change { animation: surligne 2.4s ease-out; }
+  @keyframes surligne { from { background: #fef7c3; } to { background: transparent; } }
+  .g-menus { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 10px 8px 52px; font-size: 13.5px; color: var(--g-texte); position: relative; }
+  .g-menus span, .g-menus button { padding: 3px 7px; border-radius: 4px; border: 0; background: none; }
+  .g-menus button.appli { font-weight: 600; }
+  .g-menus button.appli:hover, .g-menus button.appli[aria-expanded="true"] { background: var(--g-onglet); }
+  .g-deroulant { position: absolute; top: 28px; z-index: 3; background: #fff; border: 1px solid var(--g-trait); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.15); padding: 6px 0; min-width: 260px; }
+  .g-deroulant button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 16px; font-size: 14px; }
+  .g-deroulant button:hover { background: var(--g-onglet); }
+  .g-barre { height: 34px; border-top: 1px solid var(--g-trait); border-bottom: 1px solid var(--g-trait); background: #fff; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12px; color: var(--g-doux); }
+  .g-barre b { font-family: var(--mono); font-weight: 400; color: var(--g-texte); border-right: 1px solid var(--g-trait); padding-right: 10px; }
+  .g-grille { background: #fff; min-height: 460px; overflow: auto; }
+  .g-onglets { display: flex; gap: 2px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--g-trait); background: var(--g-fond); overflow-x: auto; font-size: 13px; }
+  .g-onglets span { padding: 6px 14px; border-radius: 6px 6px 0 0; color: var(--g-doux); white-space: nowrap; }
+  .g-onglets span.actif { background: var(--g-onglet); color: var(--g-bleu); font-weight: 600; }
+
+  /* Onglet « Démarrer » (tel que preparerModele le pose) */
+  .demarrer { padding: 26px 48px 40px; display: grid; gap: 14px; max-width: 700px; }
+  .demarrer h2 { margin: 0; font-size: 22px; }
+  .demarrer p { margin: 0; font-size: 14px; line-height: 1.5; }
+  .bouton-vert { width: 320px; max-width: 100%; height: 64px; border-radius: 12px; border: 0; background: #15803d; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; font-size: 20px; margin: 8px 0; }
+  .bouton-vert:hover { filter: brightness(1.06); }
+  .demarrer .petit { font-size: 12.5px; color: var(--g-doux); }
+
+  /* Onglet de données (après installation) */
+  .tableau-g { border-collapse: collapse; font-size: 12.5px; min-width: 640px; }
+  .tableau-g th, .tableau-g td { border: 1px solid var(--g-trait); padding: 4px 8px; text-align: left; height: 24px; }
+  .tableau-g th { background: var(--g-fond); color: var(--g-doux); font-weight: 400; width: 40px; text-align: center; }
+  .tableau-g td.entete { font-weight: 700; }
+
+  /* Écrans de Google (simplifiés) */
+  .voile { position: fixed; inset: 0; background: var(--voile); z-index: 5; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .google { width: 100%; max-width: 440px; background: #fff; border-radius: 10px; padding: 26px 26px 20px; color: var(--g-texte); display: grid; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .google .g-marque { font-size: 13px; color: var(--g-doux); }
+  .google h3 { margin: 0; font-size: 21px; font-weight: 500; }
+  .google p { margin: 0; font-size: 14px; color: var(--g-doux); }
+  .google .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .google .g-btn { border: 0; background: none; color: var(--g-bleu); font-weight: 600; padding: 8px 14px; border-radius: 20px; }
+  .google .g-btn.plein { background: var(--g-bleu); color: #fff; }
+  .google .g-lien { border: 0; background: none; color: var(--g-bleu); padding: 0; text-decoration: underline; font-size: 14px; text-align: left; }
+  .google .avert { border-left: 3px solid #e37400; padding-left: 10px; }
+  .google label { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--g-trait); }
+  .google label input { margin-top: 3px; }
+  .note-maquette { font-size: 12px; color: var(--g-doux); background: var(--g-fond); border-radius: 6px; padding: 6px 9px; }
+
+  /* Fenêtre de dialogue du Google Sheets (660 × 720 dans la vraie) */
+  .dialogue { width: 100%; max-width: 660px; max-height: 100%; background: #fff; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
+  .dialogue-tete { display: flex; align-items: center; gap: 10px; padding: 14px 20px 8px; color: var(--g-texte); font-size: 16px; }
+  .dialogue-tete b { flex: 1; font-weight: 500; }
+  .dialogue-tete button { border: 0; background: none; width: 32px; height: 32px; border-radius: 50%; font-size: 20px; color: var(--g-doux); }
+  .dialogue-corps { overflow: auto; min-height: 0; }
+
+  /* Assistant (comme FenetreAssistant.html de l'app chèques) */
+  .etapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; list-style: none; margin: 0; padding: 6px 20px 14px; }
+  .etapes li { display: grid; gap: 6px; font-size: 12.5px; color: var(--doux); min-width: 0; }
+  .etapes li::before { content: ""; height: 4px; border-radius: 4px; background: var(--trait); }
+  .etapes li.fait { color: var(--ok); } .etapes li.fait::before { background: var(--ok); }
+  .etapes li.encours { color: var(--encre); font-weight: 600; } .etapes li.encours::before { background: var(--accent); }
+  .corps { padding: 4px 20px 8px; display: grid; gap: 14px; }
+  .corps h1 { margin: 0; font-size: 20px; }
+  .corps p { margin: 0; }
+  .doux { color: var(--doux); font-size: 13.5px; }
+  .pied { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; padding: 14px 20px 18px; border-top: 1px solid var(--trait); margin-top: 8px; }
+  .btn { border-radius: 10px; padding: 11px 18px; font-weight: 600; border: 1px solid var(--trait); background: var(--surface); text-decoration: none; color: var(--encre); display: inline-block; }
+  .btn.principal { background: var(--accent); border-color: var(--accent); color: var(--blanc); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .info { border-radius: 10px; padding: 12px 14px; background: var(--accent-doux); }
+  .info.ok { background: var(--ok-doux); } .info.ok b { color: var(--ok); }
+  .info.erreur { background: var(--danger-doux); } .info.erreur b { color: var(--danger); }
+  .info.conseil, .info.attente { background: var(--orange-doux); }
+  .info.attente { display: flex; gap: 10px; align-items: center; }
+  .rangee-boutons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .roue { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--orange); border-right-color: transparent; animation: tourner .9s linear infinite; flex: none; }
+  @keyframes tourner { to { transform: rotate(360deg); } }
+  .rapport { white-space: pre-wrap; font-size: 13px; background: var(--fond); border-radius: 8px; padding: 10px 12px; margin: 8px 0 0; }
+  .champ { display: grid; gap: 4px; }
+  .champ label { font-size: 13px; font-weight: 600; }
+  .champ input { border: 1px solid var(--trait); border-radius: 8px; padding: 10px 12px; background: var(--fond); width: 100%; min-width: 0; }
+  .champ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-doux); }
+  .message { font-size: 13.5px; color: var(--danger); min-height: 0; }
+  .message:empty { display: none; }
+  .clics { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: clic; }
+  .clics li { counter-increment: clic; display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 6px 10px; border: 1px solid var(--trait); border-radius: 10px; }
+  .clics li::before { content: counter(clic); width: 24px; height: 24px; border-radius: 50%; background: var(--accent-doux); color: var(--accent-fonce); display: grid; place-items: center; font-weight: 700; font-size: 12.5px; }
+  .mini { font-size: 12px; border-radius: 6px; padding: 3px 8px; white-space: nowrap; border: 1px solid var(--trait); color: var(--doux); }
+  .mini.bleu { background: var(--g-bleu); border-color: var(--g-bleu); color: #fff; }
+  .lien-app { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .lien-app code { font-family: var(--mono); font-size: 12px; background: var(--fond); border: 1px solid var(--trait); border-radius: 8px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; }
+  .lien-app input { flex: 1; }
+  details summary { cursor: pointer; color: var(--accent-fonce); font-weight: 600; font-size: 13.5px; }
+  .apercu { font-size: 13px; color: var(--doux); overflow-wrap: anywhere; }
+  .fin { text-align: center; display: grid; gap: 10px; justify-items: center; padding: 16px 0 6px; }
+  .rond { width: 64px; height: 64px; border-radius: 50%; background: var(--ok-doux); color: var(--ok); display: grid; place-items: center; font-size: 34px; }
+  .adresse-ok { overflow-wrap: anywhere; }
+  .essai-lien { border: 0; background: none; color: var(--accent-fonce); text-decoration: underline; padding: 0; font-size: 13px; justify-self: start; }
+
+  /* Fenêtre « Gestion de l'application » */
+  .gestion { display: grid; grid-template-columns: 180px 1fr; min-height: 420px; }
+  .gestion nav { background: var(--fond); padding: 12px 8px; display: grid; align-content: start; gap: 4px; border-right: 1px solid var(--trait); }
+  .gestion nav button { border: 0; background: none; text-align: left; padding: 9px 12px; border-radius: 8px; font-weight: 600; color: var(--doux); }
+  .gestion nav button[aria-current="page"] { background: var(--surface); color: var(--encre); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .rubrique { padding: 14px 20px 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+  .rubrique h1 { margin: 0; font-size: 20px; }
+  .rubrique section { border: 1px solid var(--trait); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+  .rubrique h2 { margin: 0; font-size: 15px; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--encre); color: var(--blanc); padding: 11px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; z-index: 9; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+
+  @media (max-width: 640px) {
+    .demarrer { padding: 20px 18px 30px; }
+    .g-menus { padding-left: 10px; }
+    .etapes li { font-size: 11px; }
+    .gestion { grid-template-columns: 1fr; }
+    .gestion nav { grid-auto-flow: column; border-right: 0; border-bottom: 1px solid var(--trait); }
+    .clics li { grid-template-columns: 26px 1fr; }
+    .clics li .mini { grid-column: 2; justify-self: start; }
+  }
+</style>
+
+<div class="demo" role="note">
+  <span><b>Maquette</b> · données fictives. Vous êtes le manager d'un nouveau magasin : vous venez de copier le modèle.</span>
+  <button class="essai" id="essaiCase" aria-pressed="false">Essai : Google retire une autorisation au déploiement</button>
+  <button class="lien" id="reinit">Recommencer</button>
+</div>
+
+<main class="cadre">
+  <div class="sheets" aria-label="Google Sheets (imitation)">
+    <div class="g-tete"><div class="g-logo" aria-hidden="true"><i></i></div><div class="g-nom" id="nomSheet"></div></div>
+    <div class="g-menus">
+      <span>Fichier</span><span>Édition</span><span>Affichage</span><span>Insertion</span><span>Format</span><span>Données</span><span>Outils</span><span>Extensions</span><span>Aide</span>
+      <button class="appli" id="menuAppli" aria-expanded="false">🚀 APPLICATION</button>
+      <div class="g-deroulant" id="deroulant" hidden><button id="ouvrirGestion">⚙️ Gestion de l'application</button></div>
+    </div>
+    <div class="g-barre"><b id="cellule">A1</b><span>fx</span></div>
+    <div class="g-grille" id="grille"></div>
+    <div class="g-onglets" id="onglets"></div>
+  </div>
+</main>
+
+<!-- Écrans de Google (simplifiés) -->
+<div class="voile" id="voileGoogle" hidden>
+  <div class="google" role="dialog" aria-modal="true" aria-labelledby="gTitre" id="google"></div>
+</div>
+
+<!-- Fenêtre de l'assistant -->
+<div class="voile" id="voileAssistant" hidden>
+  <div class="dialogue" role="dialog" aria-modal="true" aria-labelledby="dlgTitre">
+    <div class="dialogue-tete"><b id="dlgTitre">▶ Installation de l'application</b><button id="fermerAssistant" aria-label="Fermer">×</button></div>
+    <div class="dialogue-corps">
+      <ol class="etapes" id="etapes"></ol>
+
+      <!-- 1. Préparation -->
+      <section class="ecran" data-ecran="0" hidden>
+        <div class="corps">
+          <h1>Préparation</h1>
+          <div class="info attente" id="prepAttente"><span class="roue" aria-hidden="true"></span><span>Vérification et préparation du Google Sheets…</span></div>
+          <div class="info erreur" id="autoPrep" hidden>
+            <b>Une autorisation manque</b> (une case n'a pas été cochée). Cliquez sur « Autoriser de nouveau », cochez <b>toutes</b> les cases, puis revenez ici et cliquez sur « C'est fait, vérifier ».
+            <div class="rangee-boutons"><button class="btn principal" id="autoriserPrep">Autoriser de nouveau</button><button class="btn" id="verifierPrep">C'est fait, vérifier</button></div>
+          </div>
+          <div id="prepResultat" hidden style="display: grid; gap: 10px">
+            <div class="info ok"><b>✓ Autorisations accordées.</b> L'application vous reconnaît comme propriétaire de ce Google Sheets.</div>
+            <div class="info ok"><b>✓ Google Sheets prêt</b> : onglets Operations, Reservations, Articles et Arrivages en place (version 2026.10.26-1800).</div>
+            <div class="info conseil"><b>Compte Google utilisé : accueil.magasin@gmail.com.</b> Les réservations sont enregistrées dans ce compte. Conseillé : un compte <b>du magasin</b> (celui de l'accueil, par exemple), qui reste quand les personnes changent.</div>
+            <details><summary>Voir le compte rendu</summary>
+              <p class="rapport">Copie d'un autre classeur : réglages hérités effacés (données intactes).
+Version 2026.10.26-1800.</p></details>
+          </div>
+        </div>
+        <div class="pied"><button class="btn principal" id="suite0" disabled>Continuer</button></div>
+      </section>
+
+      <!-- 2. Votre magasin -->
+      <section class="ecran" data-ecran="1" hidden>
+        <div class="corps">
+          <h1>Votre magasin</h1>
+          <div class="champ">
+            <label for="nomMagasin">Nom du magasin, avec l'article</label>
+            <input id="nomMagasin" maxlength="80" autocomplete="off" placeholder="l'Hypermarché …">
+            <p class="apercu" id="apercuMentions">Lu dans les mentions de l'application : « L'auteur concède à l'Hypermarché … ».</p>
+          </div>
+          <details>
+            <summary>Autres réglages (déjà remplis : à changer seulement si besoin)</summary>
+            <div class="champ" style="margin-top: 12px">
+              <label for="titreOnglet">Titre de l'onglet du navigateur</label>
+              <input id="titreOnglet" maxlength="80">
+            </div>
+          </details>
+          <p class="doux">Tout se modifie ensuite dans l'application (bouton ⚙️ Réglages, en haut à droite).</p>
+          <p class="message" id="msgMagasin" role="status"></p>
+        </div>
+        <div class="pied"><button class="btn" data-retour>Retour</button><button class="btn principal" id="suite1">Enregistrer et continuer</button></div>
+      </section>
+
+      <!-- 3. Mise en ligne -->
+      <section class="ecran" data-ecran="2" hidden>
+        <div class="corps">
+          <h1>Mettre l'application en ligne</h1>
+          <div id="enLigneGuide" style="display: grid; gap: 12px">
+            <p>Google demande de faire cette étape vous-même. Le bouton « Ouvrir la page de mise en ligne » ouvre la bonne page ; suivez ces 7 étapes, puis revenez ici. Les étapes 3 à 5 sont déjà remplies : vérifiez-les seulement.</p>
+            <ol class="clics">
+              <li><span>En haut à droite</span><span class="mini bleu">Déployer ▾</span></li>
+              <li><span>Dans le menu</span><span class="mini">Nouveau déploiement</span></li>
+              <li><span>Type (sinon : roue dentée ⚙️)</span><span class="mini">Application Web</span></li>
+              <li><span>Exécuter en tant que (déjà rempli)</span><span class="mini">Moi</span></li>
+              <li><span>Qui a accès (déjà rempli)</span><span class="mini">Tout le monde</span></li>
+              <li><span>En bas à droite</span><span class="mini bleu">Déployer</span></li>
+              <li><span>Sous « URL de l'application Web »</span><span class="mini">Copier</span></li>
+            </ol>
+            <p class="doux">Au moment de déployer, Google redemande les autorisations (« Autoriser l'accès », parfois en anglais) : faites comme au premier clic et cochez <b>toutes</b> les cases. Ne choisissez pas « Utilisateur accédant à l'application Web » : chaque PC de l'accueil aurait besoin d'un compte Google.</p>
+            <div class="champ">
+              <label for="adresseCollee">Collez ici l'adresse copiée (elle finit par /exec)</label>
+              <div class="lien-app"><input id="adresseCollee" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn" id="validerAdresse">Valider</button></div>
+              <button class="essai-lien" id="exempleAdresse">Maquette : coller une adresse d'exemple</button>
+              <p class="message" id="msgAdresse" role="status"></p>
+            </div>
+          </div>
+          <div class="info" id="autoEnLigne" hidden>
+            <b>Encore une autorisation à redonner</b> : c'est normal après le déploiement, Google en retire une (souvent l'adresse e-mail). Cliquez sur « Autoriser de nouveau », cochez <b>toutes</b> les cases, puis revenez ici et cliquez sur « C'est fait, vérifier ».
+            <div class="rangee-boutons"><button class="btn principal" id="autoriserEnLigne">Autoriser de nouveau</button><button class="btn" id="verifierEnLigne">C'est fait, vérifier</button></div>
+          </div>
+          <div class="info ok" id="enLigneOk" hidden>
+            <b>✓ Adresse de l'application enregistrée :</b> <span class="adresse-ok" id="enLigneAdresse"></span>
+            <div class="rangee-boutons"><button class="btn" id="changerAdresse">Changer l'adresse</button></div>
+          </div>
+        </div>
+        <div class="pied"><button class="btn" data-retour>Retour</button><button class="btn" id="pageMiseEnLigne">Ouvrir la page de mise en ligne</button><button class="btn principal" id="suite2" disabled>Continuer</button></div>
+      </section>
+
+      <!-- 4. Le PC de l'accueil -->
+      <section class="ecran" data-ecran="3" hidden>
+        <div class="corps">
+          <h1>Ouvrir l'application sur le PC de l'accueil</h1>
+          <p>Sur <b>chaque PC de l'accueil</b>, ouvrez ce lien (envoyez-le par e-mail si besoin), puis ajoutez-le aux <b>favoris</b> du navigateur (Ctrl + D) :</p>
+          <div class="lien-app"><code id="lienPc"></code><button class="btn" id="copierPc">Copier</button></div>
+          <div class="rangee-boutons" style="margin-top: 0"><button class="btn" id="ouvrirPc">Ouvrir l'application ici</button></div>
+          <div class="info conseil"><b>Ne donnez à l'accueil que ce lien</b>, jamais celui du Google Sheets. L'application n'a pas de code : toute personne qui a ce lien peut voir et modifier les réservations.</div>
+          <details><summary>Le PC demande de se connecter à Google ?</summary>
+            <p class="doux" style="margin-top: 8px">« Qui a accès » n'est pas sur « Tout le monde ». Dans Apps Script : Déployer → Gérer les déploiements → crayon ✏️ → Qui a accès : Tout le monde → Déployer. L'adresse ne change pas.</p></details>
+        </div>
+        <div class="pied"><button class="btn" data-retour>Retour</button><button class="btn principal" id="suite3">Terminer</button></div>
+      </section>
+
+      <!-- Fin -->
+      <section class="ecran" data-ecran="4" hidden>
+        <div class="corps">
+          <div class="fin">
+            <div class="rond" aria-hidden="true">✓</div>
+            <h1>L'application est installée</h1>
+            <p>L'onglet « Démarrer » va disparaître. Pour retrouver le lien de l'application : menu 🚀 APPLICATION → ⚙️ Gestion de l'application.</p>
+            <p class="doux">Il reste à créer la première offre dans l'application : Offres et réservations → Nouvelle offre.</p>
+            <p class="doux" id="finNomSheet"></p>
+          </div>
+        </div>
+        <div class="pied"><button class="btn" data-retour>Retour</button><button class="btn principal" id="finFermer">Fermer</button></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- Fenêtre « Gestion de l'application » -->
+<div class="voile" id="voileGestion" hidden>
+  <div class="dialogue" role="dialog" aria-modal="true" aria-labelledby="gesTitre" style="max-width: 760px">
+    <div class="dialogue-tete"><b id="gesTitre">⚙️ Gestion de l'application</b><button id="fermerGestion" aria-label="Fermer">×</button></div>
+    <div class="dialogue-corps">
+      <div class="gestion">
+        <nav aria-label="Rubriques">
+          <button data-rub="appli" aria-current="page">L'application</button>
+          <button data-rub="installation">Installation</button>
+        </nav>
+        <div>
+          <div class="rubrique" data-rubrique="appli">
+            <h1>L'application</h1>
+            <div class="info erreur" id="gesPasEnLigne"><b>L'application n'est pas encore en ligne.</b> Rubrique Installation → Ouvrir l'assistant.</div>
+            <section id="gesEnLigne" hidden>
+              <h2>Lien à ouvrir sur les PC de l'accueil</h2>
+              <div class="lien-app"><code id="gesLien"></code><button class="btn" id="gesCopier">Copier</button></div>
+              <p class="doux">À mettre en favori sur chaque PC. Le magasin réglé : <b id="gesMagasin"></b> (modifiable dans l'application, bouton ⚙️).</p>
+            </section>
+          </div>
+          <div class="rubrique" data-rubrique="installation" hidden>
+            <h1>Installation</h1>
+            <section>
+              <h2>Vérifier l'installation</h2>
+              <p class="doux">Crée ce qui manque (onglets, colonnes) et contrôle que tous les fichiers du code sont à la même version. Rien n'est jamais effacé.</p>
+              <div><button class="btn" id="gesVerifier">Vérifier</button></div>
+              <p class="rapport" id="gesRapport" hidden></p>
+            </section>
+            <section>
+              <h2>Assistant d'installation</h2>
+              <p class="doux">Pour refaire la mise en ligne ou changer l'adresse de l'application.</p>
+              <div><button class="btn" id="gesAssistant">Ouvrir l'assistant</button></div>
+            </section>
+            <section>
+              <h2>Règles d'accès</h2>
+              <p class="doux">L'accueil ne reçoit que le <b>lien de l'application</b>, jamais celui de ce Google Sheets. L'application n'a pas de code : toute personne qui a son lien peut voir et modifier les réservations.</p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const NOM_COPIE = "Copie de MODÈLE — Réservations des offres (ne pas utiliser)";
+  const ADRESSE_EXEMPLE = "https://script.google.com/macros/s/AKfycbx7Kq2-Exemple-Magasin/exec";
+  const RE_ADRESSE = /^https:\/\/script\.google\.com\/(a\/macros\/[^/\s]+\/s|macros\/s)\/[\w-]+\/exec$/;
+  const ETAPES = ["Préparation", "Votre magasin", "Mise en ligne", "Le PC de l'accueil"];
+
+  let S;
+  function depart() {
+    S = { nomSheet: NOM_COPIE, installe: false, ecran: 0, caseOubliee: false, magasin: "", titre: "Application de Réservations", adresse: "", autoRetiree: false };
+  }
+
+  // ---------- Faux Google Sheets ----------
+  function dessinerSheet() {
+    $("nomSheet").textContent = S.nomSheet;
+    const onglets = S.installe ? ["Operations", "Reservations", "Articles", "Arrivages"] : ["Démarrer", "Operations", "Reservations", "Articles", "Arrivages"];
+    $("onglets").innerHTML = "<span aria-hidden=\"true\">＋ ☰</span>" + onglets.map((o, i) => `<span class="${i === 0 ? "actif" : ""}">${o}</span>`).join("");
+    if (!S.installe) {
+      $("cellule").textContent = "B5";
+      $("grille").innerHTML = `<div class="demarrer">
+        <h2>Bienvenue</h2>
+        <p>Cette copie est la vôtre. Pour mettre l'application en service, cliquez sur le bouton vert et laissez-vous guider (environ 10 minutes).</p>
+        <button class="bouton-vert" id="boutonVert"><svg width="18" height="20" viewBox="0 0 18 20" aria-hidden="true"><path d="M2 1.5v17l14.5-8.5z" fill="#fff"/></svg>Installer l'application</button>
+        <p><b>Au premier clic, Google demande votre autorisation.</b></p>
+        <p>Il affiche « Google n'a pas validé cette application » : c'est normal. Cliquez sur « Paramètres avancés », puis sur « Accéder… », et cochez « Tout sélectionner ».</p>
+        <p>Si rien ne s'ouvre ensuite, cliquez une seconde fois sur le bouton vert. Google vous enverra un e-mail « Alerte de sécurité » : c'est normal.</p>
+        <p class="petit">Le même assistant se trouve dans le menu 🚀 APPLICATION → ⚙️ Gestion de l'application → Installation.</p>
+      </div>`;
+      $("boutonVert").addEventListener("click", clicBoutonVert);
+    } else {
+      $("cellule").textContent = "A1";
+      const entetes = ["ID", "Nom", "Type", "Date_Debut", "Date_Fin", "Mode_Saisie", "Articles_Predefinis"];
+      let lignes = `<tr><th></th>${"ABCDEFG".split("").map((l) => `<th>${l}</th>`).join("")}</tr>`;
+      lignes += `<tr><th>1</th>${entetes.map((e) => `<td class="entete">${e}</td>`).join("")}</tr>`;
+      for (let i = 2; i <= 14; i++) lignes += `<tr><th>${i}</th>${"<td></td>".repeat(7)}</tr>`;
+      $("grille").innerHTML = `<table class="tableau-g">${lignes}</table>`;
+    }
+  }
+
+  // Menu 🚀 APPLICATION : un seul article
+  $("menuAppli").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const ouvert = $("deroulant").hidden;
+    $("deroulant").hidden = !ouvert;
+    $("menuAppli").setAttribute("aria-expanded", String(ouvert));
+  });
+  document.addEventListener("click", () => { $("deroulant").hidden = true; $("menuAppli").setAttribute("aria-expanded", "false"); });
+  $("ouvrirGestion").addEventListener("click", () => ouvrirGestion("appli"));
+
+  // ---------- Écrans de Google (simplifiés) ----------
+  let autorise = false;
+  function clicBoutonVert() {
+    if (autorise) return ouvrirAssistant();
+    googleEcran(1);
+  }
+  function googleEcran(n) {
+    const g = $("google");
+    const marque = `<div class="g-marque">Google</div>`;
+    const note = `<p class="note-maquette">Maquette : écran de Google simplifié (le vrai est plus long).</p>`;
+    if (n === 1) {
+      g.innerHTML = `${marque}<h3 id="gTitre">Autorisation requise</h3><p>Un script associé à ce document a besoin de votre autorisation pour s'exécuter.</p>${note}
+        <div class="actions"><button class="g-btn" data-g="annuler">Annuler</button><button class="g-btn plein" data-g="2">Continuer</button></div>`;
+    } else if (n === 2) {
+      g.innerHTML = `${marque}<h3 id="gTitre">Google n'a pas validé cette application</h3><p class="avert">L'application demande l'accès à des informations sensibles de votre compte Google.</p>
+        <button class="g-lien" data-g="2b">Paramètres avancés</button><div id="gAvance" hidden><p>Ne continuez que si vous connaissez le développeur.</p><button class="g-lien" data-g="3">Accéder à Réservations des offres (non sécurisé)</button></div>
+        <div class="actions"><button class="g-btn plein" data-g="annuler">Retour à la sécurité</button></div>`;
+    } else {
+      g.innerHTML = `${marque}<h3 id="gTitre">Réservations des offres souhaite accéder à votre compte Google</h3>
+        <label><input type="checkbox" id="gTout" checked> <b>Tout sélectionner</b></label>
+        <label><input type="checkbox" class="gCase" checked> Afficher, modifier, créer et supprimer les feuilles de calcul associées à cette application</label>
+        <label><input type="checkbox" class="gCase" checked> Afficher votre adresse e-mail principale</label>
+        <label><input type="checkbox" class="gCase" checked> Afficher et gérer les fenêtres de l'application dans Google Sheets</label>
+        <p class="note-maquette">Essai : décochez une case pour voir ce que fait l'assistant.</p>
+        <div class="actions"><button class="g-btn" data-g="annuler">Annuler</button><button class="g-btn plein" data-g="fin">Continuer</button></div>`;
+      const cases = g.querySelectorAll(".gCase");
+      $("gTout").addEventListener("change", () => cases.forEach((c) => (c.checked = $("gTout").checked)));
+      cases.forEach((c) => c.addEventListener("change", () => ($("gTout").checked = [...cases].every((x) => x.checked))));
+    }
+    g.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => {
+      const v = b.dataset.g;
+      if (v === "annuler") { $("voileGoogle").hidden = true; return; }
+      if (v === "2b") { $("gAvance").hidden = false; return; }
+      if (v === "fin") {
+        S.caseOubliee = ![...g.querySelectorAll(".gCase")].every((c) => c.checked);
+        $("voileGoogle").hidden = true;
+        autorise = true;
+        toast(S.caseOubliee ? "Autorisation donnée, mais une case n'est pas cochée" : "Autorisation donnée");
+        // Comme dans la vraie : après l'autorisation, Google relance le script (ou il faut recliquer)
+        setTimeout(ouvrirAssistant, 700);
+        return;
+      }
+      googleEcran(+v);
+    }));
+    $("voileGoogle").hidden = false;
+  }
+
+  // ---------- Assistant ----------
+  function ouvrirAssistant() {
+    $("voileAssistant").hidden = false;
+    aller(S.ecran);
+  }
+  function aller(n) {
+    S.ecran = n;
+    document.querySelectorAll(".ecran").forEach((s) => (s.hidden = +s.dataset.ecran !== n));
+    $("etapes").hidden = n === 4;
+    $("etapes").innerHTML = ETAPES.map((t, i) => `<li class="${i < n ? "fait" : i === n ? "encours" : ""}">${t}</li>`).join("");
+    if (n === 0) preparation();
+    if (n === 1) { $("nomMagasin").value = S.magasin; $("titreOnglet").value = S.titre; apercu(); setTimeout(() => $("nomMagasin").focus(), 50); }
+    if (n === 2) dessinerEnLigne();
+    if (n === 3) $("lienPc").textContent = S.adresse;
+    if (n === 4) $("finNomSheet").textContent = S.renomme ? `Ce Google Sheets s'appelle maintenant « ${S.nomSheet} ».` : "";
+  }
+  document.querySelectorAll("[data-retour]").forEach((b) => b.addEventListener("click", () => aller(Math.max(0, S.ecran - 1))));
+  $("fermerAssistant").addEventListener("click", () => ($("voileAssistant").hidden = true));
+
+  // 1. Préparation : vérifie les autorisations, puis « Installer »
+  function preparation() {
+    $("suite0").disabled = true;
+    $("prepResultat").hidden = true;
+    $("autoPrep").hidden = true;
+    $("prepAttente").hidden = false;
+    setTimeout(() => {
+      $("prepAttente").hidden = true;
+      if (S.caseOubliee) { $("autoPrep").hidden = false; return; }
+      $("prepResultat").hidden = false;
+      $("suite0").disabled = false;
+    }, 1100);
+  }
+  $("autoriserPrep").addEventListener("click", () => { S.caseOubliee = false; toast("Maquette : Google redemande la case dans un nouvel onglet ; toutes les cases sont cochées"); });
+  $("verifierPrep").addEventListener("click", preparation);
+  $("suite0").addEventListener("click", () => aller(1));
+
+  // 2. Votre magasin
+  function apercu() {
+    const nom = $("nomMagasin").value.trim();
+    $("apercuMentions").textContent = `Lu dans les mentions de l'application : « L'auteur concède à ${nom || "l'Hypermarché …"} ».`;
+  }
+  $("nomMagasin").addEventListener("input", () => { apercu(); $("msgMagasin").textContent = ""; });
+  [$("nomMagasin"), $("titreOnglet")].forEach((c) => c.addEventListener("keydown", (e) => { if (e.key === "Enter") $("suite1").click(); }));
+  $("suite1").addEventListener("click", () => {
+    const nom = $("nomMagasin").value.trim().replace(/\s+/g, " ");
+    const titre = $("titreOnglet").value.trim();
+    if (!nom) { $("msgMagasin").textContent = "Écrivez le nom du magasin."; $("nomMagasin").focus(); return; }
+    if (!titre) { $("msgMagasin").textContent = "« Titre de l'onglet du navigateur » ne peut pas être vide."; return; }
+    S.magasin = nom; S.titre = titre;
+    // La copie porte encore le nom donné par Google : renommée d'après le magasin
+    if (/^(Copie de|Copy of) /.test(S.nomSheet)) {
+      S.nomSheet = "Réservations des offres — " + nom;
+      S.renomme = true;
+      dessinerSheet();
+      $("nomSheet").classList.remove("change"); void $("nomSheet").offsetWidth; $("nomSheet").classList.add("change");
+    }
+    aller(2);
+  });
+
+  // 3. Mise en ligne
+  function dessinerEnLigne() {
+    const ok = !!S.adresse && !S.autoRetiree;
+    $("enLigneGuide").hidden = !!S.adresse;
+    $("autoEnLigne").hidden = !S.autoRetiree;
+    $("enLigneOk").hidden = !ok;
+    $("enLigneAdresse").textContent = S.adresse;
+    $("suite2").disabled = !ok;
+    $("msgAdresse").textContent = "";
+  }
+  $("exempleAdresse").addEventListener("click", () => { $("adresseCollee").value = ADRESSE_EXEMPLE; $("adresseCollee").focus(); });
+  $("adresseCollee").addEventListener("keydown", (e) => { if (e.key === "Enter") $("validerAdresse").click(); });
+  $("validerAdresse").addEventListener("click", () => {
+    const url = $("adresseCollee").value.trim();
+    if (!RE_ADRESSE.test(url)) { $("msgAdresse").textContent = "Ce n'est pas l'adresse de l'application : elle commence par https://script.google.com/ et finit par /exec."; return; }
+    S.adresse = url;
+    S.autoRetiree = $("essaiCase").getAttribute("aria-pressed") === "true";
+    dessinerEnLigne();
+  });
+  $("autoriserEnLigne").addEventListener("click", () => toast("Maquette : Google redemande la case dans un nouvel onglet"));
+  $("verifierEnLigne").addEventListener("click", () => { S.autoRetiree = false; dessinerEnLigne(); });
+  $("changerAdresse").addEventListener("click", () => { S.adresse = ""; $("adresseCollee").value = ""; dessinerEnLigne(); });
+  $("pageMiseEnLigne").addEventListener("click", () => toast("Dans la vraie installation : l'éditeur Apps Script s'ouvre dans un nouvel onglet"));
+  $("suite2").addEventListener("click", () => aller(3));
+
+  // 4. Le PC de l'accueil
+  function copier(texte, bouton) {
+    const fini = () => { bouton.textContent = "Copié ✓"; setTimeout(() => (bouton.textContent = "Copier"), 1800); };
+    try { navigator.clipboard.writeText(texte).then(fini, fini); } catch (e) { fini(); }
+  }
+  $("copierPc").addEventListener("click", () => copier(S.adresse, $("copierPc")));
+  $("ouvrirPc").addEventListener("click", () => toast("Dans la vraie installation : l'application s'ouvre dans un nouvel onglet"));
+  $("suite3").addEventListener("click", () => aller(4));
+
+  // Fin : l'onglet « Démarrer » disparaît
+  $("finFermer").addEventListener("click", () => {
+    $("voileAssistant").hidden = true;
+    S.installe = true;
+    dessinerSheet();
+    toast("Onglet « Démarrer » retiré : l'installation est terminée");
+  });
+
+  // ---------- Fenêtre « Gestion de l'application » ----------
+  function ouvrirGestion(rub) {
+    $("gesPasEnLigne").hidden = !!S.adresse && S.installe;
+    $("gesEnLigne").hidden = !(S.adresse && S.installe);
+    $("gesLien").textContent = S.adresse;
+    $("gesMagasin").textContent = S.magasin || "—";
+    $("gesRapport").hidden = true;
+    rubrique(rub);
+    $("voileGestion").hidden = false;
+  }
+  function rubrique(nom) {
+    document.querySelectorAll("[data-rub]").forEach((b) => b.setAttribute("aria-current", b.dataset.rub === nom ? "page" : "false"));
+    document.querySelectorAll("[data-rubrique]").forEach((r) => (r.hidden = r.dataset.rubrique !== nom));
+  }
+  document.querySelectorAll("[data-rub]").forEach((b) => b.addEventListener("click", () => rubrique(b.dataset.rub)));
+  $("gesCopier").addEventListener("click", () => copier(S.adresse, $("gesCopier")));
+  $("gesVerifier").addEventListener("click", () => {
+    $("gesRapport").textContent = "Rien à faire : tout est déjà en place.\nVersion 2026.10.26-1800.";
+    $("gesRapport").hidden = false;
+  });
+  $("gesAssistant").addEventListener("click", () => {
+    $("voileGestion").hidden = true;
+    if (!autorise) return googleEcran(1);
+    S.ecran = 0;
+    ouvrirAssistant();
+  });
+  $("fermerGestion").addEventListener("click", () => ($("voileGestion").hidden = true));
+
+  // ---------- Commun ----------
+  ["voileAssistant", "voileGestion", "voileGoogle"].forEach((id) => $(id).addEventListener("click", (e) => { if (e.target === $(id) && id !== "voileAssistant") $(id).hidden = true; }));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") ["voileGestion", "voileGoogle"].forEach((id) => ($(id).hidden = true)); });
+  let minuteur;
+  function toast(t) {
+    $("toast").textContent = t; $("toast").hidden = false;
+    clearTimeout(minuteur); minuteur = setTimeout(() => ($("toast").hidden = true), 4200);
+  }
+  $("essaiCase").addEventListener("click", () => {
+    const on = $("essaiCase").getAttribute("aria-pressed") !== "true";
+    $("essaiCase").setAttribute("aria-pressed", String(on));
+    toast(on ? "Essai activé : à l'étape « Mise en ligne », Google aura retiré une autorisation" : "Essai désactivé");
+  });
+  $("reinit").addEventListener("click", () => {
+    depart(); autorise = false;
+    ["voileAssistant", "voileGestion", "voileGoogle"].forEach((id) => ($(id).hidden = true));
+    $("adresseCollee").value = "";
+    dessinerSheet();
+    toast("Retour à la copie du modèle, juste après « Créer une copie »");
+  });
+
+  depart();
+  dessinerSheet();
+})();
+</script>
