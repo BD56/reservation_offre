@@ -1,6 +1,6 @@
 // Installation : onglets et colonnes créés par le code (classeur vide, en-tête vide ou
 // incomplet), rien n'est jamais écrasé, idempotente ; création à la 1re ouverture de
-// l'application ; menu du Google Sheets et compte rendu.
+// l'application ; menu du Google Sheets et « Vérifier ».
 const assert = require("assert");
 const { makeEnv, classeurVide, lignes } = require("./mocks");
 const { FakeSheet } = require("./fakesheet");
@@ -114,13 +114,11 @@ try {
   };
   env4.ctx.doGet({});
 
-  // --- Menu du Google Sheets et compte rendu ---
+  // --- Menu du Google Sheets (un seul article) et « Vérifier » de la fenêtre Gestion ---
   env.ctx.onOpen();
-  assert.deepStrictEqual(env.menus, [
-    ["🚀 APPLICATION", "🧰 Installer / vérifier l'installation", "installerDepuisMenu"],
-  ]);
-  env.ctx.installerDepuisMenu();
-  assert.match(env.alertes[0], /^🧰 Installation \| Rien à faire[\s\S]*Version[\s\S]*Nouveau déploiement/);
+  assert.deepStrictEqual(env.menus, [["🚀 APPLICATION", "⚙️ Gestion de l'application", "ouvrirGestion"]]);
+  assert.deepStrictEqual(env.toasts, [], "classeur installé : pas de message");
+  assert.match(env.ctx.installerDepuisGestion(), /^Rien à faire[\s\S]*Version[\s\S]*Ouvrir l'assistant/);
   console.log("test_installation : OK");
 } catch (e) {
   console.log("test_installation : ÉCHEC " + ((e && e.stack) || e));

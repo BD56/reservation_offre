@@ -2,7 +2,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Application_() {
-  return "2026.10.26-1645";
+  return "2026.10.26-1833";
 }
 
 function doGet() {
@@ -23,6 +23,10 @@ function doGet() {
   } catch (e) {
     Logger.log("Création des onglets impossible : " + e);
   }
+  // Adresse /exec réellement ouverte : pour le lien de l'assistant et de « Gestion »
+  try {
+    noterAdresseApplication_(ScriptApp.getService().getUrl() || "");
+  } catch (e) {}
   const page = HtmlService.createTemplateFromFile("Index");
   // Offres et réservations glissées dans la page : affichage immédiat, sans appel au serveur
   page.copieJson = jsonPourPage_(copieSure_());

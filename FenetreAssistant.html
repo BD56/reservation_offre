@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="fr" data-version="2026.10.26-1833">
+  <head>
+    <base target="_top" />
+    <style>
+      /* Assistant d'installation (fenêtre du Google Sheets, 660 × 720), repris de l'app chèques :
+         palette « Comptoir ». */
+      :root {
+        --fond: #f5f3f0;
+        --surface: #ffffff;
+        --encre: #1c1917;
+        --doux: #6f6863;
+        --trait: #e5dfd8;
+        --accent: #0f766e;
+        --accent-fonce: #0b5d57;
+        --accent-doux: #e3f1ef;
+        --ok: #15803d;
+        --ok-doux: #e7f4eb;
+        --danger: #c81e1e;
+        --danger-doux: #fcebea;
+        --orange: #b45309;
+        --orange-doux: #fdf1e2;
+        --bleu-google: #0b57d0;
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--encre);
+        background: var(--surface);
+        margin: 0;
+      }
+      button,
+      input {
+        font: inherit;
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .etapes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        list-style: none;
+        margin: 0;
+        padding: 6px 20px 14px;
+      }
+      .etapes li {
+        display: grid;
+        gap: 6px;
+        font-size: 12.5px;
+        color: var(--doux);
+        min-width: 0;
+      }
+      .etapes li::before {
+        content: "";
+        height: 4px;
+        border-radius: 4px;
+        background: var(--trait);
+      }
+      .etapes li.fait {
+        color: var(--ok);
+      }
+      .etapes li.fait::before {
+        background: var(--ok);
+      }
+      .etapes li.encours {
+        color: var(--encre);
+        font-weight: 600;
+      }
+      .etapes li.encours::before {
+        background: var(--accent);
+      }
+      .corps {
+        padding: 4px 20px 8px;
+        display: grid;
+        gap: 14px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      p {
+        margin: 0;
+      }
+      .doux {
+        color: var(--doux);
+        font-size: 13.5px;
+      }
+      .pied {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        padding: 14px 20px 18px;
+        border-top: 1px solid var(--trait);
+        margin-top: 8px;
+      }
+      .btn {
+        border-radius: 10px;
+        padding: 11px 18px;
+        font-weight: 600;
+        border: 1px solid var(--trait);
+        background: var(--surface);
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--encre);
+        display: inline-block;
+      }
+      .btn.principal {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .info {
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: var(--accent-doux);
+      }
+      .info.ok {
+        background: var(--ok-doux);
+      }
+      .info.ok b {
+        color: var(--ok);
+      }
+      .info.erreur {
+        background: var(--danger-doux);
+      }
+      .info.erreur b {
+        color: var(--danger);
+      }
+      .info.conseil {
+        background: var(--orange-doux);
+      }
+      .info.attente {
+        background: var(--orange-doux);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .roue {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 3px solid var(--orange);
+        border-right-color: transparent;
+        animation: tourner 0.9s linear infinite;
+        flex: none;
+      }
+      .chargement {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--doux);
+        padding: 18px 0;
+      }
+      @keyframes tourner {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .roue {
+          animation: none;
+        }
+      }
+      .rapport {
+        white-space: pre-wrap;
+        font-size: 13px;
+        background: var(--fond);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin: 8px 0 0;
+      }
+      .rangee-boutons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .champ {
+        display: grid;
+        gap: 4px;
+      }
+      .champ label {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .champ input {
+        border: 1px solid var(--trait);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: var(--fond);
+        width: 100%;
+        min-width: 0;
+      }
+      .message {
+        font-size: 13.5px;
+        color: var(--danger);
+      }
+      .message:empty {
+        display: none;
+      }
+      .clics {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+        counter-reset: clic;
+      }
+      .clics li {
+        counter-increment: clic;
+        display: grid;
+        grid-template-columns: 26px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 10px;
+        border: 1px solid var(--trait);
+        border-radius: 10px;
+      }
+      .clics li::before {
+        content: counter(clic);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent-doux);
+        color: var(--accent-fonce);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 12.5px;
+      }
+      .mini {
+        font-size: 12px;
+        border-radius: 6px;
+        padding: 3px 8px;
+        white-space: nowrap;
+        border: 1px solid var(--trait);
+        color: var(--doux);
+      }
+      .mini.bleu {
+        background: var(--bleu-google);
+        border-color: var(--bleu-google);
+        color: #fff;
+      }
+      .lien-app {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-width: 0;
+      }
+      .lien-app code {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        background: var(--fond);
+        border: 1px solid var(--trait);
+        border-radius: 8px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .lien-app input {
+        flex: 1;
+      }
+      /* adresse /exec très longue : coupée à la ligne */
+      .adresse,
+      .apercu {
+        overflow-wrap: anywhere;
+      }
+      details summary {
+        cursor: pointer;
+        color: var(--accent-fonce);
+        font-weight: 600;
+        font-size: 13.5px;
+      }
+      .fin {
+        text-align: center;
+        display: grid;
+        gap: 10px;
+        justify-items: center;
+        padding: 16px 0 6px;
+      }
+      .rond {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: var(--ok-doux);
+        color: var(--ok);
+        display: grid;
+        place-items: center;
+        font-size: 34px;
+      }
+    </style>
+  </head>
+  <body>
+    <ol class="etapes" id="etapes"></ol>
+
+    <!-- 1. Préparation : autorisations vérifiées, « Installer » -->
+    <section class="ecran" data-ecran="0" hidden>
+      <div class="corps">
+        <h1>Préparation</h1>
+        <div class="info attente" id="prepAttente">
+          <span class="roue" aria-hidden="true"></span
+          ><span>Vérification et préparation du Google Sheets…</span>
+        </div>
+        <div id="prepResultat" hidden style="display: grid; gap: 10px">
+          <div class="info ok">
+            <b>✓ Autorisations accordées.</b> L'application vous reconnaît comme propriétaire de ce Google
+            Sheets.
+          </div>
+          <div class="info ok">
+            <b>✓ Google Sheets prêt</b> : onglets Operations, Reservations, Articles et Arrivages en place
+            (version <span id="prepVersion"></span>).
+          </div>
+          <div class="info conseil">
+            <b>Compte Google utilisé : <span id="prepCompte"></span>.</b> Les réservations sont enregistrées
+            dans ce compte. Conseillé : un compte <b>du magasin</b> (celui de l'accueil, par exemple), qui
+            reste quand les personnes changent.
+          </div>
+          <details>
+            <summary>Voir le compte rendu</summary>
+            <p class="rapport" id="prepRapport"></p>
+          </details>
+        </div>
+        <div class="info erreur" id="autoPrep" hidden>
+          <b>Une autorisation manque</b> (une case n'a pas été cochée). Cliquez sur « Autoriser de nouveau »,
+          cochez <b>toutes</b> les cases, puis revenez ici et cliquez sur « C'est fait, vérifier ».
+          <p class="doux" data-sans-lien hidden>
+            Fermez cette fenêtre, puis cliquez de nouveau sur le bouton vert : Google redemandera la case.
+          </p>
+          <div class="rangee-boutons">
+            <a class="btn principal" href="#" target="_blank" rel="noopener">Autoriser de nouveau</a
+            ><button class="btn" type="button" data-verifier>C'est fait, vérifier</button>
+          </div>
+        </div>
+        <div class="info erreur" id="prepErreur" hidden></div>
+      </div>
+      <div class="pied">
+        <button class="btn principal" id="btnSuite0" type="button" disabled>Continuer</button>
+      </div>
+    </section>
+
+    <!-- 2. Votre magasin -->
+    <section class="ecran" data-ecran="1" hidden>
+      <div class="corps">
+        <h1>Votre magasin</h1>
+        <p class="chargement" data-chargement role="status" hidden>
+          <span class="roue" aria-hidden="true"></span>Chargement…
+        </p>
+        <div data-contenu style="display: grid; gap: 14px">
+          <div class="champ">
+            <label for="nomMagasin">Nom du magasin, avec l'article</label>
+            <input id="nomMagasin" maxlength="80" autocomplete="off" placeholder="l'Hypermarché …" />
+            <p class="doux apercu" id="apercuMentions"></p>
+          </div>
+          <details>
+            <summary>Autres réglages (déjà remplis : à changer seulement si besoin)</summary>
+            <div class="champ" style="margin-top: 12px">
+              <label for="titreOnglet">Titre de l'onglet du navigateur</label>
+              <input id="titreOnglet" maxlength="80" />
+            </div>
+          </details>
+          <p class="doux">
+            Tout se modifie ensuite dans l'application (bouton ⚙️ Réglages, en haut à droite).
+          </p>
+        </div>
+        <p class="message" id="msgMagasin" role="status"></p>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-retour>Retour</button
+        ><button class="btn principal" id="btnMagasin" type="button">Enregistrer et continuer</button>
+      </div>
+    </section>
+
+    <!-- 3. Mise en ligne -->
+    <section class="ecran" data-ecran="2" hidden>
+      <div class="corps">
+        <h1>Mettre l'application en ligne</h1>
+        <p class="chargement" data-chargement role="status" hidden>
+          <span class="roue" aria-hidden="true"></span>Chargement…
+        </p>
+        <div id="enLigneGuide" style="display: grid; gap: 12px" hidden>
+          <p>
+            Google demande de faire cette étape vous-même. Le bouton « Ouvrir la page de mise en ligne » ouvre
+            la bonne page ; suivez ces 7 étapes, puis revenez ici. Les étapes 3 à 5 sont déjà remplies :
+            vérifiez-les seulement.
+          </p>
+          <ol class="clics">
+            <li><span>En haut à droite</span><span class="mini bleu">Déployer ▾</span></li>
+            <li><span>Dans le menu</span><span class="mini">Nouveau déploiement</span></li>
+            <li><span>Type (sinon : roue dentée ⚙️)</span><span class="mini">Application Web</span></li>
+            <li><span>Exécuter en tant que (déjà rempli)</span><span class="mini">Moi</span></li>
+            <li>
+              <span>Qui a accès (déjà rempli)</span
+              ><span class="mini"
+                >Tous les utilisateurs du domaine
+                <?= organisation ?></span
+              >
+            </li>
+            <li><span>En bas à droite</span><span class="mini bleu">Déployer</span></li>
+            <li><span>Sous « URL de l'application Web »</span><span class="mini">Copier</span></li>
+          </ol>
+          <p class="doux">
+            Au moment de déployer, Google redemande les autorisations (« Autoriser l'accès », parfois en
+            anglais) : faites comme au premier clic et cochez <b>toutes</b> les cases. Ne choisissez pas «
+            Utilisateur accédant à l'application Web » : l'application tournerait sous le compte de chaque PC,
+            qui n'a pas accès au Google Sheets.
+          </p>
+          <div class="champ">
+            <label for="adresseCollee">Collez ici l'adresse copiée (elle finit par /exec)</label>
+            <div class="lien-app">
+              <input
+                id="adresseCollee"
+                autocomplete="off"
+                placeholder="https://script.google.com/a/macros/…/exec"
+              /><button class="btn" id="btnAdresse" type="button">Valider</button>
+            </div>
+            <p class="message" id="msgAdresse" role="status"></p>
+          </div>
+        </div>
+        <div class="info" id="autoEnLigne" hidden>
+          <b>Encore une autorisation à redonner</b> : c'est normal après le déploiement, Google en retire une
+          (souvent l'adresse e-mail). Cliquez sur « Autoriser de nouveau », cochez <b>toutes</b> les cases,
+          puis revenez ici et cliquez sur « C'est fait, vérifier ».
+          <p class="doux" data-sans-lien hidden>
+            Fermez cette fenêtre, puis cliquez de nouveau sur le bouton vert : Google redemandera la case.
+          </p>
+          <div class="rangee-boutons">
+            <a class="btn principal" href="#" target="_blank" rel="noopener">Autoriser de nouveau</a
+            ><button class="btn" type="button" data-verifier>C'est fait, vérifier</button>
+          </div>
+        </div>
+        <div class="info ok" id="enLigneOk" hidden>
+          <b>✓ Adresse de l'application enregistrée :</b> <span class="adresse" id="enLigneAdresse"></span>
+          <div class="rangee-boutons">
+            <button class="btn" id="btnChangerAdresse" type="button">Changer l'adresse</button>
+          </div>
+        </div>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-retour>Retour</button
+        ><a class="btn" id="lienDeploiement" href="#" target="_blank" rel="noopener"
+          >Ouvrir la page de mise en ligne</a
+        ><button class="btn principal" id="btnSuite2" type="button" disabled>Continuer</button>
+      </div>
+    </section>
+
+    <!-- 4. Le PC de l'accueil (ensuite : « Gestion de l'application » → L'application) -->
+    <section class="ecran" data-ecran="3" hidden>
+      <div class="corps">
+        <h1>Ouvrir l'application sur le PC de l'accueil</h1>
+        <p class="chargement" data-chargement role="status" hidden>
+          <span class="roue" aria-hidden="true"></span>Chargement…
+        </p>
+        <div class="info erreur" id="pcSansAdresse" hidden>
+          <b>L'application n'est pas encore en ligne.</b> Revenez à l'écran précédent.
+        </div>
+        <div id="pcZone" style="display: grid; gap: 12px" hidden>
+          <p>
+            Sur <b>chaque PC de l'accueil</b>, ouvrez ce lien (envoyez-le par e-mail si besoin), puis
+            ajoutez-le aux <b>favoris</b> du navigateur (Ctrl + D) :
+          </p>
+          <div class="lien-app">
+            <code id="pcLien"></code><button class="btn" id="btnCopier" type="button">Copier</button>
+          </div>
+          <div>
+            <a class="btn" id="pcOuvrir" href="#" target="_blank" rel="noopener">Ouvrir l'application</a>
+          </div>
+          <div class="info conseil">
+            <b
+              >Le navigateur du PC doit être connecté à un compte Google
+              <?= organisation ?></b
+            >
+            : seuls ces comptes peuvent ouvrir l'application. Ne donnez à l'accueil que ce lien, jamais celui
+            du Google Sheets.
+          </div>
+          <details>
+            <summary>Le PC n'arrive pas à ouvrir l'application ?</summary>
+            <p class="doux" style="margin-top: 8px">
+              Connectez le navigateur à un compte Google
+              <?= organisation ?>. Si l'application reste refusée, vérifiez le déploiement dans Apps Script :
+              Déployer → Gérer les déploiements → crayon ✏️ → Qui a accès : Tous les utilisateurs du domaine
+              <?= organisation ?>
+              → Déployer. L'adresse ne change pas.
+            </p>
+          </details>
+        </div>
+        <p class="message" id="msgPc" role="status"></p>
+      </div>
+      <div class="pied">
+        <button class="btn" type="button" data-retour>Retour</button
+        ><button class="btn principal" id="btnSuite3" type="button">Terminer</button>
+      </div>
+    </section>
+
+    <!-- Fin -->
+    <section class="ecran" data-ecran="4" hidden>
+      <div class="corps">
+        <div class="fin">
+          <div class="rond" aria-hidden="true">✓</div>
+          <h1>L'application est installée</h1>
+          <p>
+            L'onglet « Démarrer » a disparu. Pour retrouver le lien de l'application : menu 🚀 APPLICATION →
+            ⚙️ Gestion de l'application.
+          </p>
+          <p class="doux">
+            Il reste à créer la première offre dans l'application : Offres et réservations → Nouvelle offre.
+          </p>
+          <p class="doux apercu" id="finNomSheet" hidden></p>
+        </div>
+      </div>
+      <div class="pied"><button class="btn principal" id="btnFin" type="button">Fermer</button></div>
+    </section>
+
+    <script>
+      const ETAPES = ["Préparation", "Votre magasin", "Mise en ligne", "Le PC de l'accueil"];
+      const ATTENTE_MS = 4000; // mise en ligne : un PC qui ouvre l'application note son adresse
+      let ecran = 0;
+      let attente = null;
+      let nomSheet = "";
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+      function section(n) {
+        return document.querySelector('.ecran[data-ecran="' + n + '"]');
+      }
+      // Message d'une erreur du serveur, sans le « Error: » ajouté par Google
+      function texteErreur(e) {
+        return ((e && e.message) || String(e)).replace(/^(Error|Exception|Erreur)\s*:\s*/, "");
+      }
+      // Autorisation manquante (la nôtre, ou le refus de Google quand il en a retiré une)
+      function refusAutorisation(e) {
+        return /autorisation google incomplète|autorisations requises|authorization is required|permission/i.test(
+          texteErreur(e)
+        );
+      }
+      function serveur(ok, ko) {
+        return google.script.run.withSuccessHandler(ok).withFailureHandler(ko);
+      }
+      function chargement(n, actif) {
+        const s = section(n);
+        const roue = s.querySelector("[data-chargement]");
+        if (roue) roue.hidden = !actif;
+        s.querySelectorAll("[data-contenu]").forEach((c) => (c.hidden = actif));
+      }
+      function arreterAttente() {
+        if (attente) clearInterval(attente);
+        attente = null;
+      }
+
+      function aller(n) {
+        arreterAttente();
+        ecran = n;
+        document.querySelectorAll(".ecran").forEach((s) => (s.hidden = +s.dataset.ecran !== n));
+        $("etapes").hidden = n === 4;
+        $("etapes").innerHTML = ETAPES.map(
+          (t, i) => `<li class="${i < n ? "fait" : i === n ? "encours" : ""}">${t}</li>`
+        ).join("");
+        if (n === 0) preparer();
+        if (n === 1) magasin();
+        if (n === 2) miseEnLigne();
+        if (n === 3) pc();
+      }
+      document
+        .querySelectorAll("[data-retour]")
+        .forEach((b) => b.addEventListener("click", () => aller(ecran - 1)));
+
+      // Encadré « Autoriser de nouveau » : lien de Google qui redemande les cases manquantes
+      // (sans lien : refermer et recliquer sur le bouton vert)
+      function montrerAutorisation(id) {
+        const boite = $(id);
+        boite.hidden = false;
+        const lien = boite.querySelector("a");
+        const sansLien = boite.querySelector("[data-sans-lien]");
+        serveur(
+          (r) => {
+            lien.hidden = !r.lien;
+            sansLien.hidden = !!r.lien;
+            if (r.lien) lien.href = r.lien;
+          },
+          () => {
+            lien.hidden = true;
+            sansLien.hidden = false;
+          }
+        ).etatAutorisations();
+      }
+
+      // --- 1. Préparation ---
+      function preparer() {
+        $("prepAttente").hidden = false;
+        $("prepResultat").hidden = true;
+        $("autoPrep").hidden = true;
+        $("prepErreur").hidden = true;
+        $("btnSuite0").disabled = true;
+        serveur(
+          (r) => {
+            $("prepAttente").hidden = true;
+            if (r.incomplet) {
+              $("prepErreur").textContent = r.rapport;
+              $("prepErreur").hidden = false;
+              return;
+            }
+            $("prepVersion").textContent = r.version;
+            $("prepCompte").textContent = r.compte || "inconnu";
+            $("prepRapport").textContent = r.rapport;
+            $("prepResultat").hidden = false;
+            $("btnSuite0").disabled = false;
+          },
+          (e) => {
+            $("prepAttente").hidden = true;
+            if (refusAutorisation(e)) return montrerAutorisation("autoPrep");
+            $("prepErreur").textContent = texteErreur(e);
+            $("prepErreur").hidden = false;
+          }
+        ).preparerInstallation();
+      }
+      $("autoPrep").querySelector("[data-verifier]").addEventListener("click", preparer);
+      $("btnSuite0").addEventListener("click", () => aller(1));
+
+      // --- 2. Votre magasin ---
+      function apercu() {
+        const nom = $("nomMagasin").value.trim();
+        $("apercuMentions").textContent =
+          "Lu dans les mentions de l'application : « L'auteur concède à " +
+          (nom || "l'Hypermarché …") +
+          " ».";
+      }
+      function magasin() {
+        $("msgMagasin").textContent = "";
+        $("btnMagasin").disabled = true;
+        chargement(1, true);
+        serveur(
+          (r) => {
+            chargement(1, false);
+            $("nomMagasin").value = r.NOM_MAGASIN;
+            $("titreOnglet").value = r.TITRE_APP;
+            apercu();
+            $("btnMagasin").disabled = false;
+            $("nomMagasin").focus();
+          },
+          (e) => {
+            chargement(1, false);
+            section(1).querySelector("[data-contenu]").hidden = true; // jamais un formulaire vide enregistré
+            $("msgMagasin").textContent = texteErreur(e) + " Revenez en arrière puis réessayez.";
+          }
+        ).lireReglagesAssistant();
+      }
+      $("nomMagasin").addEventListener("input", () => {
+        apercu();
+        $("msgMagasin").textContent = "";
+      });
+      ["nomMagasin", "titreOnglet"].forEach((id) =>
+        $(id).addEventListener("keydown", (e) => {
+          if (e.key === "Enter") $("btnMagasin").click();
+        })
+      );
+      $("btnMagasin").addEventListener("click", function () {
+        const valeurs = {
+          NOM_MAGASIN: $("nomMagasin").value.trim(),
+          TITRE_APP: $("titreOnglet").value.trim(),
+        };
+        if (!valeurs.NOM_MAGASIN) {
+          $("msgMagasin").textContent = "Écrivez le nom du magasin.";
+          $("nomMagasin").focus();
+          return;
+        }
+        const bouton = this;
+        bouton.disabled = true;
+        serveur(
+          (r) => {
+            bouton.disabled = false;
+            if (r.nomSheet) nomSheet = r.nomSheet;
+            aller(2);
+          },
+          (e) => {
+            bouton.disabled = false;
+            $("msgMagasin").textContent = texteErreur(e);
+          }
+        ).enregistrerReglagesAssistant(valeurs);
+      });
+
+      // --- 3. Mise en ligne ---
+      function afficherEnLigne(adresse) {
+        $("enLigneGuide").hidden = !!adresse;
+        $("enLigneOk").hidden = !adresse;
+        $("enLigneAdresse").textContent = adresse;
+        $("btnSuite2").disabled = !adresse;
+        if (adresse) arreterAttente();
+      }
+      // Adresse connue : on vérifie que le déploiement n'a pas retiré une autorisation
+      function adresseConnue(adresse) {
+        serveur(
+          (a) => {
+            if (a.manquantes) {
+              $("enLigneGuide").hidden = true;
+              $("btnSuite2").disabled = true;
+              montrerAutorisation("autoEnLigne");
+              return;
+            }
+            $("autoEnLigne").hidden = true;
+            afficherEnLigne(adresse);
+          },
+          () => afficherEnLigne(adresse)
+        ).etatAutorisations();
+      }
+      function miseEnLigne() {
+        $("autoEnLigne").hidden = true;
+        $("enLigneOk").hidden = true;
+        $("enLigneGuide").hidden = true;
+        $("msgAdresse").textContent = "";
+        $("btnSuite2").disabled = true;
+        chargement(2, true);
+        serveur(
+          (r) => {
+            chargement(2, false);
+            $("lienDeploiement").href = r.lienEditeur;
+            if (r.adresse) return adresseConnue(r.adresse);
+            afficherEnLigne("");
+            // Un PC (ou un autre onglet) ouvre l'application : son adresse est notée par doGet
+            attente = setInterval(() => {
+              serveur(
+                (s) => {
+                  if (s.adresse && ecran === 2 && !$("enLigneGuide").hidden) adresseConnue(s.adresse);
+                },
+                () => {} // erreur passagère (autorisations suspendues pendant le déploiement)
+              ).etatMiseEnLigne();
+            }, ATTENTE_MS);
+          },
+          (e) => {
+            chargement(2, false);
+            if (refusAutorisation(e)) return montrerAutorisation("autoEnLigne");
+            afficherEnLigne("");
+            $("msgAdresse").textContent = texteErreur(e);
+          }
+        ).etatMiseEnLigne();
+      }
+      $("adresseCollee").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") $("btnAdresse").click();
+      });
+      $("btnAdresse").addEventListener("click", function () {
+        const url = $("adresseCollee").value.trim();
+        if (!url) {
+          $("msgAdresse").textContent = "Collez l'adresse copiée sous « URL de l'application Web ».";
+          return;
+        }
+        const bouton = this;
+        bouton.disabled = true;
+        serveur(
+          (adresse) => {
+            bouton.disabled = false;
+            $("msgAdresse").textContent = "";
+            adresseConnue(adresse);
+          },
+          (e) => {
+            bouton.disabled = false;
+            if (refusAutorisation(e)) {
+              $("enLigneGuide").hidden = true;
+              return montrerAutorisation("autoEnLigne");
+            }
+            $("msgAdresse").textContent = texteErreur(e);
+          }
+        ).enregistrerAdresseApplication(url);
+      });
+      $("autoEnLigne").querySelector("[data-verifier]").addEventListener("click", miseEnLigne);
+      $("btnChangerAdresse").addEventListener("click", () => {
+        $("adresseCollee").value = "";
+        afficherEnLigne("");
+        $("adresseCollee").focus();
+      });
+      $("btnSuite2").addEventListener("click", () => aller(3));
+
+      // --- 4. Le PC de l'accueil ---
+      function pc() {
+        $("pcZone").hidden = true;
+        $("pcSansAdresse").hidden = true;
+        $("msgPc").textContent = "";
+        chargement(3, true);
+        serveur(
+          (r) => {
+            chargement(3, false);
+            if (!r.adresse) {
+              $("pcSansAdresse").hidden = false;
+              return;
+            }
+            $("pcLien").textContent = r.adresse;
+            $("pcOuvrir").href = r.adresse;
+            $("pcZone").hidden = false;
+          },
+          (e) => {
+            chargement(3, false);
+            $("msgPc").textContent = texteErreur(e);
+          }
+        ).etatApplication();
+      }
+      $("btnCopier").addEventListener("click", function () {
+        const bouton = this;
+        const fait = () => {
+          bouton.textContent = "Copié ✓";
+          setTimeout(() => (bouton.textContent = "Copier"), 2000);
+        };
+        const choisir = () => {
+          const r = document.createRange();
+          r.selectNodeContents($("pcLien"));
+          const s = getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+        };
+        try {
+          navigator.clipboard.writeText($("pcLien").textContent).then(fait, choisir);
+        } catch (e) {
+          choisir();
+        }
+      });
+      $("btnSuite3").addEventListener("click", function () {
+        const bouton = this;
+        bouton.disabled = true;
+        serveur(
+          () => {
+            bouton.disabled = false;
+            if (nomSheet) {
+              $("finNomSheet").textContent = "Ce Google Sheets s'appelle maintenant « " + nomSheet + " ».";
+              $("finNomSheet").hidden = false;
+            }
+            aller(4);
+          },
+          (e) => {
+            bouton.disabled = false;
+            $("msgPc").textContent = texteErreur(e);
+          }
+        ).terminerAssistant();
+      });
+      $("btnFin").addEventListener("click", () => google.script.host.close());
+
+      aller(0);
+    </script>
+  </body>
+</html>

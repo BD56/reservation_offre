@@ -54,8 +54,7 @@
   `installerFeuilles_` crée les onglets manquants (en-têtes `ENTETES`, gras, ligne figée,
   formats de dates) et complète les cases d'en-tête VIDES seulement (jamais d'écrasement) ;
   `doGet` l'appelle sous verrou si un onglet manque (échec = page ouverte quand même) ;
-  menu du Sheet « 🚀 APPLICATION → 🧰 Installer / vérifier l'installation » (`onOpen`,
-  `installerDepuisMenu` → compte rendu + contrôle des fichiers + version). Test
+  menu du Sheet (remplacé le 26/10 par « ⚙️ Gestion de l'application », voir plus bas). Test
   `test_installation` (9 séries). Pas de déclencheurs ni de propriétés à installer pour
   l'instant (viendront avec la sécurité / le RGPD).
 - **Un article par ligne** (demande de Bryan, 15/10, après essai sur son vrai Sheet) :
@@ -149,45 +148,46 @@
    confirmée) ; éditeur d'offre (articles en puces) ; feuille de préparation (total,
    liste à pointer triée par nom, annulées en option).
 4. ✅ Arrivages par article (voir ci-dessus).
-5. ⏳ **Installateur par magasin — À REFAIRE (26/10)**. Bryan : « l'installateur n'est pas
-   du tout comme celui de chèque différé ». ERREUR DE MA PART : j'avais lu une copie locale
-   PÉRIMÉE de l'app chèques (14/10, ancien `INSTALLATION.md`). L'installateur réel (branche
-   `design`, 18-24/10) = **assistant dans le Google Sheets** : `preparerModele` pose un
-   onglet « Démarrer » + bouton vert → autorisations vérifiées case par case
-   (`exigerAutorisations_`, `oauthScopes` dans `appsscript.json`) → fenêtre
-   `FenetreAssistant.html` (Préparation, Votre magasin + renommage du Sheet, Mise en ligne
-   guidée en 7 étapes + adresse /exec, Tablettes, Fin qui retire « Démarrer ») + menu
-   🚀 APPLICATION → fenêtre « ⚙️ Gestion de l'application » ; `INSTALLATION.md` retiré là-bas
-   (l'appli = la documentation ; `avant-d-installer.md`, `DEPLOIEMENT.md`).
-   **Décisions de Bryan (26/10)** : maquette d'abord (« go pour la maquette ») ; **PAS de
-   reprise d'une ancienne installation** ; **ne pas tenir compte de Vannes** (`appsscript.json`
-   propre au projet, comme l'app chèques). Maquette `docs/maquettes/assistant-installation.html`
-   (artefact https://claude.ai/artifact/QmPPJSdHcPTwFNwFsrqM74, v1) : onglet Démarrer + bouton
-   vert, écrans Google simplifiés (case décochée ⇒ « Une autorisation manque »), assistant en
-   4 étapes (Préparation ; Votre magasin = nom + titre replié, Sheet renommé « Réservations des
-   offres — <magasin> » s'il s'appelle « Copie de … » ; Mise en ligne = 7 étapes, « Qui a
-   accès : Tout le monde », encadré « Encore une autorisation à redonner » ; **Le PC de
-   l'accueil** = lien + Copier + favoris, pas de QR ni de code) ; Fin ; fenêtre Gestion
-   (L'application : lien ; Installation : Vérifier, Ouvrir l'assistant, Règles d'accès).
-   EN ATTENTE de validation. Ensuite : coder, retirer `INSTALLATION.md`, garder `Reglages.gs`
-   et le bouton ⚙️ de l'appli (déjà poussés le 26/10, commit 64b3f8a).
-   Ancienne version de ce point (commit 64b3f8a), pour mémoire :
-   ✅ **Installateur par magasin** (« go » de Bryan, 26/10), comme l'app chèques mais
-   SANS sécurité (« rien de sensible ») : guide **`INSTALLATION.md`** (modèle vierge,
-   lien `/copy`, 🧰 Installer, déploiement, ⚙️ Réglages) ; **`Reglages.gs`** :
-   `reglages_()` (défauts = Vannes : « l'Hypermarché Carrefour Vannes », « Application
-   de Réservations »), `enregistrerReglages` (public, sans code, 80 caractères max,
-   jamais vide, espaces resserrés), `nettoyerSiCopie_` (marque `ID_CLASSEUR` ; copie →
-   toutes les propriétés effacées, données intactes ; appelé par `doGet`, `installer_`
-   — compte rendu « Copie d'un autre classeur… » — et `enregistrerReglages`). `doGet`
-   injecte `REGLAGES_INITIAUX` et met `TITRE_APP` en titre d'onglet. Page : bouton ⚙️
-   (en-tête), fenêtre « Réglages du magasin » (aperçu de la phrase des mentions) ;
-   mentions légales = formule de l'app chèques avec `#txtNomMagasin`. Tests
-   `test_reglages` + réglages dans `test_ui_offres`, `test_rendu` (nom injecté sans
-   `</script>`), `test_ui_textes_longs` (a trouvé : nom très long qui sortait des
-   mentions à 400 px, et Échap / clic à côté qui ne fermaient pas la fenêtre → corrigés).
-   **Point ouvert pour Bryan** : « Qui a accès » au déploiement (inconnu pour Vannes :
-   le manifeste n'est pas dans le dépôt) ; le guide présente les deux choix.
+5. ✅ **Installateur par magasin = ASSISTANT, comme l'app chèques (CODÉ le 26/10, « go pour
+   coder »)**. Historique : ma 1re version (guide `INSTALLATION.md`, commit 64b3f8a) était
+   faite d'après une copie locale PÉRIMÉE de l'app chèques ; Bryan : « pas du tout comme
+   celui de chèque différé ». Maquette validée : `docs/maquettes/assistant-installation.html`
+   (artefact https://claude.ai/artifact/QmPPJSdHcPTwFNwFsrqM74, v2). Décisions de Bryan (26/10) :
+   PAS de reprise d'une ancienne installation ; ne pas tenir compte de Vannes ;
+   **« Qui a accès » = « Tous les utilisateurs du domaine Carrefour »** (pas « Tout le
+   monde ») ⇒ `appsscript.json` dans le dépôt : `oauthScopes` (spreadsheets,
+   userinfo.email, script.container.ui = `AUTORISATIONS_VERIFIEES`), webapp
+   `USER_DEPLOYING` + `access: DOMAIN` ; chaque PC connecté à un compte Google Carrefour ;
+   nom cité par la constante `ORGANISATION`.
+   - **Assistant.gs** (repris de l'app chèques) : `autorisationsManquantes_`,
+     `exigerAutorisations_` (requireScopes), `etatAutorisations` (lien « Autoriser de
+     nouveau »), `estEditeurDuClasseur_` / `exigerEditeur_` (assistant et Gestion réservés
+     au propriétaire / éditeurs du Sheet — pas un code : rien de neuf pour l'accueil),
+     `ouvrirAssistant`, `preparerInstallation` (= `installer_` + compte), `lireReglagesAssistant`
+     (nom vide tant que jamais réglé), `enregistrerReglagesAssistant` (+ `renommerCopie_` :
+     « Copie de … » → « Réservations des offres — <magasin> », jamais un nom choisi),
+     `etatMiseEnLigne`, `enregistrerAdresseApplication` (`RE_ADRESSE_APP`, /exec seulement),
+     `etatApplication`, `terminerAssistant` (retire « Démarrer » et « Feuille 1 »),
+     `noterAdresseApplication_` (appelée par `doGet`), `preparerModele` + `creerOngletDemarrer_`
+     (bouton vert = `BOUTON_INSTALLER_PNG` de l'app chèques, `outils/bouton-installer.js`).
+   - **Sheet.gs** : menu à UN article (⚙️ Gestion de l'application), toast sur une copie pas
+     encore installée (`estCopieNonInstallee_`, Reglages.gs), `installerDepuisGestion`.
+     L'ancien menu « 🧰 Installer » et `installerDepuisMenu` sont RETIRÉS.
+   - **FenetreAssistant.html** : Préparation → Votre magasin → Mise en ligne (7 étapes,
+     lien vers l'éditeur, adresse collée ou trouvée seule toutes les 4 s, encadré
+     « Encore une autorisation à redonner ») → Le PC de l'accueil (lien, Copier, Ouvrir,
+     compte Carrefour) → Fin. **FenetreGestion.html** : L'application (lien), Installation
+     (Vérifier, Ouvrir l'assistant, Règles d'accès).
+   - Docs comme l'app chèques : `INSTALLATION.md` RETIRÉ ; `docs/guide/avant-d-installer.md`
+     (à envoyer avec le lien de copie) ; `DEPLOIEMENT.md` (modèle, mises à jour, secours).
+     Le bouton ⚙️ Réglages de l'application et `Reglages.gs` restent.
+   - Tests : `test_assistant` (serveur), `test_ui_assistant` (fenêtres dans Chromium ;
+     captures avec un 2e argument), faux Sheet étendu (images, renommage, fenêtres,
+     autorisations, Session.getActiveUser). Défauts réintroduits → détectés.
+   - **À essayer sur de vrais Sheets** : `preparerModele` sur un modèle créé par clasp,
+     copie `/copy`, bouton vert et autorisations, déploiement « domaine Carrefour » depuis un
+     compte Carrefour (le manifeste préremplit-il bien « Qui a accès » ?), adresse
+     `…/a/macros/<domaine>/s/…/exec`, `Spreadsheet.rename`, propriétés copiées ou non.
 6. RGPD : purge automatique (durée à décider), mentions.
 7. Documentation (AGENTS.md…).
 

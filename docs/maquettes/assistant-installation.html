@@ -199,7 +199,7 @@
           <div id="prepResultat" hidden style="display: grid; gap: 10px">
             <div class="info ok"><b>✓ Autorisations accordées.</b> L'application vous reconnaît comme propriétaire de ce Google Sheets.</div>
             <div class="info ok"><b>✓ Google Sheets prêt</b> : onglets Operations, Reservations, Articles et Arrivages en place (version 2026.10.26-1800).</div>
-            <div class="info conseil"><b>Compte Google utilisé : accueil.magasin@gmail.com.</b> Les réservations sont enregistrées dans ce compte. Conseillé : un compte <b>du magasin</b> (celui de l'accueil, par exemple), qui reste quand les personnes changent.</div>
+            <div class="info conseil"><b>Compte Google utilisé : accueil.magasin@carrefour.com.</b> Les réservations sont enregistrées dans ce compte. Conseillé : un compte <b>du magasin</b> (celui de l'accueil, par exemple), qui reste quand les personnes changent.</div>
             <details><summary>Voir le compte rendu</summary>
               <p class="rapport">Copie d'un autre classeur : réglages hérités effacés (données intactes).
 Version 2026.10.26-1800.</p></details>
@@ -241,11 +241,11 @@ Version 2026.10.26-1800.</p></details>
               <li><span>Dans le menu</span><span class="mini">Nouveau déploiement</span></li>
               <li><span>Type (sinon : roue dentée ⚙️)</span><span class="mini">Application Web</span></li>
               <li><span>Exécuter en tant que (déjà rempli)</span><span class="mini">Moi</span></li>
-              <li><span>Qui a accès (déjà rempli)</span><span class="mini">Tout le monde</span></li>
+              <li><span>Qui a accès (déjà rempli)</span><span class="mini">Tous les utilisateurs du domaine Carrefour</span></li>
               <li><span>En bas à droite</span><span class="mini bleu">Déployer</span></li>
               <li><span>Sous « URL de l'application Web »</span><span class="mini">Copier</span></li>
             </ol>
-            <p class="doux">Au moment de déployer, Google redemande les autorisations (« Autoriser l'accès », parfois en anglais) : faites comme au premier clic et cochez <b>toutes</b> les cases. Ne choisissez pas « Utilisateur accédant à l'application Web » : chaque PC de l'accueil aurait besoin d'un compte Google.</p>
+            <p class="doux">Au moment de déployer, Google redemande les autorisations (« Autoriser l'accès », parfois en anglais) : faites comme au premier clic et cochez <b>toutes</b> les cases. Ne choisissez pas « Utilisateur accédant à l'application Web » : l'application tournerait sous le compte de chaque PC, qui n'a pas accès au Google Sheets.</p>
             <div class="champ">
               <label for="adresseCollee">Collez ici l'adresse copiée (elle finit par /exec)</label>
               <div class="lien-app"><input id="adresseCollee" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn" id="validerAdresse">Valider</button></div>
@@ -272,9 +272,9 @@ Version 2026.10.26-1800.</p></details>
           <p>Sur <b>chaque PC de l'accueil</b>, ouvrez ce lien (envoyez-le par e-mail si besoin), puis ajoutez-le aux <b>favoris</b> du navigateur (Ctrl + D) :</p>
           <div class="lien-app"><code id="lienPc"></code><button class="btn" id="copierPc">Copier</button></div>
           <div class="rangee-boutons" style="margin-top: 0"><button class="btn" id="ouvrirPc">Ouvrir l'application ici</button></div>
-          <div class="info conseil"><b>Ne donnez à l'accueil que ce lien</b>, jamais celui du Google Sheets. L'application n'a pas de code : toute personne qui a ce lien peut voir et modifier les réservations.</div>
-          <details><summary>Le PC demande de se connecter à Google ?</summary>
-            <p class="doux" style="margin-top: 8px">« Qui a accès » n'est pas sur « Tout le monde ». Dans Apps Script : Déployer → Gérer les déploiements → crayon ✏️ → Qui a accès : Tout le monde → Déployer. L'adresse ne change pas.</p></details>
+          <div class="info conseil"><b>Le navigateur du PC doit être connecté à un compte Google Carrefour</b> : seuls ces comptes peuvent ouvrir l'application. Ne donnez à l'accueil que ce lien, jamais celui du Google Sheets.</div>
+          <details><summary>Le PC n'arrive pas à ouvrir l'application ?</summary>
+            <p class="doux" style="margin-top: 8px">Connectez le navigateur à un compte Google Carrefour. Si l'application reste refusée, vérifiez le déploiement dans Apps Script : Déployer → Gérer les déploiements → crayon ✏️ → Qui a accès : Tous les utilisateurs du domaine Carrefour → Déployer. L'adresse ne change pas.</p></details>
         </div>
         <div class="pied"><button class="btn" data-retour>Retour</button><button class="btn principal" id="suite3">Terminer</button></div>
       </section>
@@ -313,7 +313,7 @@ Version 2026.10.26-1800.</p></details>
             <section id="gesEnLigne" hidden>
               <h2>Lien à ouvrir sur les PC de l'accueil</h2>
               <div class="lien-app"><code id="gesLien"></code><button class="btn" id="gesCopier">Copier</button></div>
-              <p class="doux">À mettre en favori sur chaque PC. Le magasin réglé : <b id="gesMagasin"></b> (modifiable dans l'application, bouton ⚙️).</p>
+              <p class="doux">À mettre en favori sur chaque PC, connecté à un compte Google Carrefour. Le magasin réglé : <b id="gesMagasin"></b> (modifiable dans l'application, bouton ⚙️).</p>
             </section>
           </div>
           <div class="rubrique" data-rubrique="installation" hidden>
@@ -331,7 +331,7 @@ Version 2026.10.26-1800.</p></details>
             </section>
             <section>
               <h2>Règles d'accès</h2>
-              <p class="doux">L'accueil ne reçoit que le <b>lien de l'application</b>, jamais celui de ce Google Sheets. L'application n'a pas de code : toute personne qui a son lien peut voir et modifier les réservations.</p>
+              <p class="doux">L'accueil ne reçoit que le <b>lien de l'application</b>, jamais celui de ce Google Sheets. Seuls les comptes Google Carrefour peuvent ouvrir l'application ; elle n'a pas de code : qui l'ouvre peut voir et modifier les réservations.</p>
             </section>
           </div>
         </div>
@@ -346,9 +346,8 @@ Version 2026.10.26-1800.</p></details>
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const NOM_COPIE = "Copie de MODÈLE — Réservations des offres (ne pas utiliser)";
-  const ADRESSE_EXEMPLE = "https://script.google.com/macros/s/AKfycbx7Kq2-Exemple-Magasin/exec";
+  const ADRESSE_EXEMPLE = "https://script.google.com/a/macros/carrefour.com/s/AKfycbx7Kq2-Exemple-Magasin/exec";
   const RE_ADRESSE = /^https:\/\/script\.google\.com\/(a\/macros\/[^/\s]+\/s|macros\/s)\/[\w-]+\/exec$/;
   const ETAPES = ["Préparation", "Votre magasin", "Mise en ligne", "Le PC de l'accueil"];
 

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="fr" data-version="2026.10.26-1833">
+  <head>
+    <base target="_top" />
+    <style>
+      /* Fenêtre « ⚙️ Gestion de l'application » du Google Sheets (760 × 560), reprise de l'app
+         chèques : palette « Comptoir », menu à gauche, une rubrique à la fois. */
+      :root {
+        --fond: #f5f3f0;
+        --surface: #ffffff;
+        --encre: #1c1917;
+        --doux: #6f6863;
+        --trait: #e5dfd8;
+        --accent: #0f766e;
+        --ok: #15803d;
+        --ok-doux: #e7f4eb;
+        --danger: #c81e1e;
+        --danger-doux: #fcebea;
+        --orange: #b45309;
+        --orange-doux: #fdf1e2;
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--encre);
+        background: var(--surface);
+        margin: 0;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .gestion {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        min-height: 100vh;
+      }
+      nav {
+        background: var(--fond);
+        padding: 12px 8px;
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        border-right: 1px solid var(--trait);
+      }
+      nav button {
+        border: 0;
+        background: none;
+        text-align: left;
+        padding: 9px 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        color: var(--doux);
+        cursor: pointer;
+      }
+      nav button[aria-current="page"] {
+        background: var(--surface);
+        color: var(--encre);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+      .rubrique {
+        padding: 14px 20px 20px;
+        display: grid;
+        gap: 14px;
+        align-content: start;
+        min-width: 0;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+      p {
+        margin: 0;
+      }
+      .carte {
+        border: 1px solid var(--trait);
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: grid;
+        gap: 8px;
+      }
+      .doux {
+        color: var(--doux);
+        font-size: 13.5px;
+      }
+      .btn {
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-weight: 600;
+        border: 1px solid var(--trait);
+        background: var(--surface);
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--encre);
+        display: inline-block;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .info {
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: var(--orange-doux);
+      }
+      .info.erreur {
+        background: var(--danger-doux);
+      }
+      .info.erreur b {
+        color: var(--danger);
+      }
+      .lien-app {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-width: 0;
+      }
+      .lien-app code {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        background: var(--fond);
+        border: 1px solid var(--trait);
+        border-radius: 8px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .rapport {
+        white-space: pre-wrap;
+        font-size: 13px;
+        background: var(--fond);
+        border-radius: 8px;
+        padding: 10px 12px;
+        overflow-wrap: anywhere;
+      }
+      .chargement {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--doux);
+      }
+      .roue {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 3px solid var(--orange);
+        border-right-color: transparent;
+        animation: tourner 0.9s linear infinite;
+        flex: none;
+      }
+      @keyframes tourner {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .roue {
+          animation: none;
+        }
+      }
+      .message {
+        font-size: 13.5px;
+        color: var(--danger);
+        overflow-wrap: anywhere;
+      }
+      .message:empty {
+        display: none;
+      }
+      #gesMagasin {
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="gestion">
+      <nav aria-label="Rubriques">
+        <button type="button" data-rubrique-lien="appli" aria-current="page">L'application</button>
+        <button type="button" data-rubrique-lien="installation">Installation</button>
+      </nav>
+      <div>
+        <section class="rubrique" data-rubrique="appli">
+          <h1>L'application</h1>
+          <p class="chargement" id="gesChargement" role="status">
+            <span class="roue" aria-hidden="true"></span>Chargement…
+          </p>
+          <div class="info erreur" id="gesPasEnLigne" hidden>
+            <b>L'application n'est pas encore en ligne.</b> Rubrique Installation → Ouvrir l'assistant.
+          </div>
+          <div class="carte" id="gesEnLigne" hidden>
+            <h2>Lien à ouvrir sur les PC de l'accueil</h2>
+            <div class="lien-app">
+              <code id="gesLien"></code><button class="btn" id="gesCopier" type="button">Copier</button>
+            </div>
+            <div>
+              <a class="btn" id="gesOuvrir" href="#" target="_blank" rel="noopener">Ouvrir l'application</a>
+            </div>
+            <p class="doux">
+              À mettre en favori sur chaque PC, connecté à un compte Google
+              <?= organisation ?>. Magasin réglé : <b id="gesMagasin"></b> (modifiable dans l'application,
+              bouton ⚙️).
+            </p>
+          </div>
+          <p class="message" id="msgAppli" role="status"></p>
+        </section>
+        <section class="rubrique" data-rubrique="installation" hidden>
+          <h1>Installation</h1>
+          <div class="carte">
+            <h2>Vérifier l'installation</h2>
+            <p class="doux">
+              Crée ce qui manque (onglets, colonnes) et contrôle que tous les fichiers du code sont à la même
+              version. Rien n'est jamais effacé.
+            </p>
+            <div><button class="btn" id="gesVerifier" type="button">Vérifier</button></div>
+            <p class="rapport" id="gesRapport" hidden></p>
+          </div>
+          <div class="carte">
+            <h2>Assistant d'installation</h2>
+            <p class="doux">
+              Pour refaire la mise en ligne, changer l'adresse de l'application ou le nom du magasin.
+            </p>
+            <div><button class="btn" id="gesAssistant" type="button">Ouvrir l'assistant</button></div>
+          </div>
+          <div class="carte">
+            <h2>Règles d'accès</h2>
+            <p class="doux">
+              L'accueil ne reçoit que le <b>lien de l'application</b> (rubrique L'application), jamais celui
+              de ce Google Sheets. Seuls les comptes Google
+              <?= organisation ?>
+              peuvent ouvrir l'application ; elle n'a pas de code : qui l'ouvre peut voir et modifier les
+              réservations.
+            </p>
+          </div>
+          <p class="message" id="msgInstallation" role="status"></p>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      function $(id) {
+        return document.getElementById(id);
+      }
+      function texteErreur(e) {
+        return ((e && e.message) || String(e)).replace(/^(Error|Exception|Erreur)\s*:\s*/, "");
+      }
+      function rubrique(nom) {
+        document
+          .querySelectorAll("[data-rubrique-lien]")
+          .forEach((b) => b.setAttribute("aria-current", b.dataset.rubriqueLien === nom ? "page" : "false"));
+        document.querySelectorAll("[data-rubrique]").forEach((r) => (r.hidden = r.dataset.rubrique !== nom));
+      }
+      document
+        .querySelectorAll("[data-rubrique-lien]")
+        .forEach((b) => b.addEventListener("click", () => rubrique(b.dataset.rubriqueLien)));
+
+      // --- L'application : lien des PC de l'accueil ---
+      google.script.run
+        .withSuccessHandler((r) => {
+          $("gesChargement").hidden = true;
+          $("gesPasEnLigne").hidden = !!r.adresse;
+          $("gesEnLigne").hidden = !r.adresse;
+          $("gesLien").textContent = r.adresse;
+          $("gesOuvrir").href = r.adresse || "#";
+          $("gesMagasin").textContent = r.magasin;
+        })
+        .withFailureHandler((e) => {
+          $("gesChargement").hidden = true;
+          $("msgAppli").textContent = texteErreur(e);
+        })
+        .etatApplication();
+      $("gesCopier").addEventListener("click", function () {
+        const bouton = this;
+        const choisir = () => {
+          const r = document.createRange();
+          r.selectNodeContents($("gesLien"));
+          getSelection().removeAllRanges();
+          getSelection().addRange(r);
+        };
+        try {
+          navigator.clipboard.writeText($("gesLien").textContent).then(() => {
+            bouton.textContent = "Copié ✓";
+            setTimeout(() => (bouton.textContent = "Copier"), 2000);
+          }, choisir);
+        } catch (e) {
+          choisir();
+        }
+      });
+
+      // --- Installation ---
+      $("gesVerifier").addEventListener("click", function () {
+        const bouton = this;
+        bouton.disabled = true;
+        $("msgInstallation").textContent = "";
+        google.script.run
+          .withSuccessHandler((rapport) => {
+            bouton.disabled = false;
+            $("gesRapport").textContent = rapport;
+            $("gesRapport").hidden = false;
+          })
+          .withFailureHandler((e) => {
+            bouton.disabled = false;
+            $("msgInstallation").textContent = texteErreur(e);
+          })
+          .installerDepuisGestion();
+      });
+      // L'assistant remplace cette fenêtre
+      $("gesAssistant").addEventListener("click", function () {
+        this.disabled = true;
+        google.script.run
+          .withFailureHandler((e) => {
+            this.disabled = false;
+            $("msgInstallation").textContent = texteErreur(e);
+          })
+          .ouvrirAssistant();
+      });
+    </script>
+  </body>
+</html>

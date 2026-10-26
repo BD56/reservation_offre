@@ -14,11 +14,15 @@ Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**
 - **Arrivages.gs** — arrivages par lot : quantité reçue d'un article répartie entre les
   clients (`enregistrerArrivage`, la plus ancienne réservation d'abord, même en partie),
   remise au client (`remettre`, retrait partiel permis). Règle : reçu = attribué + en stock.
+- **Assistant.gs** — assistant d'installation (bouton vert de l'onglet « Démarrer » de la
+  copie du modèle) : autorisations Google vérifiées case par case, nom du magasin, mise en
+  ligne guidée, lien des PC de l'accueil ; `preparerModele` (pour l'auteur, sur le modèle).
+  Réservé aux personnes qui ont accès au Google Sheets (`exigerEditeur_`).
 - **Application.gs** — `doGet`, `include_`, outils communs (`avecVerrou_`, `texte_`, `nouvelId_`…).
 - **Copie.gs** — copie de la page : toutes les offres + réservations des offres actives
   (glissée dans la page par `doGet`, rechargée par `chargerCopie`).
-- **Installation.gs** — onglets et en-têtes créés par le code (`installerFeuilles_`, menu
-  du Sheet `onOpen` → `installerDepuisMenu`), contrôle « tous les fichiers à la même version ».
+- **Installation.gs** — onglets et en-têtes créés par le code (`installerFeuilles_`,
+  `installer_`), contrôle « tous les fichiers à la même version ».
 - **Operations.gs** — offres : détail (offres terminées), création, modification, suppression
   en cascade (onglets réécrits en une fois). Chaque modification renvoie la copie à jour.
 - **Reglages.gs** — réglages du magasin (nom avec l'article, titre de l'onglet), modifiés
@@ -27,6 +31,11 @@ Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**
 - **Reservations.gs** — enregistrement d'une réservation (identifiant donné par la page :
   un réessai n'écrit pas deux fois) et de ses articles, changement d'état, modification
   (client, articles, état) et suppression d'une réservation.
+- **Sheet.gs** — menu du Google Sheets « 🚀 APPLICATION → ⚙️ Gestion de l'application »
+  (`onOpen`, `ouvrirGestion`, `installerDepuisGestion`).
+- **appsscript.json** — manifeste : autorisations déclarées (`oauthScopes` = celles que
+  l'assistant vérifie), application exécutée sous le compte qui déploie, ouverte aux
+  comptes du domaine Carrefour (`access: DOMAIN`).
 
 Page :
 - **Index.html** — squelette (+ `COPIE_INITIALE` injectée) qui inclut **Style.html** (style
@@ -36,6 +45,11 @@ Page :
   réservations d'une offre, fiche, éditeur d'offre), **ScriptImpression** (feuille de
   préparation) — `<?!= include_('Nom') ?>`. **Aucune ressource externe** (plus de Bootstrap
   ni de CDN).
+
+Fenêtres du Google Sheets (pages complètes) : **FenetreAssistant.html** (assistant en 4
+écrans : Préparation, Votre magasin, Mise en ligne, Le PC de l'accueil) et
+**FenetreGestion.html** (L'application : lien des PC ; Installation : Vérifier, Ouvrir
+l'assistant, règles d'accès).
 
 ## Écrans
 - **Nouvelle réservation** : offre (menu déroulant ; reste choisie pour le client suivant),
@@ -69,41 +83,23 @@ Page :
 Les fonctions serveur dont le nom finit par `_` ne sont pas appelables depuis la page.
 
 ## Installer pour un nouveau magasin
-Voir **[`INSTALLATION.md`](INSTALLATION.md)** : un classeur **modèle vierge** contenant le
-code, copié par chaque magasin (lien `/copy`), puis 🧰 Installer, déploiement et ⚙️
-Réglages du magasin. Aucun copier-coller de code pour le magasin.
+Comme l'app chèques : un **modèle vierge** (Google Sheets avec le code et l'onglet
+« Démarrer ») que chaque magasin copie (lien `/copy`, donné par l'auteur). Dans la copie,
+le bouton vert **▶ Installer l'application** ouvre l'assistant, qui guide jusqu'au PC de
+l'accueil. Aucun copier-coller de code pour le magasin. À envoyer avec le lien :
+[`docs/guide/avant-d-installer.md`](docs/guide/avant-d-installer.md).
 
 Les onglets `Operations`, `Reservations`, `Articles` et `Arrivages` (et leurs en-têtes) sont
-**créés par le code** : à la première ouverture de l'application, ou par le menu du Sheet
-**🚀 APPLICATION → 🧰 Installer / vérifier l'installation** (compte rendu : ce qui a été
-créé, réglages hérités d'une copie effacés, fichiers manquants, version). Rien n'est
-jamais écrasé : sur un classeur déjà en service, seules les cases d'en-tête vides sont
-complétées. Après une mise à jour qui ajoute des colonnes ou un onglet (numéro `SCHEMA`
-de `00_Constantes.gs`), la première ouverture de l'application les ajoute d'elle-même.
+**créés par le code** (assistant, « Vérifier » de la fenêtre Gestion, ou première ouverture
+de l'application). Rien n'est jamais écrasé : sur un classeur déjà en service, seules les
+cases d'en-tête vides sont complétées. Une copie repart sans les réglages hérités.
 
-## Mettre à jour l'application en service
-Chaque fichier porte le même numéro de version. S'il manque un fichier ou qu'un fichier
-est resté à l'ancienne version, la page affiche **« Installation incomplète »** au lieu
-d'une application à moitié à jour.
-
-### Sans outil (copier-coller dans l'éditeur Apps Script)
-1. **Première fois après le découpage :** dans l'éditeur, **supprimer `Code.gs`**
-   (sinon Google refuse de lancer le projet : noms déclarés deux fois), puis créer les
-   fichiers manquants avec **exactement** les mêmes noms (`+` → Script / HTML, sans
-   l'extension). Mise à jour « arrivages » : créer **`Arrivages.gs`** ; mise à jour
-   « réglages » : créer **`Reglages.gs`**.
-2. Pour chaque fichier `.gs` / `.html` : tout sélectionner, coller le contenu **Raw** de
-   GitHub, enregistrer.
-3. **Déployer → Gérer les déploiements → ✏️ sur le déploiement existant → Version :
-   Nouvelle version → Déployer** (même URL, ne pas créer de nouveau déploiement).
-
-### Avec clasp (depuis un ordinateur)
-1. Une fois : `npm install`, copier `.clasp.json.exemple` en `.clasp.json` avec
-   l'identifiant du script, puis **`npx clasp pull`** pour récupérer le vrai manifeste
-   `appsscript.json` (il n'est pas encore dans le dépôt : ne pas en inventer un, il
-   contient les droits d'accès du déploiement) et le committer.
-2. Ensuite : `npm run push` (vérifie les numéros de version puis envoie), puis
-   « Nouvelle version » sur le déploiement existant comme ci-dessus.
+## Modèle, mises à jour, secours
+Voir **[`DEPLOIEMENT.md`](DEPLOIEMENT.md)** : créer et mettre à jour le modèle
+(`preparerModele`), mettre à jour une installation (`npm run push`, Vérifier, « Nouvelle
+version » du déploiement), secours sans clasp. Chaque fichier porte le même numéro de
+version : s'il manque un fichier ou qu'un fichier est resté à l'ancienne version, la page
+affiche **« Installation incomplète »** au lieu d'une application à moitié à jour.
 
 ## Outils de développement
 - `npm test` — tests hors ligne : faux Google Sheets (imite la conversion automatique :

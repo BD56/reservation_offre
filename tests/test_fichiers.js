@@ -66,20 +66,50 @@ try {
       "deleteOperation",
       "deleteReservation",
       "doGet",
+      "enregistrerAdresseApplication",
       "enregistrerArrivage",
       "enregistrerReglages",
+      "enregistrerReglagesAssistant",
+      "etatApplication",
+      "etatAutorisations",
+      "etatMiseEnLigne",
       "getOperationDetails",
-      "installerDepuisMenu",
+      "installerDepuisGestion",
+      "lireReglagesAssistant",
       "onOpen",
+      "ouvrirAssistant",
+      "ouvrirGestion",
+      "preparerInstallation",
+      "preparerModele",
       "remettre",
       "saveOperation",
       "saveReservation",
+      "terminerAssistant",
       "updateOperation",
       "updateReservation",
       "updateReservationStatus",
     ],
     "fonctions appelables depuis la page"
   );
+
+  // Manifeste : autorisations déclarées = celles que l'assistant vérifie ; application ouverte
+  // aux comptes de l'entreprise, exécutée sous le compte qui déploie
+  const manifeste = JSON.parse(fs.readFileSync(repo + "/appsscript.json", "utf8"));
+  const ctx = vm.createContext({});
+  vm.runInContext(fs.readFileSync(repo + "/00_Constantes.gs", "utf8"), ctx);
+  assert.deepStrictEqual(
+    manifeste.oauthScopes,
+    JSON.parse(JSON.stringify(vm.runInContext("AUTORISATIONS_VERIFIEES", ctx)))
+  );
+  assert.deepStrictEqual(manifeste.webapp, { executeAs: "USER_DEPLOYING", access: "DOMAIN" });
+  assert.strictEqual(manifeste.timeZone, "Europe/Paris");
+  // Fenêtres du Google Sheets : pages complètes (jamais incluses dans Index.html), listées
+  // dans le contrôle de l'installation
+  const pagesListees = JSON.parse(JSON.stringify(vm.runInContext("FICHIERS_PAGE", ctx)));
+  for (const f of fs.readdirSync(repo).filter((x) => /^Fenetre\w+\.html$/.test(x))) {
+    assert.ok(pagesListees.includes(f.replace(".html", "")), f + " dans FICHIERS_PAGE");
+    assert.match(fs.readFileSync(repo + "/" + f, "utf8"), /^<!doctype html>/i, f + " : page complète");
+  }
 
   // --- Page ---
   const index = fs.readFileSync(repo + "/Index.html", "utf8");

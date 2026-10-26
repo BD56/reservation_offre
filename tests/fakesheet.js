@@ -42,6 +42,45 @@ class FakeSheet {
     while (this.cells.length < r) this.cells.push([]);
     this.cells[r - 1][c - 1] = v;
   }
+  // Mise en page (onglet « Démarrer ») et images-boutons
+  setHiddenGridlines() {
+    return this;
+  }
+  setColumnWidth() {
+    return this;
+  }
+  setRowHeights() {
+    return this;
+  }
+  insertImage(blob, colonne, ligne) {
+    const image = {
+      blob,
+      colonne,
+      ligne,
+      script: null,
+      setWidth(l) {
+        this.largeur = l;
+        return this;
+      },
+      setHeight(h) {
+        this.hauteur = h;
+        return this;
+      },
+      setAltTextTitle(t) {
+        this.titre = t;
+        return this;
+      },
+      assignScript(f) {
+        this.script = f;
+        return this;
+      },
+    };
+    this.images = (this.images || []).concat([image]);
+    return image;
+  }
+  getImages() {
+    return this.images || [];
+  }
   getLastRow() {
     for (let r = this.cells.length; r >= 1; r--)
       if ((this.cells[r - 1] || []).some((v) => v !== "" && v !== undefined && v !== null)) return r;
@@ -134,6 +173,12 @@ class FakeRange {
   setFontWeight() {
     return this;
   }
+  setFontSize() {
+    return this;
+  }
+  setWrap() {
+    return this;
+  }
   setNumberFormat() {
     return this;
   }
@@ -172,11 +217,25 @@ function makeSpreadsheet(env) {
   return {
     getSheetByName: (n) => env.sheets[n] || null,
     getSheets: () => Object.values(env.sheets),
-    insertSheet: (name) => {
+    getName: () => env.nomClasseur || "Réservations",
+    rename: (n) => {
+      env.nomClasseur = n;
+    },
+    // Position respectée (onglet inséré en tête : index 0)
+    insertSheet: (name, index) => {
       const s = new FakeSheet(name);
-      env.sheets[name] = s;
+      const noms = Object.keys(env.sheets);
+      noms.splice(index === undefined ? noms.length : index, 0, name);
+      const avant = Object.assign({}, env.sheets);
+      for (const n of Object.keys(env.sheets)) delete env.sheets[n];
+      for (const n of noms) env.sheets[n] = n === name ? s : avant[n];
       return s;
     },
+    setActiveSheet: (s) => {
+      env.feuilleActive = s.getName();
+      return s;
+    },
+    moveActiveSheet() {},
     getNumSheets: () => Object.keys(env.sheets).length,
     deleteSheet: (s) => {
       delete env.sheets[s.getName()];

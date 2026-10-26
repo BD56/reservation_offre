@@ -3,7 +3,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_00_Constantes_() {
-  return "2026.10.26-1645";
+  return "2026.10.26-1833";
 }
 
 // Onglets du classeur
@@ -53,16 +53,45 @@ const ETAT_RETIRE = "Retrait";
 // réponse perdue renvoie le même identifiant et ne crée pas de double.
 const FORMAT_ID_RES = /^RES-\d{10,}-[0-9a-f]{4}$/;
 
+// Assistant d'installation (voir Assistant.gs) : onglet d'accueil du modèle, retiré à la fin.
+const FEUILLE_DEMARRER = "Démarrer";
+// Nom du Google Sheets donné par l'assistant (« Réservations des offres — l'Hypermarché X »),
+// seulement s'il porte encore le nom donné par Google à la copie (jamais le modèle, jamais
+// un nom choisi par le manager).
+const NOM_APPLICATION = "Réservations des offres";
+const NOM_COPIE_GOOGLE = /^(Copie de|Copy of) /;
+// Qui peut ouvrir l'application (déploiement « Application Web », appsscript.json :
+// access DOMAIN) : les comptes Google de l'entreprise. Nom cité dans les fenêtres.
+const ORGANISATION = "Carrefour";
+// Autorisations Google vérifiées (consentement case par case : une case peut rester
+// décochée, ou sauter lors d'une nouvelle autorisation, par ex. au déploiement). Sans
+// Google Sheets, rien ne marche ; sans l'adresse e-mail, le propriétaire n'est plus
+// reconnu ; sans les fenêtres, ni assistant ni « Gestion de l'application ». Mêmes
+// valeurs que « oauthScopes » dans appsscript.json (test_fichiers).
+const AUTORISATIONS_VERIFIEES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/script.container.ui",
+];
+// Menu du Sheet (cf. Sheet.gs) : chemin cité dans les messages
+const MENU_GESTION = "menu 🚀 APPLICATION → ⚙️ Gestion de l'application";
+const MESSAGE_AUTORISATION_INCOMPLETE =
+  "Autorisation Google incomplète (une case n'a pas été cochée) : " +
+  MENU_GESTION +
+  ", puis cochez « Tout sélectionner » sur l'écran de Google.";
+
 // Fichiers de l'application (contrôle de l'installation : tous présents, même version)
 const FICHIERS_SERVEUR = [
   "00_Constantes",
   "Application",
   "Arrivages",
+  "Assistant",
   "Copie",
   "Installation",
   "Operations",
   "Reglages",
   "Reservations",
+  "Sheet",
 ];
 const FICHIERS_PAGE = [
   "Index",
@@ -73,4 +102,6 @@ const FICHIERS_PAGE = [
   "ScriptImpression",
   "ScriptOffres",
   "ScriptSaisie",
+  "FenetreAssistant",
+  "FenetreGestion",
 ];

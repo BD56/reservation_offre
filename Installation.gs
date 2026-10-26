@@ -1,10 +1,12 @@
 // Installation : onglets et colonnes du Google Sheets créés par le code (rien n'est jamais
-// écrasé), réglages hérités d'une copie effacés (nettoyerSiCopie_), menu du Sheet, et contrôle « tous les fichiers présents et au même numéro de
-// version » (sinon page « Installation incomplète » au lieu d'une application à moitié à jour).
+// écrasé), réglages hérités d'une copie effacés (nettoyerSiCopie_), et contrôle « tous les
+// fichiers présents et au même numéro de version » (sinon page « Installation incomplète »
+// au lieu d'une application à moitié à jour). Lancée par l'assistant (Assistant.gs) et par
+// « Gestion de l'application » → Vérifier (Sheet.gs).
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Installation_() {
-  return "2026.10.26-1645";
+  return "2026.10.26-1833";
 }
 
 // Liste des problèmes (vide si tout va bien). La version de référence est celle de ce fichier.
@@ -129,23 +131,4 @@ function installer_() {
   rapport.push("Version " + version_Installation_() + ".");
   Logger.log(rapport.join("\n"));
   return rapport.join("\n");
-}
-
-// Menu du Google Sheets → « 🧰 Installer / vérifier l'installation »
-function installerDepuisMenu() {
-  const ui = SpreadsheetApp.getUi(); // échoue hors du Google Sheets : rien n'est fait
-  ui.alert(
-    "🧰 Installation",
-    installer_() +
-      "\n\nSi l'application n'est pas encore en ligne : Extensions → Apps Script → " +
-      "Déployer → Nouveau déploiement → Application Web.",
-    ui.ButtonSet.OK
-  );
-}
-
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu("🚀 APPLICATION")
-    .addItem("🧰 Installer / vérifier l'installation", "installerDepuisMenu")
-    .addToUi();
 }

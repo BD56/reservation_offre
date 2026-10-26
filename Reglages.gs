@@ -5,7 +5,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Reglages_() {
-  return "2026.10.26-1645";
+  return "2026.10.26-1833";
 }
 
 // Clé absente = valeur par défaut (l'existant : Carrefour Vannes)
@@ -57,4 +57,14 @@ function nettoyerSiCopie_() {
   if (marque) props.deleteAllProperties();
   props.setProperty("ID_CLASSEUR", id);
   return !!marque;
+}
+
+// Copie pas encore installée ? (lecture seule, utilisable dans onOpen)
+function estCopieNonInstallee_() {
+  try {
+    const marque = PropertiesService.getDocumentProperties().getProperty("ID_CLASSEUR");
+    return !!marque && marque !== SpreadsheetApp.getActiveSpreadsheet().getId();
+  } catch (e) {
+    return false;
+  }
 }
