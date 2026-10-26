@@ -28,6 +28,7 @@ function makeEnv(opts = {}) {
     alertes: [], // fenêtres affichées dans le Google Sheets
   };
   env.props = makeProps(opts.props);
+  env.idClasseur = opts.idClasseur || "CLASSEUR-TEST";
   const ss = makeSpreadsheet(env);
   env.ctx = loadCode(opts.repo, {
     LockService: {

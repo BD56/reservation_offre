@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-version="2026.10.25-1128">
+<html lang="fr" data-version="2026.10.26-1645">
   <head>
     <base target="_top">
     <?!= include_('Style') ?>
@@ -19,6 +19,7 @@
         </nav>
         <div class="espace"></div>
         <span class="puce envoi" id="indicateurEnvoi" role="status" hidden><span class="rond"></span><span id="txtEnvoi"></span></span>
+        <button type="button" class="icone-btn" id="btnReglages" title="Réglages du magasin" aria-label="Réglages du magasin"><svg class="ico"><use href="#i-reglages"/></svg></button>
         <button type="button" class="icone-btn" id="btnAide" title="Aide" aria-label="Aide"><svg class="ico"><use href="#i-aide"/></svg></button>
       </header>
 
@@ -172,10 +173,25 @@
           <div class="tete neutre"><svg class="ico"><use href="#i-livre"/></svg><div><b id="mentionsTitre">Mentions légales</b></div><button type="button" class="icone-btn" data-fermer="voileMentions" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
           <div class="texte-fenetre">
             <p><b>© 2026 DESJARDINS Bryan - Tous droits réservés.</b></p>
-            <p>L'autorisation d'utiliser cette application est accordée exclusivement à l'<b>Hypermarché Carrefour Vannes</b>. Toute reproduction, copie, modification ou déploiement de cet outil vers une autre structure est strictement interdite sans l'accord préalable de l'auteur.</p>
+            <p>Cette application, son code et sa conception demeurent la propriété exclusive de l'auteur, qui en conserve l'intégralité des droits. L'auteur concède à <b id="txtNomMagasin"></b> une simple licence d'utilisation non exclusive, non cessible et révocable à tout moment, dans les conditions convenues par écrit avec l'auteur, sans transfert d'aucun droit de propriété. L'auteur reste libre de faire évoluer, suspendre ou retirer cette autorisation quand il le souhaite, ainsi que d'exploiter, céder ou proposer l'outil à toute autre structure de son choix. Toute reproduction, copie, modification ou déploiement de cet outil par un tiers, sans l'accord écrit préalable de l'auteur, est strictement interdit. Les données saisies restent la propriété de l'établissement, qui les conserve en cas de retrait de l'autorisation.</p>
             <p><b>Confidentialité et Données :</b> cet outil a été pensé et conçu pour un usage strictement interne, dédié à la gestion des réservations. Les données saisies (Identités, Contacts téléphoniques ou mails, etc.) sont stockées et archivées de manière sécurisée à des fins de traçabilité de l'offre, et ne sont en aucun cas prévues pour être cédées ou transmises à des tiers.</p>
             <p><b>Responsabilité :</b> l'auteur fournit uniquement l'infrastructure technique de cette application. La responsabilité quant à l'utilisation conforme de l'outil et au traitement légal des données collectées (respect du RGPD) incombe exclusivement à la direction de l'établissement utilisateur. L'auteur décline toute responsabilité en cas d'usage abusif, détourné ou négligent de ces informations par l'établissement.</p>
           </div>
+        </div>
+      </div>
+
+      <!-- Réglages du magasin (sans code : rien de sensible) -->
+      <div class="voile centre" id="voileReglages" hidden>
+        <div class="fenetre-form etroite" role="dialog" aria-modal="true" aria-labelledby="reglagesTitre">
+          <div class="tiroir-tete"><h2 id="reglagesTitre">Réglages du magasin</h2><button type="button" class="icone-btn" data-fermer="voileReglages" aria-label="Fermer"><svg class="ico"><use href="#i-fermer"/></svg></button></div>
+          <div class="tiroir-corps">
+            <div class="champ"><label for="rNomMagasin">Nom du magasin, avec l'article</label><input id="rNomMagasin" maxlength="80" placeholder="Ex. : l'Hypermarché Carrefour Vannes"></div>
+            <p class="indice" id="rApercu"></p>
+            <div class="champ"><label for="rTitre">Titre de l'onglet du navigateur</label><input id="rTitre" maxlength="80" placeholder="Ex. : Application de Réservations"></div>
+            <p class="indice">Le nouveau titre s'affiche à la prochaine ouverture de l'application.</p>
+            <p class="erreur-texte" id="rErreur" role="status"></p>
+          </div>
+          <div class="tiroir-pied"><button type="button" class="plein" id="rEnregistrer">Enregistrer les réglages</button></div>
         </div>
       </div>
 
@@ -190,6 +206,7 @@
             <p><b>Modifier ou supprimer une réservation :</b> cliquez sur la ligne du client (état, coordonnées, quantités commandées, arrivées et remises). On ne peut donner à un client que ce qui est en stock ; ce qu'on lui retire retourne en stock.</p>
             <p><b>Déjà inscrit :</b> même nom et même téléphone ou email sur la même offre → une alerte propose de modifier la réservation existante.</p>
             <p><b>Feuille de préparation :</b> totaux à préparer et liste à pointer, triée par nom (les annulées ne comptent pas).</p>
+            <p><b>Réglages du magasin (⚙️) :</b> nom du magasin (mentions légales) et titre de l'onglet.</p>
             <p><b>Réservation NON enregistrée :</b> la connexion a été perdue ou le serveur a refusé. « Réessayer » ne crée jamais de double.</p>
           </div>
         </div>
@@ -205,6 +222,8 @@
       // Offres et réservations des offres actives, glissées dans la page par doGet (null si
       // la lecture a échoué : la page les demande alors au serveur).
       const COPIE_INITIALE = <?!= copieJson ?>;
+      // Réglages du magasin (nom avec l'article, titre de l'onglet)
+      const REGLAGES_INITIAUX = <?!= reglagesJson ?>;
     </script>
     <?!= include_('ScriptCommun') ?>
     <?!= include_('ScriptCopie') ?>

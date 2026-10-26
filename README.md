@@ -21,6 +21,9 @@ Serveur (une seule portée globale : **un nom déclaré dans deux .gs = erreur**
   du Sheet `onOpen` → `installerDepuisMenu`), contrôle « tous les fichiers à la même version ».
 - **Operations.gs** — offres : détail (offres terminées), création, modification, suppression
   en cascade (onglets réécrits en une fois). Chaque modification renvoie la copie à jour.
+- **Reglages.gs** — réglages du magasin (nom avec l'article, titre de l'onglet), modifiés
+  dans l'application (⚙️, sans code) ; une copie du classeur repart sans les réglages
+  hérités (`nettoyerSiCopie_`, marque `ID_CLASSEUR`).
 - **Reservations.gs** — enregistrement d'une réservation (identifiant donné par la page :
   un réessai n'écrit pas deux fois) et de ses articles, changement d'état, modification
   (client, articles, état) et suppression d'une réservation.
@@ -65,18 +68,18 @@ Page :
 
 Les fonctions serveur dont le nom finit par `_` ne sont pas appelables depuis la page.
 
-## Installer sur un nouveau Google Sheets
+## Installer pour un nouveau magasin
+Voir **[`INSTALLATION.md`](INSTALLATION.md)** : un classeur **modèle vierge** contenant le
+code, copié par chaque magasin (lien `/copy`), puis 🧰 Installer, déploiement et ⚙️
+Réglages du magasin. Aucun copier-coller de code pour le magasin.
+
 Les onglets `Operations`, `Reservations`, `Articles` et `Arrivages` (et leurs en-têtes) sont
 **créés par le code** : à la première ouverture de l'application, ou par le menu du Sheet
 **🚀 APPLICATION → 🧰 Installer / vérifier l'installation** (compte rendu : ce qui a été
-créé, fichiers manquants, version). Rien n'est jamais écrasé : sur un classeur déjà en
-service, seules les cases d'en-tête vides sont complétées. Après une mise à jour qui ajoute des
-colonnes ou un onglet (numéro `SCHEMA` de `00_Constantes.gs`), la première ouverture de
-l'application les ajoute d'elle-même.
-1. Créer un Google Sheets vide, puis Extensions → Apps Script.
-2. Créer les fichiers du dépôt (`.gs` et `.html`, mêmes noms) et y coller leur contenu.
-3. Recharger le Sheet → menu 🚀 APPLICATION → 🧰 Installer (accepter les autorisations).
-4. Déployer → Nouveau déploiement → Application Web.
+créé, réglages hérités d'une copie effacés, fichiers manquants, version). Rien n'est
+jamais écrasé : sur un classeur déjà en service, seules les cases d'en-tête vides sont
+complétées. Après une mise à jour qui ajoute des colonnes ou un onglet (numéro `SCHEMA`
+de `00_Constantes.gs`), la première ouverture de l'application les ajoute d'elle-même.
 
 ## Mettre à jour l'application en service
 Chaque fichier porte le même numéro de version. S'il manque un fichier ou qu'un fichier
@@ -87,7 +90,8 @@ d'une application à moitié à jour.
 1. **Première fois après le découpage :** dans l'éditeur, **supprimer `Code.gs`**
    (sinon Google refuse de lancer le projet : noms déclarés deux fois), puis créer les
    fichiers manquants avec **exactement** les mêmes noms (`+` → Script / HTML, sans
-   l'extension). Mise à jour « arrivages » : créer **`Arrivages.gs`**.
+   l'extension). Mise à jour « arrivages » : créer **`Arrivages.gs`** ; mise à jour
+   « réglages » : créer **`Reglages.gs`**.
 2. Pour chaque fichier `.gs` / `.html` : tout sélectionner, coller le contenu **Raw** de
    GitHub, enregistrer.
 3. **Déployer → Gérer les déploiements → ✏️ sur le déploiement existant → Version :

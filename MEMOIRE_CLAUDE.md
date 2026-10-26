@@ -1,6 +1,6 @@
 # Mémoire de travail — Claude
 
-> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-25.
+> Fichier de reprise après compactage du contexte. Dernière mise à jour : 2026-10-26.
 
 ## ▶️ État actuel
 - Branche de travail : `claude/happy-franklin-af909r` (pas de pull request).
@@ -149,14 +149,22 @@
    confirmée) ; éditeur d'offre (articles en puces) ; feuille de préparation (total,
    liste à pointer triée par nom, annulées en option).
 4. ✅ Arrivages par article (voir ci-dessus).
-5. **Prochaine étape validée (« ok ok », 25/10) : installateur par magasin**, comme l'app
-   chèques : modèle vierge + lien `/copy`, guide `INSTALLATION.md`, bouton ⚙️ Réglages
-   dans l'application SANS sécurité (« rien de sensible ») : nom du magasin (avec
-   l'article), titre peut-être ; valeurs par défaut = Vannes ; une copie n'hérite pas des
-   réglages (détection par ID_CLASSEUR, comme `nettoyerSiCopie_`) ; mentions légales
-   avec la formule de l'app chèques (licence non exclusive au nom du magasin réglé,
-   « dans les conditions convenues par écrit avec l'auteur »).
-   Sécurité : AUCUNE (décision de Bryan, 25/10).
+5. ✅ **Installateur par magasin** (« go » de Bryan, 26/10), comme l'app chèques mais
+   SANS sécurité (« rien de sensible ») : guide **`INSTALLATION.md`** (modèle vierge,
+   lien `/copy`, 🧰 Installer, déploiement, ⚙️ Réglages) ; **`Reglages.gs`** :
+   `reglages_()` (défauts = Vannes : « l'Hypermarché Carrefour Vannes », « Application
+   de Réservations »), `enregistrerReglages` (public, sans code, 80 caractères max,
+   jamais vide, espaces resserrés), `nettoyerSiCopie_` (marque `ID_CLASSEUR` ; copie →
+   toutes les propriétés effacées, données intactes ; appelé par `doGet`, `installer_`
+   — compte rendu « Copie d'un autre classeur… » — et `enregistrerReglages`). `doGet`
+   injecte `REGLAGES_INITIAUX` et met `TITRE_APP` en titre d'onglet. Page : bouton ⚙️
+   (en-tête), fenêtre « Réglages du magasin » (aperçu de la phrase des mentions) ;
+   mentions légales = formule de l'app chèques avec `#txtNomMagasin`. Tests
+   `test_reglages` + réglages dans `test_ui_offres`, `test_rendu` (nom injecté sans
+   `</script>`), `test_ui_textes_longs` (a trouvé : nom très long qui sortait des
+   mentions à 400 px, et Échap / clic à côté qui ne fermaient pas la fenêtre → corrigés).
+   **Point ouvert pour Bryan** : « Qui a accès » au déploiement (inconnu pour Vannes :
+   le manifeste n'est pas dans le dépôt) ; le guide présente les deux choix.
 6. RGPD : purge automatique (durée à décider), mentions.
 7. Documentation (AGENTS.md…).
 
@@ -172,6 +180,9 @@
 - Le manifeste `appsscript.json` réel (accès du déploiement) : le récupérer par
   `clasp pull` avant tout `npm run push`.
 - Première mise à jour après découpage : supprimer `Code.gs` dans l'éditeur.
+- Mise à jour « réglages » : créer **`Reglages.gs`** ; 1re ouverture = classeur marqué
+  (`ID_CLASSEUR`), titre et nom de Vannes inchangés. Tester une vraie copie (`/copy`) :
+  les propriétés du classeur sont-elles copiées par Google ? (géré dans les deux cas).
 - Mise à jour « arrivages » : créer le fichier **`Arrivages.gs`** dans l'éditeur ; à la
   1re ouverture, l'onglet `Arrivages` et les en-têtes Arrive / Remis doivent apparaître
   seuls (propriété SCHEMA) ; anciennes réservations « Retrait » affichées « Terminée »

@@ -1,5 +1,5 @@
 <!-- Outils communs : échappement, message bref, fenêtres, écrans, démarrage, aide et mentions. -->
-<script data-version="2026.10.25-1128">
+<script data-version="2026.10.26-1645">
   function $(id) {
     return document.getElementById(id);
   }
@@ -71,14 +71,15 @@
     .querySelectorAll("[data-fermer]")
     .forEach((b) => b.addEventListener("click", () => fermerVoile(b.dataset.fermer)));
   // Clic à côté d'une fenêtre : fermée (pas pour les alertes, qui demandent une réponse)
-  ["voileFiche", "voileOffre", "voileMentions", "voileFeuille", "aide"].forEach((id) =>
+  const FENETRES = ["voileFiche", "voileOffre", "voileMentions", "voileFeuille", "voileReglages", "aide"];
+  FENETRES.forEach((id) =>
     $(id).addEventListener("click", (e) => {
       if (e.target === $(id)) fermerVoile(id);
     })
   );
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
-    ["voileFiche", "voileOffre", "voileMentions", "voileFeuille", "aide"].forEach(fermerVoile);
+    FENETRES.forEach(fermerVoile);
   });
 
   // --- Écrans : saisie, offres, réservations d'une offre ---
@@ -111,8 +112,52 @@
   $("fermerAide").addEventListener("click", () => ($("aide").hidden = true));
   $("lienMentions").addEventListener("click", () => ouvrirVoile("voileMentions"));
 
+  // --- Réglages du magasin (sans code : rien de sensible) ---
+  let reglages = REGLAGES_INITIAUX || { NOM_MAGASIN: "", TITRE_APP: "" };
+  function appliquerReglages(r) {
+    reglages = r;
+    $("txtNomMagasin").textContent = r.NOM_MAGASIN;
+  }
+  function apercuReglages() {
+    const nom = $("rNomMagasin").value.trim();
+    $("rApercu").textContent = nom ? `Mentions légales : « L'auteur concède à ${nom} une licence… »` : "";
+  }
+  $("btnReglages").addEventListener("click", function () {
+    $("rNomMagasin").value = reglages.NOM_MAGASIN;
+    $("rTitre").value = reglages.TITRE_APP;
+    $("rErreur").textContent = "";
+    $("rEnregistrer").disabled = false;
+    apercuReglages();
+    ouvrirVoile("voileReglages");
+    $("rNomMagasin").focus();
+  });
+  $("rNomMagasin").addEventListener("input", apercuReglages);
+  $("rEnregistrer").addEventListener("click", function () {
+    const valeurs = { NOM_MAGASIN: $("rNomMagasin").value.trim(), TITRE_APP: $("rTitre").value.trim() };
+    if (!valeurs.NOM_MAGASIN) return refuserReglages("Indiquez le nom du magasin.", "rNomMagasin");
+    if (!valeurs.TITRE_APP) return refuserReglages("Indiquez le titre de l'onglet.", "rTitre");
+    const bouton = this;
+    bouton.disabled = true;
+    google.script.run
+      .withSuccessHandler(function (r) {
+        appliquerReglages(r);
+        fermerVoile("voileReglages");
+        showToast("Réglages enregistrés");
+      })
+      .withFailureHandler(function (err) {
+        bouton.disabled = false;
+        refuserReglages(messageErreur(err));
+      })
+      .enregistrerReglages(valeurs);
+  });
+  function refuserReglages(texte, idChamp) {
+    $("rErreur").textContent = texte;
+    if (idChamp) $(idChamp).focus();
+  }
+
   // Démarrage : la copie glissée dans la page suffit (aucun appel au serveur) ; sinon on la demande.
   document.addEventListener("DOMContentLoaded", function () {
+    appliquerReglages(reglages);
     if (COPIE_INITIALE) {
       appliquerCopie(COPIE_INITIALE);
     } else {

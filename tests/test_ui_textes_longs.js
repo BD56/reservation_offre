@@ -37,6 +37,7 @@ function preparer(env) {
   c.enregistrerArrivage(idOp, TRES_LONG, 4);
   const idArt = env.sheets.Articles.getDataRange().getValues()[1][0];
   c.remettre(env.ids.res, { [idArt]: 1 });
+  c.enregistrerReglages({ NOM_MAGASIN: LONG });
 }
 
 // Éléments dont un descendant sort (à droite) de la boîte, hors zones défilantes prévues
@@ -121,6 +122,14 @@ async function chevauchements(page) {
       await attendre(page, 150);
       assert.ok(await page.isVisible("#voileDoublon"));
       await verifier("doublon", "#voileDoublon .fenetre");
+      await page.click("#doublonStop");
+      // Réglages et mentions légales (nom du magasin très long)
+      await page.click("#btnReglages");
+      await verifier("réglages", "#voileReglages .fenetre-form");
+      await page.keyboard.press("Escape");
+      await page.click("#lienMentions");
+      await verifier("mentions", "#voileMentions .fenetre");
+      await page.keyboard.press("Escape");
       assert.strictEqual(
         await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
         false,

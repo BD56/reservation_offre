@@ -323,9 +323,39 @@ const repo = process.argv[2];
     // --- Mentions légales et aide ---
     await page.click("#ongletSaisie");
     await page.click("#lienMentions");
-    assert.match(await page.textContent("#voileMentions"), /Hypermarché Carrefour Vannes/);
+    assert.match(
+      await page.textContent("#voileMentions"),
+      /L'auteur concède à l'Hypermarché Carrefour Vannes une simple licence/
+    );
     await page.keyboard.press("Escape");
     assert.ok(!(await page.isVisible("#voileMentions")));
+    // Réglages du magasin (sans code)
+    await page.click("#btnReglages");
+    assert.strictEqual(await page.inputValue("#rNomMagasin"), "l'Hypermarché Carrefour Vannes");
+    assert.strictEqual(await page.inputValue("#rTitre"), "Application de Réservations");
+    await page.fill("#rNomMagasin", "le <b>Super U</b> de Lorient");
+    assert.match(await page.textContent("#rApercu"), /concède à le <b>Super U<\/b> de Lorient une licence/);
+    await page.fill("#rTitre", "");
+    await page.click("#rEnregistrer");
+    assert.match(await page.textContent("#rErreur"), /titre de l'onglet/);
+    await page.fill("#rTitre", "Réservations Lorient");
+    env.pannes.enregistrerReglages = "Quota dépassé";
+    await page.click("#rEnregistrer");
+    await attendre(page);
+    assert.match(await page.textContent("#rErreur"), /Quota dépassé/);
+    assert.ok(await page.isEnabled("#rEnregistrer"));
+    delete env.pannes.enregistrerReglages;
+    await page.click("#rEnregistrer");
+    await attendre(page);
+    assert.ok(!(await page.isVisible("#voileReglages")));
+    assert.match(await toast(), /Réglages enregistrés/);
+    assert.deepStrictEqual(
+      [env.props.getProperty("CFG_NOM_MAGASIN"), env.props.getProperty("CFG_TITRE_APP")],
+      ["le <b>Super U</b> de Lorient", "Réservations Lorient"]
+    );
+    await page.click("#lienMentions");
+    assert.match(await page.textContent("#voileMentions"), /concède à le <b>Super U<\/b> de Lorient une/);
+    await page.keyboard.press("Escape");
     // Aide en fenêtre centrée : fermée par la croix ou par un clic à côté
     await page.click("#btnAide");
     assert.ok(await page.isVisible("#aide .fenetre-form"));

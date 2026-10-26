@@ -67,6 +67,7 @@ try {
       "deleteReservation",
       "doGet",
       "enregistrerArrivage",
+      "enregistrerReglages",
       "getOperationDetails",
       "installerDepuisMenu",
       "onOpen",

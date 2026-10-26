@@ -4,7 +4,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Arrivages_() {
-  return "2026.10.25-1128";
+  return "2026.10.26-1645";
 }
 
 // Ligne d'article telle que l'application la lit. Arrivé / Remis vides = ligne d'avant le

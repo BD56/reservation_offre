@@ -1,10 +1,10 @@
 // Installation : onglets et colonnes du Google Sheets créés par le code (rien n'est jamais
-// écrasé), menu du Sheet, et contrôle « tous les fichiers présents et au même numéro de
+// écrasé), réglages hérités d'une copie effacés (nettoyerSiCopie_), menu du Sheet, et contrôle « tous les fichiers présents et au même numéro de
 // version » (sinon page « Installation incomplète » au lieu d'une application à moitié à jour).
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Installation_() {
-  return "2026.10.25-1128";
+  return "2026.10.26-1645";
 }
 
 // Liste des problèmes (vide si tout va bien). La version de référence est celle de ce fichier.
@@ -112,7 +112,9 @@ function installerFeuilles_() {
 
 // Installation complète (idempotente) : onglets, colonnes, contrôle des fichiers.
 function installer_() {
+  const copie = avecVerrou_(nettoyerSiCopie_);
   const rapport = installerFeuilles_();
+  if (copie) rapport.unshift("Copie d'un autre classeur : réglages hérités effacés (données intactes).");
   PropertiesService.getDocumentProperties().setProperty("SCHEMA", SCHEMA);
   let problemes = [];
   try {

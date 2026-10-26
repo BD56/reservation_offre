@@ -35,7 +35,8 @@ async function ouvrir(repo, opts = {}) {
   if (opts.preparer) opts.preparer(env); // données de départ (offres, réservations…)
   // Comme doGet : la copie est glissée dans la page (opts.sansCopie : lecture échouée -> null)
   const copieJson = opts.sansCopie ? "null" : env.ctx.jsonPourPage_(env.ctx.copie_());
-  const html = rendrePage(repo, { copieJson }).replace(
+  const reglagesJson = env.ctx.jsonPourPage_(env.ctx.reglages_());
+  const html = rendrePage(repo, { copieJson, reglagesJson }).replace(
     "<head>",
     // comme doGet (addMetaTag)
     '<head><meta name="viewport" content="width=device-width, initial-scale=1"><script>' + PROXY + "</script>"

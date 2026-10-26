@@ -18,8 +18,10 @@ try {
     email: "",
     articles: [],
   });
+  env.ctx.enregistrerReglages({ NOM_MAGASIN: "</script><script>window.__xss=2</script>" });
+  const reglagesJson = env.ctx.jsonPourPage_(env.ctx.reglages_());
   for (const copieJson of ["null", env.ctx.jsonPourPage_(env.ctx.copie_())]) {
-    const rendu = rendrePage(repo, { copieJson });
+    const rendu = rendrePage(repo, { copieJson, reglagesJson });
     assert.ok(!/<\?/.test(rendu), "aucune balise de modèle restante");
     let n = 0;
     for (const m of rendu.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)) {
@@ -39,6 +41,12 @@ try {
       const noms = copie.reservations[env.ids.foie].map((r) => r.nom);
       assert.ok(noms.includes("</script><script>window.__xss=1</script>"), "nom relu à l'identique");
     } else assert.strictEqual(copie, null);
+    const reglages = new Function("return " + rendu.match(/const REGLAGES_INITIAUX = (.*);/)[1])();
+    assert.strictEqual(
+      reglages.NOM_MAGASIN,
+      "</script><script>window.__xss=2</script>",
+      "réglage relu à l'identique"
+    );
   }
   console.log("test_rendu : OK");
 } catch (e) {

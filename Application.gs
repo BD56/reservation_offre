@@ -2,7 +2,7 @@
 
 // Même numéro dans tous les fichiers : contrôle de l'installation (outils/version.js).
 function version_Application_() {
-  return "2026.10.25-1128";
+  return "2026.10.26-1645";
 }
 
 function doGet() {
@@ -13,6 +13,9 @@ function doGet() {
   // complétée à l'ouverture (rien n'est écrasé)
   try {
     const props = PropertiesService.getDocumentProperties();
+    // Copie d'un autre classeur : réglages hérités effacés (une seule fois, sous verrou)
+    if (props.getProperty("ID_CLASSEUR") !== SpreadsheetApp.getActiveSpreadsheet().getId())
+      avecVerrou_(nettoyerSiCopie_);
     if (props.getProperty("SCHEMA") !== SCHEMA || feuillesManquantes_().length) {
       avecVerrou_(installerFeuilles_);
       props.setProperty("SCHEMA", SCHEMA);
@@ -23,11 +26,23 @@ function doGet() {
   const page = HtmlService.createTemplateFromFile("Index");
   // Offres et réservations glissées dans la page : affichage immédiat, sans appel au serveur
   page.copieJson = jsonPourPage_(copieSure_());
+  const reglages = reglagesSurs_();
+  page.reglagesJson = jsonPourPage_(reglages);
   return page
     .evaluate()
-    .setTitle("Application de Réservations")
+    .setTitle(reglages.TITRE_APP)
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// Pour doGet : une lecture impossible n'empêche jamais la page de s'ouvrir
+function reglagesSurs_() {
+  try {
+    return reglages_();
+  } catch (e) {
+    Logger.log("Réglages illisibles : " + e);
+    return Object.assign({}, REGLAGES_DEFAUTS);
+  }
 }
 
 // Morceaux de la page (Style.html, Script*.html), insérés tels quels dans Index.html
